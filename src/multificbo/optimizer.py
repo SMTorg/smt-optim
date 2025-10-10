@@ -8,7 +8,6 @@ from typing import Any, Callable, List, Optional, Union
 
 import pickle
 
-
 from multificbo.surrogate_models import Surrogate
 from multificbo.acquisition_strategies import AcquisitionStrategy
 

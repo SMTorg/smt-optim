@@ -8,6 +8,7 @@ from multificbo.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, V
 
 def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
          max_iter: int = 100,
+         xt_init: list = None,
          log: str = "log") -> dict:
 
     # set objective
@@ -39,6 +40,7 @@ def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
     optim_config = OptimizerConfig(
         constraints=    cstr_config,
         max_iter=       max_iter,
+        xt_init=        xt_init,
         log_filename=   log,
     )
 
@@ -54,6 +56,7 @@ def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
 
 def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
            max_iter: int = 100,
+           xt_init: list = None,
            log: str = "log") -> dict:
 
     # set objective
@@ -81,6 +84,7 @@ def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constrain
     optim_config = OptimizerConfig(
         constraints=    cstr_config,
         max_iter=       max_iter,
+        xt_init=        xt_init,
         log_filename=   log,
     )
 
@@ -96,6 +100,7 @@ def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constrain
 
 def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
          max_iter: int = 100,
+         xt_init: list = None,
          log: str = "log",
          verbose: bool = False) -> dict:
 
@@ -124,6 +129,7 @@ def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints
     optim_config = OptimizerConfig(
         constraints=    cstr_config,
         max_iter=       max_iter,
+        xt_init=        xt_init,
         log_filename=   log,
         verbose=        verbose,
     )

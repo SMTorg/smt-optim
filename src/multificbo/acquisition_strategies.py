@@ -80,7 +80,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         scipy_cstr = []
         if constrained:
-            scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_value(x.reshape(1, -1))} for c_gp in
+            scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_value(x.reshape(1, -1)).ravel()} for c_gp in
                           cstr_surrogates]
 
         for i in range(acq_x0.shape[0]):
