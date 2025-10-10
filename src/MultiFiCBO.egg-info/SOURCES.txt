@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+setup.cfg
+src/MultiFiCBO.egg-info/PKG-INFO
+src/MultiFiCBO.egg-info/SOURCES.txt
+src/MultiFiCBO.egg-info/dependency_links.txt
+src/MultiFiCBO.egg-info/requires.txt
+src/MultiFiCBO.egg-info/top_level.txt
