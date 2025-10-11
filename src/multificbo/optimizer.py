@@ -294,11 +294,22 @@ class Optimizer():
         self.acq_strategy = self.strategy(optimizer=self)
 
     def update_f_min(self):
-        feasible_mask = np.any(self.ct[-1] <= 1e-4, axis=1)     # use cstr_tol in ConstraintConfig
-        self.f_min = np.min(np.where(feasible_mask == True, self.yt[-1], np.inf))
+        # feasible_mask = np.any(self.ct[-1] <= 1e-4, axis=1)     # use cstr_tol in ConstraintConfig
+        # self.f_min = np.min(np.where(feasible_mask == True, self.yt[-1], np.inf))
+        # print(f"f_min = {self.f_min}")
 
-        if self.f_min == np.inf:
-            warnings.warn("No feasible point in training data.")
+        feas_mask = np.all(self.ct[-1] <= 1e-4, axis=1)
+        if np.any(feas_mask):
+            next_f_min = np.min(self.yt[-1][feas_mask])
+        else:
+            next_f_min = np.inf
+
+        self._check_f_min(self.f_min, next_f_min)
+        self.f_min = next_f_min
+
+    def _check_f_min(self, previous_f_min, next_f_min):
+        if previous_f_min < next_f_min:
+            warnings.warn("f_min is increasing.")
 
     def sample_point(self, x_new: np.ndarray, level: int) -> tuple:
 

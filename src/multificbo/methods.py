@@ -9,7 +9,8 @@ from multificbo.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, V
 def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
          max_iter: int = 100,
          xt_init: list = None,
-         log: str = "log") -> dict:
+         log: str = "log",
+         verbose: bool = False) -> dict:
 
     # set objective
     obj_config = ObjectiveConfig(
@@ -42,6 +43,7 @@ def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
         max_iter=       max_iter,
         xt_init=        xt_init,
         log_filename=   log,
+        verbose=        verbose,
     )
 
     # set acquisition strategy
@@ -57,7 +59,8 @@ def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
 def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
            max_iter: int = 100,
            xt_init: list = None,
-           log: str = "log") -> dict:
+           log: str = "log",
+           verbose: bool = False) -> dict:
 
     # set objective
     obj_config = ObjectiveConfig(
@@ -86,6 +89,7 @@ def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constrain
         max_iter=       max_iter,
         xt_init=        xt_init,
         log_filename=   log,
+        verbose=        verbose,
     )
 
     # set acquisition strategy
