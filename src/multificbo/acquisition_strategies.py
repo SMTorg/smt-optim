@@ -3,9 +3,14 @@ import scipy.stats as stats
 import scipy.optimize as so
 from warnings import warn
 
+from deap import base, creator, tools, algorithms
+import random
+
 from multificbo.surrogate_models import Surrogate
 from multificbo.acquisition_functions import expected_improvement, probability_of_improvement
 from multificbo.acquisition_functions import log_ei
+
+
 
 # TODO: acquisition strategy class template
 class AcquisitionStrategy:
@@ -330,6 +335,8 @@ class VFPI:
 
         self.f_min = np.inf
 
+        self.sub_optimizer = "DEAP"
+
         if self.optimizer is not None:
             self.mfck = self.optimizer.obj_surrogate.mfck
         else:
@@ -403,6 +410,8 @@ class VFPI:
 
     def epi(self, x, level) -> np.ndarray:
 
+        x = x.reshape(1, -1)
+
         means, vars = self.mfck.predict_all_levels(x)
         cov = self.mfck.predict_level_covariances(x, level)
 
@@ -410,47 +419,78 @@ class VFPI:
 
         corr = self.fidelity_correlation(cov, vars[level].reshape(-1, 1), vars[-1].reshape(-1, 1))
 
-        # TODO: add cost ratio here
+        cost_ratio = self.costs[-1]/self.costs[level]
 
         density = self.sample_density(x, level, self.mfck)
 
-        return pi * corr * density
+        satisfying = 1.0
+
+        # TODO: should use the different fidelity level predictions
+        for c_id in range(self.num_cstr):
+            g_pred = self.optimizer.cstr_surrogates[c_id].predict_values(x)
+            s2_pred = self.optimizer.cstr_surrogates[c_id].predict_variances(x)
+
+            satisfying *= stats.norm.cdf(g_pred / np.sqrt(s2_pred))
+
+        return pi * corr * cost_ratio * density * satisfying
 
     def execute_infill_strategy(self, optimizer) -> list:
 
         self.current_level = 0
         self.f_min, _ = self.predicted_f_min(-1)
 
+        self.num_dim = optimizer.num_dim
+        self.bounds = optimizer.domain
+
+        self.num_cstr = optimizer.num_cstr
+
+        self.num_levels = optimizer.num_levels
+        self.costs = optimizer.costs
+
+        self.optimizer = optimizer
+
+        if self.sub_optimizer == "COBYLA":
+            x_infill, fid_infill = self.minimize_with_scipy()
+
+        elif self.sub_optimizer == "DEAP":
+            x_infill, fid_infill = self.minimize_with_deap(self.epi,
+                                                           self.bounds,
+                                                           self.num_levels)
+        else:
+            raise Exception(f"Unknown sub optimizer: {self.sub_optimizer}")
+
+        infill = []
+        for lvl in range(self.num_levels):
+            if lvl == fid_infill:
+                infill.append(x_infill)
+            else:
+                infill.append(None)
+
+        return infill
+
+
+    def minimize_with_scipy(self) -> tuple:
+
+        self.current_level = 0
+
         def epi_scipy_wrapper(x: np.ndarray) -> float:
             x = x.reshape(1, -1)
             epi = self.epi(x, self.current_level).ravel()
-            cost_ratio = (optimizer.costs[-1]/optimizer.costs[self.current_level])
-
-            satisfying = 1.0
-
-            # TODO: test implementation
-            for cstr in range(len(optimizer.cstr_surrogates)):
-                g_pred = optimizer.cstr_surrogates[cstr].predict_values(x)
-                s2_pred = optimizer.cstr_surrogates[cstr].predict_variances(x)
-
-                satisfying *= stats.norm.cdf(g_pred/np.sqrt(s2_pred))
-
-            return -epi * cost_ratio * satisfying
-
+            return -epi
 
         dim = optimizer.num_dim
         bounds = optimizer.domain
         acq_multistart = self.n_start
-        acq_sampler = stats.qmc.LatinHypercube(d=dim)   # To be verified, but I believe scipy LHS sampler works better
+        acq_sampler = stats.qmc.LatinHypercube(d=self.num_dim)   # To be verified, but I believe scipy LHS sampler works better
 
         acq_x0 = acq_sampler.random(acq_multistart)
-        acq_x0 = stats.qmc.scale(acq_x0, bounds[:, 0], bounds[:, 1])
+        acq_x0 = stats.qmc.scale(acq_x0, self.bounds[:, 0], self.bounds[:, 1])
 
-        all_epi_max = []
-        all_epi_argmax = []
+        all_epi_f = []
+        all_epi_x = []
         all_epi_fid = []
 
-        for lvl in range(optimizer.num_levels):
+        for lvl in range(self.num_levels):
             self.current_level = lvl
 
             for i in range(acq_x0.shape[0]):
@@ -461,26 +501,125 @@ class VFPI:
                                   bounds=bounds,
                                   tol=1e-4)
 
-                all_epi_max.append(res.fun)
-                all_epi_argmax.append(res.x)
+                all_epi_f.append(res.fun)
+                all_epi_x.append(res.x)
                 all_epi_fid.append(self.current_level)
 
 
-        epi_max_index = np.argmin(all_epi_max)
-        x_infill = all_epi_argmax[epi_max_index]
+        epi_max_index = np.argmin(all_epi_f)
+        x_infill = all_epi_x[epi_max_index]
         fid_infill = all_epi_fid[epi_max_index]
 
-        infill = []
-
-        for lvl in range(optimizer.num_levels):
-            if lvl == fid_infill:
-                infill.append(x_infill)
-            else:
-                infill.append(None)
-
-        return infill
+        return x_infill, fid_infill
 
 
+    def minimize_with_deap(self, epi_func, bounds, num_levels,
+                           pop_size=50, ngen=40, seed=None):
+        """
+        Minimize an acquisition function jointly over x and fidelity level using DEAP.
 
+        :param epi_func: Callable function to minimize, of the form ``epi_func(x, fid)``.
+        :type epi_func: callable
 
+        :param bounds: Bounds for the continuous design variables.
+        :type bounds: list[tuple[float, float]]
 
+        :param num_levels: Number of discrete fidelity levels (0 .. num_levels - 1).
+        :type num_levels: int
+
+        :param pop_size: Population size.
+        :type pop_size: int
+
+        :param ngen: Number of generations.
+        :type ngen: int
+
+        :param seed: Random seed for reproducibility.
+        :type seed: int, optional
+
+        :return: A tuple ``(best_x, best_fid)`` where:
+                 - ``best_x`` is the best variable found
+                 - ``best_fig`` is the corresponding fidelity level
+        :rtype: tuple[np.ndarray, int]
+        """
+
+        num_dim = self.bounds.shape[0]
+
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+
+        # define DEAP classes (guard against re-creation if function is called multiple times)
+        if "FitnessMin" not in creator.__dict__:
+            creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+        if "Individual" not in creator.__dict__:
+            creator.create("Individual", list, fitness=creator.FitnessMin)
+
+        toolbox = base.Toolbox()
+
+        # initialization for x variables
+        for i in range(self.num_dim):
+            toolbox.register(f"attr_x_{i}", random.uniform, bounds[i, 0], bounds[i, 1])
+
+        # initialization for fidelity variable (int)
+        toolbox.register("attr_fid", random.randint, 0, num_levels-1)
+
+        # combine x variables + fidelity
+        toolbox.register(
+            "individual",
+            tools.initCycle,
+            creator.Individual,
+            [toolbox.__getattribute__(f"attr_x_{i}") for i in range(num_dim)] + [toolbox.attr_fid],
+            n=1,
+        )
+
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
+        # evaluation
+        def evaluate(individual):
+            x = np.clip(np.array(individual[:-1]), bounds[:, 0], bounds[:, 1])
+
+            fid = int(np.clip(round(individual[-1]), 0, num_levels-1))
+
+            return (-epi_func(x, fid),)
+
+        toolbox.register("evaluate", evaluate)
+
+        # operators
+        toolbox.register("mate", tools.cxBlend, alpha=0.5)
+
+        # continuous mutation for x, integer mutation for fid
+        def mutate(individual, indpb=0.2):
+            for i in range(num_dim):
+                if random.random() < indpb:
+                    individual[i] = random.uniform(bounds[i, 0], bounds[i, 1])
+
+            # mutate fidelity with small probability
+            if random.random() < indpb:
+                individual[-1] = random.randint(0, num_levels - 1)
+
+            # clip variables within the boundaries
+            for i in range(num_dim):
+                individual[i] = np.clip(individual[i], bounds[i, 0], bounds[i, 1])
+
+            # clip the fidelity with the problem's levels
+            individual[-1] = np.clip(individual[-1], 0, num_levels-1)
+
+            return (individual,)
+
+        toolbox.register("mutate", mutate)
+        toolbox.register("select", tools.selTournament, tournsize=3)
+
+        # create population
+        pop = toolbox.population(n=pop_size)
+
+        # run evolution
+        algorithms.eaSimple(pop, toolbox, cxpb=0.6, mutpb=0.3, ngen=ngen,
+                            stats=None, halloffame=None, verbose=False)
+
+        # get best individual
+        best_ind = tools.selBest(pop, 1)[0]
+        best_x = np.array(best_ind[:-1])
+        best_fid = int(round(best_ind[-1]))
+        best_f = evaluate(best_ind)[0]
+
+        return best_x, best_fid
