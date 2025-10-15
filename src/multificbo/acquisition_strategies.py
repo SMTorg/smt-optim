@@ -72,8 +72,8 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
             x = x.reshape(1, -1)
 
-            mu = obj_surrogate.predict_value(x)
-            s2 = obj_surrogate.predict_variance(x)
+            mu = obj_surrogate.predict_values(x)
+            s2 = obj_surrogate.predict_variances(x)
 
             return -self.acq_func(mu, s2, f_min)
 
@@ -88,7 +88,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         scipy_cstr = []
         if num_cstr > 0:
-            scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_value(x.reshape(1, -1)).ravel()} for c_gp in
+            scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_values(x.reshape(1, -1)).ravel()} for c_gp in
                           cstr_surrogates]
 
         for i in range(acq_x0.shape[0]):
@@ -98,7 +98,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
             acq_res_f[i] = acq_res.fun
 
             for c_id in range(num_cstr):
-                acq_res_c[i, c_id] = cstr_surrogates[c_id].predict_value(acq_res_x[i, :].reshape(1, -1))
+                acq_res_c[i, c_id] = cstr_surrogates[c_id].predict_values(acq_res_x[i, :].reshape(1, -1))
 
         # check if solution respect the constraints
         feas_mask = np.all(acq_res_c <= 1e-4, axis=1)   # TODO: add user parameter to modify the tolerance
@@ -267,8 +267,8 @@ class MFEI:
             def scipy_ei_wrapper(x):
                 x = x.reshape(1, -1)
 
-                mu = obj_surrogate.predict_value(x)
-                s2 = obj_surrogate.predict_variance(x)
+                mu = obj_surrogate.predict_values(x)
+                s2 = obj_surrogate.predict_variances(x)
 
                 return -self.acq_func(mu, s2, f_min) * self.alpha1(x, lvl, n_level - 1) * alpha3
 
@@ -280,7 +280,7 @@ class MFEI:
 
             scipy_cstr = []
             if constrained:
-                scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_value(x.reshape(1, -1))} for
+                scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_values(x.reshape(1, -1))} for
                               c_gp in
                               cstr_surrogates]
 
@@ -430,8 +430,8 @@ class VFPI:
 
             # TODO: test implementation
             for cstr in range(len(optimizer.cstr_surrogates)):
-                g_pred = optimizer.cstr_surrogates[cstr].predict_value(x)
-                s2_pred = optimizer.cstr_surrogates[cstr].predict_variance(x)
+                g_pred = optimizer.cstr_surrogates[cstr].predict_values(x)
+                s2_pred = optimizer.cstr_surrogates[cstr].predict_variances(x)
 
                 satisfying *= stats.norm.cdf(g_pred/np.sqrt(s2_pred))
 

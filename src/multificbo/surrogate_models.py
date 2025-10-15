@@ -11,7 +11,9 @@ from smt.design_space import (
     OrdinalVariable,
 )
 
-from smt.surrogate_models import KRG, MixHrcKernelType, MixIntKernelType
+# from smt.surrogate_models import MixHrcKernelType, MixIntKernelType
+
+EPSILON = np.finfo(float).eps
 
 class Surrogate():
 
@@ -21,11 +23,22 @@ class Surrogate():
     def train(self, xt, yt):
         raise Exception("train() method not implemented.")
 
-    def predict_value(self, x_pred):
+    def predict_values(self, x_pred):
         raise Exception("predict_value() method not implemented.")
 
-    def predict_variance(self, x_pred):
+    def predict_variances(self, x_pred):
         raise Exception("predict_variance() method not implemented.")
+
+
+def check_theta_bounds(theta: np.ndarray, theta_bounds: np.ndarray) -> np.ndarray:
+
+    lower_disc = (theta <= theta_bounds[0])
+    theta = np.where(lower_disc, theta_bounds[0] + np.sqrt(EPSILON), theta)
+
+    upper_disc = (theta >= theta_bounds[1])
+    theta = np.where(upper_disc, theta_bounds[1] - np.sqrt(EPSILON), theta)
+
+    return theta
 
 
 class SmtKRG(Surrogate):
@@ -36,31 +49,52 @@ class SmtKRG(Surrogate):
         # TODO: implement a way to control the random_state
 
         self.optimizer = optimizer
-
         self.name = name
 
-        self.n_start = 10 * optimizer.num_dim  # TODO: add option to control ratio
+        self.num_dim = 0
+        self.krg = None
+        self.krg_initialized = False
 
-        self.previous_theta = np.ones(optimizer.num_dim)
+        if optimizer is not None:
+            self._init_smt(optimizer)
 
         # TODO: should use optimizer.domain
+
+        else:
+            raise Exception("Unsupported domain type.")
+
+    def _init_smt(self, optimizer):
+
+        self.num_dim = optimizer.num_dim
+        self.costs = optimizer.costs
+
+        self.n_start = 3*optimizer.num_dim
+        self.previous_theta = np.ones(self.num_dim)
+
         # KRG for continuous domain
         if type(self.optimizer.domain) is np.ndarray:
-            self.dim = optimizer.domain.shape[0]
-            self.krg = KRG(print_global=False, n_start=10 * self.dim, random_state=None)
+            self.krg = KRG(print_global=False,
+                           n_start=self.n_start,
+                           random_state=None)
 
         # KRG for mixed integer domain
-        elif type(optimizer.domain) is DesignSpace:
-            self.dim = optimizer.domain.n_dv
-            self.krg = KRG(design_space=domain,
-                            categorical_kernel=MixIntKernelType.CONT_RELAX,
-                            hyper_opt="Cobyla",
-                            corr="abs_exp",
-                            n_start=3*self.dim,
-                            print_global=False,
-            )
+        # elif type(optimizer.domain) is DesignSpace:
+        #     self.dim = optimizer.domain.n_dv
+        #     self.krg = KRG(design_space=domain,
+        #                     categorical_kernel=MixIntKernelType.CONT_RELAX,
+        #                     hyper_opt="Cobyla",
+        #                     corr="abs_exp",
+        #                     n_start=3*self.dim,
+        #                     print_global=False,
+        #     )
 
-    def train(self, xt, yt):
+            self.theta_bounds = self.krg.options["theta_bounds"]
+        else:
+            raise Exception("Unsupported domain type.")
+
+        self.krg_initialized = True
+
+    def train(self, xt: list, yt: list):
         """
         Train the GP on the training data.
 
@@ -69,10 +103,17 @@ class SmtKRG(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
+        if not self.krg_initialized:
+            raise Exception("KRG must be initialized before training.")
+
         # print(f"xt= \n{xt}")
-        if type(self.optimizer.domain) is np.ndarray:
-            self.krg.options["theta0"] = self.previous_theta
-            self.krg.options["n_start"] = self.n_start
+        try:
+            if type(self.optimizer.domain) is np.ndarray:
+                self.previous_theta = check_theta_bounds(self.previous_theta, self.theta_bounds)
+                self.krg.options["theta0"] = self.previous_theta
+                self.krg.options["n_start"] = self.n_start
+        except:
+            warn("Error changing KRG parameters.")
 
         self.xt = xt[-1]
         self.yt = yt[-1]
@@ -84,11 +125,11 @@ class SmtKRG(Surrogate):
         self.previous_theta = self.krg.optimal_theta
         if self.name: self.optimizer.iter_data[f"{self.name}_opt_theta"] = self.previous_theta
 
-    def predict_value(self, x_pred):
+    def predict_values(self, x_pred):
         y_pred = self.krg.predict_values(x_pred)
         return y_pred
 
-    def predict_variance(self, x_pred):
+    def predict_variances(self, x_pred):
         s2_pred = self.krg.predict_variances(x_pred)
         return s2_pred
 
@@ -116,10 +157,11 @@ class SmtMFK(Surrogate):
         self.num_levels = optimizer.num_levels
         self.costs = optimizer.costs
 
+        self.n_start = 3*optimizer.num_dim
         self.previous_theta = np.ones((self.num_levels, self.num_dim))
 
         self.mfk = MFK(print_global=False,
-                       n_start=3*self.num_dim,
+                       n_start=self.n_start,
                        random_state=None)
 
         self.theta_bounds = self.mfk.options["theta_bounds"]
@@ -130,13 +172,14 @@ class SmtMFK(Surrogate):
     def train(self, xt: list, yt: list):
 
         if not self.mfk_initialized:
-            raise Exception("MFK was not initialized.")
+            raise Exception("MFK must be initialized before training.")
 
         try:
+            self.previous_theta = check_theta_bounds(self.previous_theta, self.theta_bounds)
             self.mfk.options["theta0"] = self.previous_theta
-            # self.mfk.options["n_start"] = self.n_start
+            self.mfk.options["n_start"] = self.n_start
         except:
-            print("Error changing MFK parameters.")
+            warn("Error changing MFK parameters.")
 
         self.xt = xt
         self.yt = yt
@@ -149,15 +192,14 @@ class SmtMFK(Surrogate):
         self.mfk.train()
 
         self.previous_theta = np.array(self.mfk.optimal_theta).reshape(self.num_levels, self.num_dim)
-        self.fix_optimal_theta()
 
         if self.name: self.optimizer.iter_data[f"{self.name}_opt_theta"] = self.previous_theta
 
-    def predict_value(self, x_pred: np.ndarray) -> np.ndarray:
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
         y_pred = self.mfk.predict_values(x_pred)
         return y_pred
 
-    def predict_variance(self, x_pred: np.ndarray) -> np.ndarray:
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
         s2_pred = self.mfk.predict_variances(x_pred)
         return s2_pred
 
@@ -197,15 +239,6 @@ class SmtMFK(Surrogate):
 
         return s2_red, tot_rho2
 
-    def fix_optimal_theta(self):
-        # TODO: review implementation
-        for lvl in range(self.previous_theta.shape[0]):
-            for i in range(self.previous_theta.shape[1]):
-                if self.previous_theta[lvl, i] <= self.theta_bounds[0]:
-                    self.previous_theta[lvl, i] += np.sqrt(np.finfo(np.float64).eps)
-                elif self.previous_theta[lvl, i] >= self.theta_bounds[0]:
-                    self.previous_theta[lvl, i] -= np.sqrt(np.finfo(np.float64).eps)
-
 class SmtMFCK(Surrogate):
 
     def __init__(self, optimizer=None, name=None):
@@ -229,8 +262,10 @@ class SmtMFCK(Surrogate):
         self.num_levels = optimizer.num_levels
         self.costs = optimizer.costs
 
+        self.n_start = 3*optimizer.num_dim
+
         self.mfck = MFCK(print_global=False,
-                         n_start=3*self.num_dim,
+                         n_start=self.n_start,
                          random_state=None)
 
         self.mfck.options["lambda"] = 0.0
@@ -240,7 +275,7 @@ class SmtMFCK(Surrogate):
     def train(self, xt: list, yt: list):
 
         if not self.mfck_initialized:
-            raise Exception("MFCK was not initialized.")
+            raise Exception("MFK must be initialized before training.")
 
         self.xt = xt
         self.yt = yt
@@ -256,10 +291,10 @@ class SmtMFCK(Surrogate):
 
         # if self.name: self.optimizer.iter_data[f"{self.name}_opt_theta"] = self.previous_theta
 
-    def predict_value(self, x_pred: np.ndarray) -> np.ndarray:
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
         y_pred = self.mfck.predict_values(x_pred)
         return y_pred
 
-    def predict_variance(self, x_pred: np.ndarray) -> np.ndarray:
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
         s2_pred = self.mfck.predict_variances(x_pred)
         return s2_pred

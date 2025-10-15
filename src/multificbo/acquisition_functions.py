@@ -68,29 +68,11 @@ def log1mexp(z: np.ndarray) -> np.ndarray:
     return log1mexp_arr
 
 
-def mfei_alpha1(x: np.ndarray, level: int) -> np.ndarray:
-    """
-    Compute the correlation between the posterior estimate of level l and posterior estimate of level m (highest fidelity).
-
-    Args:
-        x:
-        level:
-
-    Returns:
-
-    """
-
-    alpha1 = 0
+def fidelity_correlation(covariance: np.ndarray, li_var: np.ndarray, lj_var: np.ndarray) -> np.ndarray:
+    return np.clip(np.abs(covariance/np.sqrt(li_var * lj_var)), 0, 1)
 
 
-
-    return alpha1
-
-def fidelity_correlation(covariance, li_var, lj_var):
-    pass
-
-
-def probability_of_improvement(mu, s2, f_min):
+def probability_of_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
 
     pi = np.zeros_like(mu)
 
