@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats as stats
 import scipy.optimize as so
+from warnings import warn
 
 from multificbo.surrogate_models import Surrogate
 from multificbo.acquisition_functions import expected_improvement, probability_of_improvement
@@ -53,13 +54,19 @@ class MonoFiAcqStrat(AcquisitionStrategy):
         f_min = optimizer.f_min
         bounds = optimizer.domain
 
+        num_cstr = optimizer.num_cstr
+
         obj_surrogate = optimizer.obj_surrogate
         cstr_surrogates = optimizer.cstr_surrogates
 
-        if optimizer.num_cstr > 0:
-            constrained = True
-        else:
-            constrained = False
+
+        ct_norm = np.linalg.norm(optimizer.ct[-1], axis=1)
+
+        # if there is no feasible points in the training data, f_min is set to objective value corresponding to the
+        # minimum constraint violation
+        if f_min == np.inf:
+            argmin_ct_norm = np.argmin(ct_norm)
+            f_min = optimizer.yt[-1][argmin_ct_norm]
 
         def scipy_ei_wrapper(x):
 
@@ -77,9 +84,10 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         acq_res_x = np.empty_like(acq_x0)
         acq_res_f = np.empty(acq_multistart)
+        acq_res_c = np.empty((acq_multistart, num_cstr))
 
         scipy_cstr = []
-        if constrained:
+        if num_cstr > 0:
             scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_value(x.reshape(1, -1)).ravel()} for c_gp in
                           cstr_surrogates]
 
@@ -89,9 +97,21 @@ class MonoFiAcqStrat(AcquisitionStrategy):
             acq_res_x[i, :] = acq_res.x
             acq_res_f[i] = acq_res.fun
 
-        # TODO: check if solution respect the constraint
+            for c_id in range(num_cstr):
+                acq_res_c[i, c_id] = cstr_surrogates[c_id].predict_value(acq_res_x[i, :].reshape(1, -1))
 
-        next_index = np.argmin(acq_res_f)
+        # check if solution respect the constraints
+        feas_mask = np.all(acq_res_c <= 1e-4, axis=1)   # TODO: add user parameter to modify the tolerance
+        if np.any(feas_mask):
+            next_index = np.argmin(
+                np.where(feas_mask == True, acq_res_f, np.inf)
+            )
+        else:
+            # if none of the solutions are feasible, the solution with the lowest constraint violation is selected
+            acq_res_c_norm = np.linalg.norm(acq_res_c, axis=1)
+            next_index = np.argmin(acq_res_c_norm)
+            warn("No feasible point found through the acquisition function.")
+
         next_x = acq_res_x[next_index, :]
 
         return next_x
