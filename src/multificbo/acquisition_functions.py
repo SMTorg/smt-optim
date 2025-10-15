@@ -5,7 +5,23 @@ import copy
 
 from multificbo.surrogate_models import Surrogate
 
-def expected_improvement(mu, s2, f_min):
+def expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+    """
+    Expected Improvement acquisition function.
+
+    :param mu: Mean prediction.
+    :type mu: np.ndarray
+
+    :param s2: Variance prediction.
+    :type s2: np.ndarray
+
+    :param f_min: Best minimum objective value in training data.
+    :type f_min: np.ndarray
+
+    :return: The EI acquisition function value.
+    :rtype: np.ndarray
+    """
+
     mask_s = (s2 > 0).ravel()
 
     s = np.empty_like(s2)
@@ -22,6 +38,22 @@ def expected_improvement(mu, s2, f_min):
 # ------- TODO: CLEAN LOG EXPECTED IMPROVEMENT -------
 # ------- LOG EXPECTED IMPROVEMENT -------
 def log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+    """
+    Log Expected Improvement acquisition function. More numerically stable that the EI acquisition function especially
+    when the GP's variance is small. From: https://arxiv.org/abs/2310.20708.
+
+    :param mu: Mean prediction.
+    :type mu: np.ndarray
+
+    :param s2: Variance prediction.
+    :type s2: np.ndarray
+
+    :param f_min: Best minimum objective value in training data.
+    :type f_min: np.ndarray
+
+    :return: The log EI acquisition function value.
+    :rtype: np.ndarray
+    """
 
     s = np.sqrt(s2)
 
@@ -69,10 +101,40 @@ def log1mexp(z: np.ndarray) -> np.ndarray:
 
 
 def fidelity_correlation(covariance: np.ndarray, li_var: np.ndarray, lj_var: np.ndarray) -> np.ndarray:
+    """
+    GP posterior fidelity correlation between 2 fidelity levels. The correlation is clipped between 0 and 1.
+
+    :param covariance: Posterior covariance prediction between fidelity levels i and j.
+    :type covariance: np.ndarray
+
+    :param li_var: Variance prediction of fidelity level i.
+    :type li_var: np.ndarray
+
+    :param lj_var: Variance prediction of fidelity level j.
+    :type lj_var: np.ndarray
+
+    :return: The fidelity correlation value
+    :rtype: np.ndarray
+    """
+
     return np.clip(np.abs(covariance/np.sqrt(li_var * lj_var)), 0, 1)
 
 
 def probability_of_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+    """
+    Probability of Improvement acquisition function.
+    :param mu: Mean prediction.
+    :type mu: np.ndarray
+
+    :param s2: Variance prediction.
+    :type s2: np.ndarray
+
+    :param f_min: Minimum predicted objective value.
+    :type f_min: np.ndarray
+
+    :return: The PI acquisition function value.
+    :rtype: np.ndarray
+    """
 
     pi = np.zeros_like(mu)
 
