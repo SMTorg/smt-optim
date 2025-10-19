@@ -429,6 +429,9 @@ class Optimizer():
                 warnings.warn("")
 
             infill_values = []
+            infill_x = []
+            infill_f = []
+            infill_c = []
 
             # Sample each fidelity level sequentially
             max_level = 0
@@ -450,17 +453,23 @@ class Optimizer():
                     warnings.warn("Infill point is already in the training data.")
                     continue
 
+                # sample objective function and constraints
                 next_y, next_c = self.sample_point(next_x, k)
-                infill_values.append(next_y)
 
-                # Sample the objective function at the infill location and add them to the training data
-                next_y = self.obj_func[k](next_x)
+                infill_x.append(next_x)
+                infill_f.append(next_y)
+                infill_c.append(next_c)
+
+                # add infill evaluation to the training data
                 self.xt[k] = np.vstack((self.xt[k], next_x))
                 self.yt[k] = np.append(self.yt[k], next_y)
                 self.ct[k] = np.vstack((self.ct[k], next_c))
 
+            # log infill point, objective value and constraints values
+            self.iter_data["infill_x"] = infill_x
+            self.iter_data["infill_f"] = infill_f
+            self.iter_data["infill_c"] = infill_c
 
-            self.iter_data["infill_values"] = infill_values
             self.iter_data["max_f_level"] = max_level
 
             # update f_min
