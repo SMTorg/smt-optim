@@ -143,6 +143,7 @@ def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints
 
     # initialize optimizer and start optimization
     optimizer = Optimizer(obj_config, optim_config, strategy)
+    optimizer.acq_strategy.sub_optimizer = "COBYLA"   # TODO: fix genetic algorithm
     opt_data = optimizer.optimize()
 
     return opt_data

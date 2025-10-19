@@ -77,6 +77,29 @@ def wrap_constraints(constraints):
     return wrapped_c
 
 
+def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
+    """
+    Apply L1 correction to x point to make sure it's within the problem's bounds.
+
+    :param x: Infill point.
+    :type x: np.ndarray
+
+    :param bounds: Problem boundaries.
+    :type bounds: np.ndarray
+
+    :return: The bounds corrected infill point.
+    :rtype: np.ndarray
+    """
+
+    x_corrected = np.where(x < bounds[:, 0], bounds[:, 0], x)
+    x_corrected = np.where(x_corrected > bounds[:, 1], bounds[:, 1], x_corrected)
+
+    if np.any(x != x_corrected):
+        warnings.warn("Infill point was outside of the bounds. L1 correction was applied.")
+
+    return x_corrected
+
+
 @dataclass
 class ObjectiveConfig:
     objective: Union[Callable, List[Callable]]
@@ -312,6 +335,8 @@ class Optimizer():
             warnings.warn("f_min is increasing.")
 
     def sample_point(self, x_new: np.ndarray, level: int) -> tuple:
+
+        x_new = check_bounds(x_new, self.domain)
 
         obj = self.obj_func[level](x_new)
         obj = obj.reshape(1, 1)
