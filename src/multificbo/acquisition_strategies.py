@@ -7,8 +7,7 @@ from deap import base, creator, tools, algorithms
 import random
 
 from multificbo.surrogate_models import Surrogate
-from multificbo.acquisition_functions import expected_improvement, probability_of_improvement
-from multificbo.acquisition_functions import log_ei
+from multificbo.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
 
 
 
@@ -339,6 +338,7 @@ class VFPI:
 
         if self.optimizer is not None:
             self.mfck = self.optimizer.obj_surrogate.mfck
+            self.n_start *= self.optimizer.num_dim
         else:
             self.mfck = None
 
@@ -415,14 +415,19 @@ class VFPI:
         means, vars = self.mfck.predict_all_levels(x)
         cov = self.mfck.predict_level_covariances(x, level)
 
+        # probability of improvement
         pi = probability_of_improvement(means[-1].reshape(-1, 1), vars[-1].reshape(-1, 1), self.f_min)
 
-        corr = self.fidelity_correlation(cov, vars[level].reshape(-1, 1), vars[-1].reshape(-1, 1))
+        # fidelity correlation penalty
+        corr = fidelity_correlation(cov, vars[level].reshape(-1, 1), vars[-1].reshape(-1, 1))
 
+        # cost ratio penalty
         cost_ratio = self.costs[-1]/self.costs[level]
 
+        # density penalty
         density = self.sample_density(x, level, self.mfck)
 
+        # constraints penalty
         satisfying = 1.0
 
         # TODO: should use the different fidelity level predictions
@@ -478,8 +483,8 @@ class VFPI:
             epi = self.epi(x, self.current_level).ravel()
             return -epi
 
-        dim = optimizer.num_dim
-        bounds = optimizer.domain
+        dim = self.optimizer.num_dim
+        bounds = self.optimizer.domain
         acq_multistart = self.n_start
         acq_sampler = stats.qmc.LatinHypercube(d=self.num_dim)   # To be verified, but I believe scipy LHS sampler works better
 

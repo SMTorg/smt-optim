@@ -1,5 +1,7 @@
 import numpy as np
 
+from abc import ABC, abstractmethod
+
 from smt.surrogate_models import KRG
 from smt.applications import MFK, MFCK
 
@@ -15,23 +17,41 @@ from smt.design_space import (
 
 EPSILON = np.finfo(float).eps
 
-class Surrogate():
+class Surrogate(ABC):
+    """
+    Abstract class for surrogate models.
+    """
 
     def __init__(self, optimizer=None, name=None):
         pass
 
-    def train(self, xt, yt):
+    @abstractmethod
+    def train(self, xt: list, yt: list):
         raise Exception("train() method not implemented.")
 
-    def predict_values(self, x_pred):
+    @abstractmethod
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
         raise Exception("predict_value() method not implemented.")
 
-    def predict_variances(self, x_pred):
+    @abstractmethod
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
         raise Exception("predict_variance() method not implemented.")
 
 
 def check_theta_bounds(theta: np.ndarray, theta_bounds: np.ndarray) -> np.ndarray:
+    """
+    Apply corrections to GP hyperparameters that are on or outside of their boundaries,
+    with a small overhead to avoid triggering SMT warnings.
 
+    :param theta: GP hyperparameters.
+    :type theta: np.ndarray
+
+    :param theta_bounds: Hyperparameter bounds. np.ndarray[lower, upper].
+    :type theta_bounds: np.ndarray
+
+    :return: The corrected GP hyperparameters.
+    :rtype: np.ndarray
+    """
     lower_disc = (theta <= theta_bounds[0])
     theta = np.where(lower_disc, theta_bounds[0] + np.sqrt(EPSILON), theta)
 
