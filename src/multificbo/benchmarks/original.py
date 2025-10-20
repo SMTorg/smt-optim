@@ -200,3 +200,216 @@ class Rosenbrock(BenchmarkProblem):
         return res
 
 
+class Sasena1(BenchmarkProblem):
+    """
+    [1]
+
+    f_min = -1.1723
+    f_min_x = np.array([2.7450, 2.3523])
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.num_dim = 2
+        self.num_cstr = 1
+        self.num_fidelity = 2
+        self.bounds = np.array([
+            [0, 5],
+            [0, 5]
+        ])
+
+        self.costs = [0.1, 1]
+
+        self.objective = [self.lf_objective, self.hf_objective]
+        self.constraints = [
+            [self.lf_constraint, self.hf_constraint]
+        ]
+
+
+    def hf_objective(self, x):
+        return 2+ 0.01*(x[1] - x[0]**2)**2 + (1 - x[0])**2 + 2*(2 - x[1])**2 + 7*np.sin(0.5*x[0])*np.sin(0.7*x[0]*x[1])
+
+    def lf_objective(self, x):
+        return self.hf_objective(x) + np.exp(x[0]) - x[1]**3
+
+    def hf_constraint(self, x):
+        return - np.sin(x[0] - x[1] - np.pi/8)
+
+    def lf_constraint(self, x):
+        return self.hf_constraint(x) + 0.2*x[1] - 0.7*x[0] + x[0]*x[1]
+
+
+
+class Branin2(BenchmarkProblem):
+    """
+    [1]
+
+    f_min = 12.001
+    f_min_x = np.array([0.941, 0.317])
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.num_dim = 2
+        self.num_cstr = 1
+        self.num_fidelity = 2
+        self.bounds = np.array([
+            [0, 1],
+            [0, 1]
+        ])
+
+        self.costs = [0.1, 1]
+        self.objective = [self.lf_objective, self.hf_objective]
+        self.constraints = [
+            [self.lf_constraint, self.hf_constraint]
+        ]
+
+
+    def hf_objective(self, x):
+        return branin_forrester(x)
+
+    def lf_objective(self, x):
+        return self.hf_objective(x) + x[0]*x[1] + 0.3*x[0]
+
+    def hf_constraint(self, x):
+
+        x[0] = (x[0] - 0.5)/0.5
+        x[1] = (x[1] - 0.5)/0.5
+
+        return 6 - (4 - 2.1*x[0]**2 + x[0]**4/3)*x[0]**2 - x[0]*x[1] - (4*x[1]**2 - 4)*x[1]**2 - 3*np.sin(6 - 6*x[0]) - 3*np.sin(6 - 6*x[1])
+
+    # def hf_constraint(self, x):
+    #
+    #     x1 = (x[0].item() - 1)/2
+    #     x2 = (x[1].item() - 1)/2
+    #
+    #     term1 = 6
+    #     term2 = (4 - 2.1 * x1 ** 2 + (x1 ** 4) / 3) * x1 ** 2
+    #     term3 = x1 * x2
+    #     term4 = (4 * x2 ** 2 - 4) * x2 ** 2
+    #     term5 = 3 * np.sin(6 * (1 - x1))
+    #     term6 = 3 * np.sin(6 * (1 - x2))
+    #
+    #     return term1 - term2 - term3 - term4 - term5 - term6
+
+    def lf_constraint(self, x):
+        # Does the perturbation should also be scaled?
+        return self.hf_constraint(x) + x[0] + 0.4*x[1] + np.exp(x[0])
+
+
+# class Sasena2(BenchmarkProblem):
+#     """
+#     [1]
+#     """
+#
+#     def __init__(self):
+#         super().__init__()
+#
+#         self.num_dim = 2
+#         self.num_cstr = 2
+#         self.num_fidelity = 2
+#
+#         self.bounds = np.array([
+#             [0, 1],
+#             [0, 1]
+#         ])
+#
+#         self.costs = [0.1, 1]
+#         self.objective = [self.lf_objective, self.hf_objective]
+#         self.constraints = [
+#             [self.lf_constraint_1, self.hf_constraint_1],
+#             [self.lf_constraint_2, self.hf_constraint_2]
+#         ]
+#
+#
+#     bounds = np.array([[0, 1], [0, 1]])
+#
+#     f_min = -0.7483
+#     f_min_x = np.array([0.2017, 0.8332])
+#
+#     def hf_objective(self, x):
+#         return -(x[0] - 1)**2 - (x[1] - 0.5)**2
+#
+#     def lf_objective(self, x):
+#         return self.hf_objective(x) - x[0]*x[1]
+#
+#     def hf_constraint(self, x):
+#         return -(x[0] - 1)**2 - (x[1] - 0.5)**2
+#
+#     def lf_constraint(self, x):
+#         return self.hf_constraint(x) - 0.7*x[0]**3 + x[0]*x[1]**2
+#
+#     def hf_constraint_1(self, x):
+#         return 10*x[0] + x[1] - 7
+#
+#     def lf_constraint_1(self, x):
+#         return self.hf_constraint_1(x) + np.exp(x[0])
+#
+#     def hf_constraint_2(self, x):
+#         return (x[0] - 0.5)**2 + (x[1] - 0.5)**2*np.exp(-x[1]**7) - 12
+#
+#     def lf_constraint_2(self, x):
+#         return self.hf_constraint_2(x) + np.sin(x[1])
+
+
+class BraninMF(BenchmarkProblem):
+
+    def __init__(self):
+        super().__init__()
+
+        self.num_dim = 2
+        self.num_cstr = 1
+        self.num_fidelity = 2
+        self.bounds = np.array([
+            [0, 1],
+            [0, 1]
+        ])
+
+        self.costs = [0.1, 1]
+        self.objective = [self.lf_objective, self.hf_objective]
+        self.constraints = [
+            [self.lf_constraint, self.hf_constraint]
+        ]
+
+        # costs = np.array([0.20, 1])
+        #
+        # # # Best feasible objective stated in reference paper
+        # # min_value = 24.863
+        # # min_location = np.array([[0.498, 0.401]])
+        #
+        # # Best feasible objective inferred by experimentation
+        # min_value = 20.640378369840477                             # 20.64081390475597
+        # min_location = np.array([0.23200528, 0.86204935])         # np.array([[0.2320232, 0.8619862]])
+        #
+        # # Other usable variable name for standardization with previous work
+        # f_min = min_value
+        # f_min_x = min_location
+
+    def hf_objective(self, x):
+        x0, x1 = self.decompose_x(x)
+        res = (15*x1 - 5.1/(4*np.pi**2) * (15*x0 - 5)**2 + 5/np.pi * (15*x0 - 5) - 6)**2 + 10*((1 - 1/(8*np.pi))*np.cos(15*x0 - 5) + 1) + 5*(15*x0 - 5)
+        return res
+
+    def lf_objective(self, x):
+        x0, x1 = self.decompose_x(x)
+        res = self.hf_objective(x).ravel() - np.cos(0.5*x0) - x1**3
+        return res
+
+    def hf_constraint(self, x):
+        x0, x1 = self.decompose_x(x)
+        res = -x0*x1 + 0.2
+        return res
+
+    def lf_constraint(self, x):
+        x0, x1 = self.decompose_x(x)
+        # res = -x0*x1 - 0.7*x1 + 0.3*x0
+        # return res
+        # return -0.4285714285714286*x0 -0.375*x1 + 0.3
+        # return -0.2857*x0 - 0.2*x1 + 0.2
+        return -0.375*x0 -0.5*x1 + 0.3
+
+    def decompose_x(self, x):
+        return x[0], x[1]
+

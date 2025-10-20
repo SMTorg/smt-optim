@@ -3,6 +3,8 @@ from .base import BenchmarkProblem
 
 from . import original
 from . import gano
+from . import avt
+from . import modified_avt
 
 available = {}
 
@@ -13,6 +15,8 @@ def _register_from_module(module):
 
 _register_from_module(original)
 _register_from_module(gano)
+_register_from_module(avt)
+_register_from_module(modified_avt)
 
 def list_problems(**criteria):
 
