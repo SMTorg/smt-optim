@@ -1,4 +1,5 @@
 import numpy as np
+from functools import partial
 from .base import BenchmarkProblem
 
 
@@ -102,16 +103,23 @@ class ConstrainedSpring(BenchmarkProblem):
             [1, 4]
         ])
 
-        self.costs = []
+        self.costs = [0.15/9, 1]
 
-        obj_hf = lambda x, dt=0.01: self.spring_f(x, dt)
-        obj_lf = lambda x, dt=0.6: self.spring_f(x, dt)
+        # lambda function is not pickable -> partial is used instead
+        # obj_hf = lambda x, dt=0.01: self.spring_f(x, dt)
+        # obj_lf = lambda x, dt=0.6: self.spring_f(x, dt)
+        #
+        # cstr_hf = lambda x, dt=0.01: self.spring_c(x, dt)
+        # cstr_lf = lambda x, dt=0.6: self.spring_c(x, dt)
 
-        cstr_hf = lambda x, dt=0.01: self.spring_c(x, dt)
-        cstr_lf = lambda x, dt=0.6: self.spring_c(x, dt)
+        self.objective = [
+            partial(self.spring_f, dt=0.6),
+            partial(self.spring_f, dt=0.01),
+        ]
 
-        self.objective = [obj_lf, obj_hf]
-        self.constraints = [[cstr_lf, cstr_hf]]
+        self.constraints = [
+            [partial(self.spring_c, dt=0.6), partial(self.spring_c, dt=0.01)]
+        ]
 
         self.t0 = 0.0
         self.tf = 6.0

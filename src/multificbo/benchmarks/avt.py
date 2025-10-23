@@ -46,7 +46,7 @@ class Mass(BenchmarkProblem):
             [1, 4]
         ])
 
-        self.costs = []
+        self.costs = [0.15/9, 1]
 
         obj_hf = lambda x, dt=0.01: self.mass(x, dt)
         obj_lf = lambda x, dt=0.6: self.mass(x, dt)
@@ -76,7 +76,7 @@ class Spring(BenchmarkProblem):
             [1, 4]
         ])
 
-        self.costs = []
+        self.costs = [0.15/9, 1]
 
         obj_hf = lambda x, dt=0.01: self.spring(x, dt)
         obj_lf = lambda x, dt=0.6: self.spring(x, dt)
@@ -107,7 +107,7 @@ class SpringMass(BenchmarkProblem):
             [1, 4]
         ])
 
-        self.costs = []
+        self.costs = [0.15/9, 1]
 
         obj_hf = lambda x, dt=0.01: self.spring(x, dt)
         obj_lf = lambda x, dt=0.6: self.sping(x, dt)
