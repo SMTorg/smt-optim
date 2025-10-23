@@ -8,6 +8,7 @@ from multificbo.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, V
 
 def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
          max_iter: int = 100,
+         max_budget: float = np.inf,
          xt_init: list = None,
          log: str = "log",
          verbose: bool = False) -> dict:
@@ -41,6 +42,7 @@ def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
     optim_config = OptimizerConfig(
         constraints=    cstr_config,
         max_iter=       max_iter,
+        max_budget=     max_budget,
         xt_init=        xt_init,
         log_filename=   log,
         verbose=        verbose,
@@ -58,6 +60,7 @@ def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
 
 def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
            max_iter: int = 100,
+           max_budget: float = np.inf,
            xt_init: list = None,
            log: str = "log",
            verbose: bool = False) -> dict:
@@ -87,6 +90,7 @@ def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constrain
     optim_config = OptimizerConfig(
         constraints=    cstr_config,
         max_iter=       max_iter,
+        max_budget=     max_budget,
         xt_init=        xt_init,
         log_filename=   log,
         verbose=        verbose,
@@ -104,6 +108,7 @@ def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constrain
 
 def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
          max_iter: int = 100,
+         max_budget: float = np.inf,
          xt_init: list = None,
          log: str = "log",
          verbose: bool = False) -> dict:
@@ -133,6 +138,7 @@ def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints
     optim_config = OptimizerConfig(
         constraints=    cstr_config,
         max_iter=       max_iter,
+        max_budget=     max_budget,
         xt_init=        xt_init,
         log_filename=   log,
         verbose=        verbose,
@@ -147,3 +153,100 @@ def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints
     opt_data = optimizer.optimize()
 
     return opt_data
+
+def run_optimizer(
+        objective,
+        domain,
+        surrogate,
+        strategy,
+        costs,
+        constraints: list = [],
+        max_iter: int = np.inf,
+        max_budget: float = np.inf,
+        xt_init: list = None,
+        log: str = "log",
+        verbose: bool = False,
+        optimizer_kwargs: dict = None,
+        strategy_kwargs: dict = None
+) -> dict:
+
+    if max_iter == np.inf and max_budget == np.inf:
+        raise Exception("At least one stopping criterion must be defined.")
+
+    obj_config = ObjectiveConfig(
+        objective=objective,
+        domain=domain,
+        type="minimize",
+        surrogate=surrogate,
+        costs=costs,
+    )
+
+    cstr_config = [
+        ConstraintConfig(
+            constraint=c_funcs,
+            type="less",
+            tol=1e-4,
+            surrogate=surrogate,
+        )
+        for c_funcs in constraints
+    ]
+
+    optim_config = OptimizerConfig(
+        constraints=cstr_config,
+        max_iter=max_iter,
+        max_budget=max_budget,
+        xt_init=xt_init,
+        log_filename=log,
+        verbose=verbose,
+    )
+
+    optimizer = Optimizer(obj_config, optim_config, strategy)
+
+    if optimizer_kwargs:
+        for key, value in optimizer_kwargs.items():
+            setattr(optimizer, key, value)
+
+    return optimizer.optimize()
+
+
+def minimize(
+        objective,
+        domain,
+        costs,
+        method: str,
+        max_iter: int = np.inf,
+        max_budget: float = np.inf,
+        constraints: list = [],
+        xt_init: list = None,
+        log: str = "log",
+        verbose: bool = False,
+        optimizer_kwargs: dict = None,
+        strategy_kwargs: dict = None
+):
+
+    methods = {
+        "sego": dict(surrogate=SmtKRG, strategy=MonoFiAcqStrat, costs=[1]),
+        "mfsego": dict(surrogate=SmtMFK, strategy=MultiFiAcqStrat),
+        "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
+    }
+
+    config = methods[method]
+    surrogate = config["surrogate"]
+    strategy = config["strategy"]
+    costs = costs or config["costs", [1]]
+
+    return run_optimizer(
+        objective=objective,
+        domain=domain,
+        surrogate=surrogate,
+        strategy=strategy,
+        costs=costs,
+        constraints=constraints,
+        max_iter=max_iter,
+        max_budget=max_budget,
+        xt_init=xt_init,
+        log=log,
+        verbose=verbose,
+        optimizer_kwargs=optimizer_kwargs,
+        strategy_kwargs=strategy_kwargs,
+    )

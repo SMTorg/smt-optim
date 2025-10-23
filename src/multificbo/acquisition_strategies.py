@@ -334,7 +334,7 @@ class VFPI:
 
         self.f_min = np.inf
 
-        self.sub_optimizer = "DEAP"
+        self.sub_optimizer = "COBYLA"
 
         if self.optimizer is not None:
             self.mfck = self.optimizer.obj_surrogate.mfck
