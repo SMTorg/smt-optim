@@ -3,7 +3,7 @@ from typing import Any, Callable, List, Optional, Union
 
 from multificbo.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
 from multificbo.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
-from multificbo.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, VFPI
+from multificbo.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFEI, VFPI
 
 
 def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
@@ -228,6 +228,7 @@ def minimize(
         "sego": dict(surrogate=SmtKRG, strategy=MonoFiAcqStrat, costs=[1]),
         "mfsego": dict(surrogate=SmtMFK, strategy=MultiFiAcqStrat),
         "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
+        "mfei": dict(surrogate=SmtMFCK, strategy=MFEI),
     }
 
     config = methods[method]

@@ -88,7 +88,8 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         acq_res_x = np.empty_like(acq_x0)
         acq_res_f = np.empty(acq_multistart)
-        acq_res_c = np.empty((acq_multistart, num_cstr))
+        if num_cstr > 1:
+            acq_res_c = np.empty((acq_multistart, num_cstr))
 
         scipy_cstr = []
         if num_cstr > 0:
@@ -105,7 +106,10 @@ class MonoFiAcqStrat(AcquisitionStrategy):
                 acq_res_c[i, c_id] = cstr_surrogates[c_id].predict_values(acq_res_x[i, :].reshape(1, -1))
 
         # check if solution respect the constraints
-        feas_mask = np.all(acq_res_c <= 1e-4, axis=1)   # TODO: add user parameter to modify the tolerance
+        if num_cstr == 0:
+            feas_mask = np.full_like(acq_res_f, True)
+        else:
+            feas_mask = np.all(acq_res_c <= 1e-4, axis=1)   # TODO: add user parameter to modify the tolerance
         if np.any(feas_mask):
             next_index = np.argmin(
                 np.where(feas_mask == True, acq_res_f, np.inf)
@@ -186,141 +190,274 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 
         return next_x_all_lvl
 
+# class MFEI:
+#     def __init__(self, acq_func=expected_improvement, optimizer=None):
+#         super().__init__()
+#
+#         self.optimizer = optimizer
+#         self.acq_func = acq_func
+#         self.n_start = 10
+#
+#     def alpha1(self, x: np.ndarray, l: int, m:int ):
+#
+#         # or approximate a pearson correlation factor?
+#
+#         mfk = self.optimizer.obj_surrogate.mfk
+#
+#         s2_pred, rho2 = mfk.predict_variances_all_levels(x)
+#
+#         var_l = s2_pred[:, l]
+#         var_m = s2_pred[:, m]
+#
+#         kappa = var_l
+#
+#         for ll in range(l, m):
+#             kappa *= np.sqrt(rho2[ll])
+#
+#         alpha1 = kappa/np.sqrt(var_l * var_m)
+#         # print(f"alpha1 = {alpha1}")
+#         #
+#         # mu_l = mfk._predict_intermediate_values(x, l+1)
+#         # print(f"mu_l = {mu_l}")
+#         # mu_mm = mfk._predict_intermediate_values(x, m+1)
+#         # print(f"mu_mm = {mu_mm}")
+#         # mu_m = mfk._predict_values(x)
+#         # print(f"mu_m = {mu_m}")
+#         #
+#         # samples_l = np.random.normal(loc=mu_l.squeeze(), scale=np.sqrt(var_l.squeeze()), size=10_000)
+#         # samples_m = np.random.normal(loc=mu_m.squeeze(), scale=np.sqrt(var_m.squeeze()), size=10_000)
+#         #
+#         # print(f"pearson = \n{np.corrcoef(samples_l, samples_m)}")
+#         #
+#         #
+#         # print(f"corr = {np.sqrt(var_l.squeeze())/np.abs(mu_m - mu_l) + np.sqrt(var_m)}")
+#         # apply correction if correlation coefficient is > 1. Should raise warning?
+#         alpha1 = np.where(alpha1 > 1, 1, alpha1)
+#         return alpha1
+#
+#     def alpha2(self, x: np.ndarray, l: int):
+#         # assume no noise
+#         return 1.0
+#
+#     def alpha3(self, l):
+#
+#         costs = self.optimizer.obj_surrogate.cost
+#
+#         tot_cost_m = np.sum(costs)
+#         tot_cost_l = np.sum(costs[0:l+1])
+#
+#         return tot_cost_m/tot_cost_l
+#
+#
+#     def execute_infill_strategy(self, optimizer) -> list:
+#
+#         obj_surrogate = optimizer.obj_surrogate
+#         dim = optimizer.num_dim
+#         n_level = optimizer.num_levels
+#         f_min = optimizer.f_min
+#         bounds = optimizer.domain
+#
+#         acq_sampler = stats.qmc.LatinHypercube(d=dim)   # To be verified, but I believe scipy LHS sampler works better
+#
+#         acq_x0 = acq_sampler.random(self.n_start)
+#         acq_x0 = stats.qmc.scale(acq_x0, bounds[:, 0], bounds[:, 1])
+#
+#         best_x_per_level = []
+#         best_f_per_level = []
+#
+#         for lvl in range(n_level):
+#
+#             alpha3 = self.alpha3(lvl)
+#
+#             acq_res_x = np.empty_like(acq_x0)
+#             acq_res_f = np.empty(self.n_start)
+#
+#             def scipy_ei_wrapper(x):
+#                 x = x.reshape(1, -1)
+#
+#                 mu = obj_surrogate.predict_values(x)
+#                 s2 = obj_surrogate.predict_variances(x)
+#
+#                 return -self.acq_func(mu, s2, f_min) * self.alpha1(x, lvl, n_level - 1) * alpha3
+#
+#             cstr_surrogates = optimizer.cstr_surrogates
+#             constrained = optimizer.constrained
+#
+#             if cstr_surrogates is None or cstr_surrogates == []:
+#                 constrained = True
+#
+#             scipy_cstr = []
+#             if constrained:
+#                 scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_values(x.reshape(1, -1))} for
+#                               c_gp in
+#                               cstr_surrogates]
+#
+#             for i in range(acq_x0.shape[0]):
+#
+#                 so_x0 = acq_x0[i, :]
+#                 acq_res = so.minimize(scipy_ei_wrapper, so_x0,
+#                                       bounds=bounds,
+#                                       method="COBYLA",
+#                                       constraints=scipy_cstr,
+#                                       tol=1e-4)
+#
+#                 acq_res_x[i, :] = acq_res.x
+#                 acq_res_f[i] = acq_res.fun
+#
+#             index = np.argmin(acq_res_f)
+#             best_x_per_level.append( acq_res_x[index, :] )
+#             best_f_per_level.append( acq_res_f[index] )
+#
+#             optimizer.iter_data[f"lvl{lvl}_acq_f"] = acq_res_f[index]
+#             optimizer.iter_data[f"lvl{lvl}_alpha1"] = self.alpha1(np.array([acq_res_x[index, :]]), lvl, n_level-1)
+#             optimizer.iter_data[f"lvl{lvl}_alpha3"] = alpha3
+#
+#         next_level = np.argmax(best_f_per_level)
+#         next_x = best_x_per_level[next_level]
+#
+#         optimizer.iter_data["infill_x"] = next_x
+#         optimizer.iter_data["infill_max_level"] = next_level
+#
+#         next_x_all_lvl = [None] * n_level
+#
+#         for k in range(next_level+1):
+#             if k <= next_level:
+#                 next_x_all_lvl[k] = next_x
+#
+#         return next_x_all_lvl
+
 class MFEI:
+
     def __init__(self, acq_func=expected_improvement, optimizer=None):
-        super().__init__()
 
         self.optimizer = optimizer
         self.acq_func = acq_func
         self.n_start = 10
 
-    def alpha1(self, x: np.ndarray, l: int, m:int ):
+        self.num_dim = 0
+        self.num_cstr = 0
+        self.num_levels = 0
+        self.bounds = None
 
-        # or approximate a pearson correlation factor?
+        self.obj_surrogate = None
+        self.cstr_surrogates = []
 
-        mfk = self.optimizer.obj_surrogate.mfk
+        self.sub_optimizer = "COBYLA"
 
-        s2_pred, rho2 = mfk.predict_variances_all_levels(x)
+        if self.optimizer is not None:
+            self.num_dim = self.optimizer.num_dim
+            self.num_cstr = self.optimizer.num_cstr
+            self.num_levels = self.optimizer.num_levels
+            self.bounds = self.optimizer.domain
 
-        var_l = s2_pred[:, l]
-        var_m = s2_pred[:, m]
+            self.obj_surrogate = self.optimizer.obj_surrogate
+            self.cstr_surrogates = self.optimizer.cstr_surrogates
 
-        kappa = var_l
 
-        for ll in range(l, m):
-            kappa *= np.sqrt(rho2[ll])
+    def augmented_ei(self, x, level):
 
-        alpha1 = kappa/np.sqrt(var_l * var_m)
-        # print(f"alpha1 = {alpha1}")
-        #
-        # mu_l = mfk._predict_intermediate_values(x, l+1)
-        # print(f"mu_l = {mu_l}")
-        # mu_mm = mfk._predict_intermediate_values(x, m+1)
-        # print(f"mu_mm = {mu_mm}")
-        # mu_m = mfk._predict_values(x)
-        # print(f"mu_m = {mu_m}")
-        #
-        # samples_l = np.random.normal(loc=mu_l.squeeze(), scale=np.sqrt(var_l.squeeze()), size=10_000)
-        # samples_m = np.random.normal(loc=mu_m.squeeze(), scale=np.sqrt(var_m.squeeze()), size=10_000)
-        #
-        # print(f"pearson = \n{np.corrcoef(samples_l, samples_m)}")
-        #
-        #
-        # print(f"corr = {np.sqrt(var_l.squeeze())/np.abs(mu_m - mu_l) + np.sqrt(var_m)}")
-        # apply correction if correlation coefficient is > 1. Should raise warning?
-        alpha1 = np.where(alpha1 > 1, 1, alpha1)
-        return alpha1
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
 
-    def alpha2(self, x: np.ndarray, l: int):
-        # assume no noise
-        return 1.0
+        means, vars = self.obj_surrogate.mfck.predict_all_levels(x)
+        cov = self.obj_surrogate.mfck.predict_level_covariances(x, level)
 
-    def alpha3(self, l):
+        ei = self.acq_func(means[-1].reshape(-1, 1), vars[-1].reshape(-1, 1), self.f_min)
+        alpha1 = fidelity_correlation(cov, vars[level].reshape(-1, 1), vars[-1].reshape(-1, 1))
+        alpha3 = self.optimizer.costs[-1]/self.optimizer.costs[level]
 
-        costs = self.optimizer.obj_surrogate.cost
+        return ei * alpha1 * alpha3
 
-        tot_cost_m = np.sum(costs)
-        tot_cost_l = np.sum(costs[0:l+1])
+    def minimize_with_scipy(self) -> tuple:
 
-        return tot_cost_m/tot_cost_l
+        self.current_level = 0
+
+        def augmented_ei_scipy_wrapper(x: np.ndarray) -> float:
+            x = x.reshape(1, -1)
+            augmented_ei = self.augmented_ei(x, self.current_level).ravel()
+            return -augmented_ei
+
+        dim = self.optimizer.num_dim
+        bounds = self.optimizer.domain
+        acq_multistart = self.n_start
+        acq_sampler = stats.qmc.LatinHypercube(d=self.num_dim)   # To be verified, but I believe scipy LHS sampler works better
+
+        acq_x0 = acq_sampler.random(acq_multistart)
+        acq_x0 = stats.qmc.scale(acq_x0, self.bounds[:, 0], self.bounds[:, 1])
+
+        acq_res_x = np.empty((self.n_start*self.num_levels, self.num_dim))
+        acq_res_f = np.empty(self.n_start*self.num_levels)
+        acq_res_lvl = np.empty(self.n_start*self.num_levels)
+
+        if self.num_cstr > 0:
+            acq_res_c = np.empty((self.n_start * self.num_levels, self.num_cstr))
+
+        scipy_cstr = []
+        for c_surrogate in self.cstr_surrogates:
+            scipy_cstr.append(
+                {"type": "ineq",
+                 "fun": lambda x, f=c_surrogate.mfck.predict_all_levels: -f(x.reshape(1, -1))[0][-1].ravel()}
+            )
+
+        for lvl in range(self.num_levels):
+            self.current_level = lvl
+
+            for i in range(acq_x0.shape[0]):
+
+                j = lvl*self.n_start + i
+
+                res = so.minimize(augmented_ei_scipy_wrapper,
+                                  acq_x0[i, :],
+                                  method="COBYLA",
+                                  bounds=bounds,
+                                  constraints=scipy_cstr,
+                                  tol=1e-4)
+
+                acq_res_x[j, :] = res.x
+                acq_res_f[j] = res.fun
+                acq_res_lvl[j] = self.current_level
+
+                for c_id, c_surrogate in enumerate(self.cstr_surrogates):
+                    acq_res_c[j, c_id] = c_surrogate.predict_values(acq_res_x[j, :].reshape(1, -1)).ravel()
+
+        # check if solution respect the constraints
+        if self.optimizer.num_cstr == 0:
+            feas_mask = np.full_like(acq_res_f, True)
+        else:
+            feas_mask = np.all(acq_res_c <= 1e-4, axis=1)   # TODO: add user parameter to modify the tolerance
+
+        if np.any(feas_mask):
+            next_index = np.argmin(
+                np.where(feas_mask == True, acq_res_f, np.inf)
+            )
+        else:
+            # if none of the solutions are feasible, the solution with the lowest constraint violation is selected
+            acq_res_c_norm = np.linalg.norm(acq_res_c, axis=1)
+            next_index = np.argmin(acq_res_c_norm)
+            warn("No feasible point found through the acquisition function.")
+
+        x_infill = acq_res_x[next_index, :]
+        lvl_infill = acq_res_lvl[next_index]
+
+        return x_infill, lvl_infill
 
 
     def execute_infill_strategy(self, optimizer) -> list:
 
-        obj_surrogate = optimizer.obj_surrogate
-        dim = optimizer.num_dim
-        n_level = optimizer.num_levels
-        f_min = optimizer.f_min
-        bounds = optimizer.domain
+        self.optimizer = optimizer
+        self.f_min = self.optimizer.f_min
 
-        acq_sampler = stats.qmc.LatinHypercube(d=dim)   # To be verified, but I believe scipy LHS sampler works better
+        x_infill, fid_infill = self.minimize_with_scipy()
 
-        acq_x0 = acq_sampler.random(self.n_start)
-        acq_x0 = stats.qmc.scale(acq_x0, bounds[:, 0], bounds[:, 1])
+        infill = []
+        for lvl in range(self.num_levels):
+            if lvl == fid_infill:
+                infill.append(x_infill)
+            else:
+                infill.append(None)
 
-        best_x_per_level = []
-        best_f_per_level = []
+        return infill
 
-        for lvl in range(n_level):
-
-            alpha3 = self.alpha3(lvl)
-
-            acq_res_x = np.empty_like(acq_x0)
-            acq_res_f = np.empty(self.n_start)
-
-            def scipy_ei_wrapper(x):
-                x = x.reshape(1, -1)
-
-                mu = obj_surrogate.predict_values(x)
-                s2 = obj_surrogate.predict_variances(x)
-
-                return -self.acq_func(mu, s2, f_min) * self.alpha1(x, lvl, n_level - 1) * alpha3
-
-            cstr_surrogates = optimizer.cstr_surrogates
-            constrained = optimizer.constrained
-
-            if cstr_surrogates is None or cstr_surrogates == []:
-                constrained = True
-
-            scipy_cstr = []
-            if constrained:
-                scipy_cstr = [{"type": "ineq", "fun": lambda x, c_gp=c_gp: -c_gp.predict_values(x.reshape(1, -1))} for
-                              c_gp in
-                              cstr_surrogates]
-
-            for i in range(acq_x0.shape[0]):
-
-                so_x0 = acq_x0[i, :]
-                acq_res = so.minimize(scipy_ei_wrapper, so_x0,
-                                      bounds=bounds,
-                                      method="COBYLA",
-                                      constraints=scipy_cstr,
-                                      tol=1e-4)
-
-                acq_res_x[i, :] = acq_res.x
-                acq_res_f[i] = acq_res.fun
-
-            index = np.argmin(acq_res_f)
-            best_x_per_level.append( acq_res_x[index, :] )
-            best_f_per_level.append( acq_res_f[index] )
-
-            optimizer.iter_data[f"lvl{lvl}_acq_f"] = acq_res_f[index]
-            optimizer.iter_data[f"lvl{lvl}_alpha1"] = self.alpha1(np.array([acq_res_x[index, :]]), lvl, n_level-1)
-            optimizer.iter_data[f"lvl{lvl}_alpha3"] = alpha3
-
-        next_level = np.argmax(best_f_per_level)
-        next_x = best_x_per_level[next_level]
-
-        optimizer.iter_data["infill_x"] = next_x
-        optimizer.iter_data["infill_max_level"] = next_level
-
-        next_x_all_lvl = [None] * n_level
-
-        for k in range(next_level+1):
-            if k <= next_level:
-                next_x_all_lvl[k] = next_x
-
-        return next_x_all_lvl
 
 
 class VFPI:

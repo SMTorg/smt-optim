@@ -22,16 +22,15 @@ def expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.nda
     :rtype: np.ndarray
     """
 
-    mask_s = (s2 > 0).ravel()
+    mask_s = s2 > 0
+    ei = np.full_like(mu, 0)
 
-    s = np.empty_like(s2)
-    s[mask_s] = np.sqrt(s2[mask_s])
-
-    ei = np.full_like(mu, -np.inf)
-    z = np.empty_like(mu)
-
-    z[mask_s] = (f_min - mu[mask_s])/s[mask_s]
-    ei[mask_s] = (f_min - mu[mask_s])*stats.norm.cdf(z[mask_s]) + s[mask_s]*stats.norm.pdf(z[mask_s])
+    if not np.any(mask_s):
+        return np.full_like(mu, 0)
+    else:
+        s = np.sqrt(s2[mask_s])
+        z = (f_min - mu[mask_s])/s
+        ei[mask_s] = (f_min - mu[mask_s])*stats.norm.cdf(z) + s*stats.norm.pdf(z)
 
     return ei
 

@@ -95,7 +95,7 @@ def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
     x_corrected = np.where(x_corrected > bounds[:, 1], bounds[:, 1], x_corrected)
 
     if np.any(x != x_corrected):
-        warnings.warn("Infill point was outside of the bounds. L1 correction was applied.")
+        warnings.warn(f"Infill point was outside of the bounds. L1 correction was applied: (initial = {x}; corrected = {x}).")
 
     return x_corrected
 
