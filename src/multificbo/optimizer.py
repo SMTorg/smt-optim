@@ -95,7 +95,7 @@ def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
     x_corrected = np.where(x_corrected > bounds[:, 1], bounds[:, 1], x_corrected)
 
     if np.any(x != x_corrected):
-        warnings.warn(f"Infill point was outside of the bounds. L1 correction was applied: (initial = {x}; corrected = {x}).")
+        warnings.warn(f"Infill point was outside of the bounds. L1 correction was applied: (initial = {x}; corrected = {x_corrected}).")
 
     return x_corrected
 
@@ -125,6 +125,7 @@ class OptimizerConfig:
     xt_init: Optional[Any] = None
     log_filename: Optional[str] = "log"
     verbose: Optional[bool] = False
+    callback_func: Optional[Callable] = None
 
 
 class Optimizer():
@@ -161,6 +162,7 @@ class Optimizer():
         # get misc configuration
         self.log_filename = config.log_filename
         self.verbose = config.verbose
+        self.callback_func = config.callback_func
 
         #
         self.strategy = strategy
@@ -379,7 +381,7 @@ class Optimizer():
 
             self.iter_data = dict()  # reset iteration data dictionary
 
-            if self.verbose: print(f"======= iter: {iter_id}/{self.max_iter} =======")
+            # if self.verbose: print(f"======= iter: {iter_id}/{self.max_iter} =======")
 
             # ------- Surrogate models training -------
             gp_t0 = time.perf_counter()
@@ -402,13 +404,13 @@ class Optimizer():
             # log gp training elapsed time
             self.iter_data["gp_training_time"] = gp_time
 
-            if self.verbose: print(f"Elapsed time for training GPs: {gp_time:.3f} s")
+            # if self.verbose: print(f"Elapsed time for training GPs: {gp_time:.3f} s")
 
             # # ------- Acquisition function optimization -------
             acq_t0 = time.perf_counter()
 
             # Find enrichment location
-            next_x_all_lvl = self.acq_strategy.execute_infill_strategy(optimizer=self)
+            self.next_x = self.acq_strategy.execute_infill_strategy(optimizer=self)
 
             acq_t1 = time.perf_counter()
             acq_time = acq_t1 - acq_t0  # elapsed time for finding the next acquisition point
@@ -416,16 +418,16 @@ class Optimizer():
             # log acquisition function maximization time
             self.iter_data["acq_opt_time"] = acq_time
 
-            if self.verbose: print(f"Elapsed time for max acq func: {acq_time:.3f} s")
+            # if self.verbose: print(f"Elapsed time for max acq func: {acq_time:.3f} s")
 
             # ------- Sample infill location -------
 
             # Convert the single fidelity acquisition function output to a list as
             # to make it compatible with the multi-fidelity approach
-            if type(next_x_all_lvl) is not list:
-                next_x_all_lvl = [next_x_all_lvl]
+            if type(self.next_x) is not list:
+                self.next_x = [self.next_x]
 
-            if len(next_x_all_lvl) != self.num_levels:
+            if len(self.next_x) != self.num_levels:
                 warnings.warn("")
 
             infill_values = []
@@ -437,33 +439,32 @@ class Optimizer():
             max_level = 0
             for k in range(self.num_levels):
 
-                next_x = next_x_all_lvl[k]
-
                 # Assumes that all lower fidelity levels must be sampled
-                if next_x is None:
+                if self.next_x[k] is None:
                     continue
-
-                if self.verbose: print(f"sampling level {k + 1}")
 
                 max_level = k
 
                 # Check if the infill point is already in the training data
                 # TODO: what to do if the next infill location is already in the training data?
-                if np.any(np.all(self.xt[k] == next_x, axis=1)):
+                if np.any(np.all(self.xt[k] == self.next_x[k], axis=1)):
                     warnings.warn("Infill point is already in the training data.")
                     continue
 
                 # sample objective function and constraints
-                next_y, next_c = self.sample_point(next_x, k)
+                next_y, next_c = self.sample_point(self.next_x[k], k)
 
-                infill_x.append(next_x)
+                infill_x.append(self.next_x[k])
                 infill_f.append(next_y)
                 infill_c.append(next_c)
 
                 # add infill evaluation to the training data
-                self.xt[k] = np.vstack((self.xt[k], next_x))
+                self.xt[k] = np.vstack((self.xt[k], self.next_x[k]))
                 self.yt[k] = np.append(self.yt[k], next_y)
                 self.ct[k] = np.vstack((self.ct[k], next_c))
+
+            if self.callback_func is not None:
+                self.callback_func(self)
 
             # log infill point, objective value and constraints values
             self.iter_data["infill_x"] = infill_x
@@ -498,7 +499,7 @@ class Optimizer():
 
             # Display the iteration number, best feasible objective and fidelity level sampled
             if self.verbose : print(
-                f"|  iter= {iter_id}  |  f_min= {self.f_min:.3e}  |  mf lvl= {max_level}/{self.num_levels - 1}  |")
+                f"| iter= {iter_id}/{self.max_iter} | budget={self.budget}/{self.max_budget} | f_min={self.f_min:.3e} | lvl={max_level}/{self.num_levels - 1} | gp_time={gp_time:.3f} | acq_time={acq_time:.3f}")
 
             # ------- End of optimization loop -------
 

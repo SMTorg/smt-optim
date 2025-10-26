@@ -63,7 +63,6 @@ class MonoFiAcqStrat(AcquisitionStrategy):
         obj_surrogate = optimizer.obj_surrogate
         cstr_surrogates = optimizer.cstr_surrogates
 
-
         ct_norm = np.linalg.norm(optimizer.ct[-1], axis=1)
 
         # if there is no feasible points in the training data, f_min is set to objective value corresponding to the
@@ -88,7 +87,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         acq_res_x = np.empty_like(acq_x0)
         acq_res_f = np.empty(acq_multistart)
-        if num_cstr > 1:
+        if num_cstr > 0:
             acq_res_c = np.empty((acq_multistart, num_cstr))
 
         scipy_cstr = []
