@@ -145,6 +145,9 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 
     def mf_acq_strategy(self, optimizer) -> list:
 
+        # set acquisition function to mono-fidelity strategy
+        self.mono_fi_strat.acq_func = self.acq_func
+
         # get next sampling point
         next_x = self.mono_fi_strat.execute_infill_strategy(optimizer)
 
