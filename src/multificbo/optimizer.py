@@ -40,6 +40,32 @@ def wrap_objective(obj_func, maximize=False, logger=None):
 
     return wrapped_obj_func
 
+
+def wrap_func(func, factor: float = 1, step: float = 0):
+    """
+    Wrap function to return coeff * (func - step).
+
+    :param x: Function to wrap.
+    :type x: callable
+
+    :param bounds: Multiplicative factor.
+    :type bounds: float
+
+    :return: Additive step.
+    :rtype: float
+    """
+
+    def wrapped(x, f=func):
+        return factor*(f(x) - step)
+
+    return wrapped
+
+
+
+
+
+
+
 def wrap_constraints(constraints):
     """
     Wrap the constraint functions so to make them have the form c(x) <= 0
@@ -103,29 +129,31 @@ def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
 @dataclass
 class ObjectiveConfig:
     objective: Union[Callable, List[Callable]]
-    domain: Union[np.ndarray]
-    type: str = "minimize"
+    domain: Union[np.ndarray]                       # problem bounds np.ndarray(dim, 2) lower = bounds[:, 0], upper = bounds[:, 1]
+    type: str = "minimize"                          # problem's type -> "minimize" or "maximize")
     surrogate: Surrogate = None
-    costs: List = None
+    costs: List = None                              # cost of each fidelity level
 
 @dataclass
 class ConstraintConfig:
     constraint: Union[Callable, List[Callable]]
-    type: str = "less"
-    tol: float = 1e-4
+    type: str = "less"                              # "less"-> g <= 0; "greater" -> g >= 0
+    value: float = 0                                # g <= value (or g >= value if type is " greater")
+    tol: float = 1e-4                               # does not work. use OptimizerConfig.ctol instead
     surrogate: Surrogate = None
 
 @dataclass
 class OptimizerConfig:
     constraints: Optional[List[ConstraintConfig]] = None
-    max_iter: Optional[int] = None
-    max_budget: Optional[float] = float("inf")
-    max_time: Optional[float] = float("inf")
-    nt_init: Optional[int] = None
-    xt_init: Optional[Any] = None
-    log_filename: Optional[str] = "log"
-    verbose: Optional[bool] = False
-    callback_func: Optional[Callable] = None
+    ctol: float = 1e-4                                      # tolerance for all constraints
+    max_iter: Optional[int] = None                          # max number of BO iterations
+    max_budget: Optional[float] = float("inf")              # max BO budget
+    max_time: Optional[float] = float("inf")                # max BO elapsed time
+    nt_init: Optional[int] = None                           # number of samples in initial DOE (with LHS)
+    xt_init: Optional[Any] = None                           # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
+    log_filename: Optional[str] = "log"                     # name for the logfile -> " log_filename" + ".pkl"
+    verbose: Optional[bool] = False                         # True/False print each iteration informations
+    callback_func: Optional[Callable] = None                # additional method to call at the end of each iteration
 
 
 class Optimizer():
@@ -149,6 +177,8 @@ class Optimizer():
 
         # get constraint configurations
         self.cstr_config = config.constraints
+        self.cstr_funcs = []
+        self.ctol = config.ctol
 
         # get stopping criteria
         self.max_iter = config.max_iter
@@ -224,18 +254,45 @@ class Optimizer():
 
         wrapped_obj_func = []
 
+        if maximize:
+            factor = -1
+        else:
+            factor = 1
+
         for func in obj_func:
-
-            def wrapped(x, f=func):
-                val = f(x)
-
-                if maximize:
-                    return -val
-                return val
-
-            wrapped_obj_func.append(wrapped)
+            wrapped_obj_func.append(wrap_func(func, factor=factor))
 
         return wrapped_obj_func
+
+    def _wrap_constraints(self, cstr_func: list, type: str, value: float):
+        """
+        Wrap all the fidelity levels of a given constraint to match the constraint's type (less or greater;
+        by default = "less") and its value (by default = 0).
+
+        :param cstr_func: List of callable where each callable is a fidelity level.
+        :type cstr_func: list[callable]
+
+        :param type: Define constraint's type where "less" is for constraints of type g <= 0 and "greater" is for
+                     constraints of type g >= 0.
+        :type type: str
+
+        :param value: Limit value of the constraint g <= value
+        :type value: float
+
+        :return:
+        """
+
+        if type == "less":
+            factor = 1
+        elif type == "greater":
+            factor = -1
+
+        wrapped_cstr_func = []
+
+        for func in cstr_func:
+            wrapped_cstr_func.append(wrap_func(func, factor=factor, step=value))
+
+        return wrapped_cstr_func
 
 
     def _check_constraints(self):
@@ -246,7 +303,9 @@ class Optimizer():
         self.num_cstr = len(self.cstr_config)
 
         if self.num_cstr > 0:
-            for c_config in self.cstr_config:
+            for c_id, c_config in enumerate(self.cstr_config):
+
+                self.cstr_funcs.append([])
 
                 if callable(c_config.constraint):
                     c_config.constraint = [c_config.constraint]
@@ -257,6 +316,10 @@ class Optimizer():
 
                 if len(c_config.constraint) != self.num_levels:
                     raise Exception("ConstraintConfig.constraint must have the same number of levels as the objective.")
+
+                self.cstr_funcs[c_id].append(
+                    self._wrap_constraints(c_config.constraint, c_config.type, c_config.value)
+                )
 
     def _setup_stopping_criteria(self):
 
@@ -276,7 +339,7 @@ class Optimizer():
     def _check_init_points(self):
 
         if self.nt_init is not None and self.xt_init is not None:
-            raise Exception("Initial training points must be defined either by setting a number of starting point (nt_init) or by providing starting points (xt_init). Not both.")
+            raise Exception("Define nt_init or xt_init, but not both.")
 
         elif self.nt_init is None:
             self.nt_init = 3*self.num_dim
@@ -323,7 +386,7 @@ class Optimizer():
         # self.f_min = np.min(np.where(feasible_mask == True, self.yt[-1], np.inf))
         # print(f"f_min = {self.f_min}")
 
-        feas_mask = np.all(self.ct[-1] <= 1e-4, axis=1)
+        feas_mask = np.all(self.ct[-1] <= self.ctol, axis=1)
         if np.any(feas_mask):
             next_f_min = np.min(self.yt[-1][feas_mask])
         else:
@@ -345,8 +408,8 @@ class Optimizer():
 
         cstr = np.zeros((1, max(1, self.num_cstr)))
 
-        for i, c_config in enumerate(self.cstr_config):
-            cstr[i] = c_config.constraint[level](x_new)
+        for c_id, c_func in enumerate(self.cstr_funcs):
+            cstr[c_id] = c_func[c_id][level](x_new)
 
         return obj, cstr
 
