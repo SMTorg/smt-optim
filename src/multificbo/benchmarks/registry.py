@@ -5,6 +5,7 @@ from . import original
 from . import gano
 from . import avt
 from . import modified_avt
+from . import edge_cases
 
 available = {}
 
@@ -17,6 +18,8 @@ _register_from_module(original)
 _register_from_module(gano)
 _register_from_module(avt)
 _register_from_module(modified_avt)
+_register_from_module(edge_cases)
+
 
 def list_problems(**criteria):
 

@@ -1,6 +1,4 @@
 import numpy as np
-from scipy._lib.cobyqa.problem import Problem
-
 from .base import BenchmarkProblem
 
 
