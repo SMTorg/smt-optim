@@ -1,3 +1,36 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "MultiFiCBO"
+version = "0.0.1"
+authors = [
+  { name="Oihan Cordelier", email="oihan.cordelier@polymtl.ca" },
+]
+description = "A small example package"
+readme = "README.md"
+requires-python = ">=3.11"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "smt",
+]
+
+license = "LicenseRef-My-Custom-License"
+license-files = ["LICEN[CS]E*"]
+
+[project.optional-dependencies]
+dev = [
+    "smt>=2.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/oihanc/MultiFiCBO"
+Issues = "https://github.com/oihanc/MultiFiCBO/issues"
