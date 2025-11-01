@@ -6,9 +6,11 @@ from warnings import warn
 from deap import base, creator, tools, algorithms
 import random
 
-from multificbo.surrogate_models import Surrogate
+# from multificbo.optimizer import Optimizer
+from multificbo.surrogate_models import Surrogate, SmtMFK
 from multificbo.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
 
+from multificbo.suboptimizers.orthomads import orthomads
 
 
 # TODO: acquisition strategy class template
@@ -28,16 +30,71 @@ class MonoFiAcqStrat(AcquisitionStrategy):
         super().__init__()
 
         self.acq_func = acq_func
+        self.sub_optimizer = "COBYLA"
         self.n_start = 10
 
         if optimizer is not None:
             self.n_start *= optimizer.num_dim
 
     def execute_infill_strategy(self, optimizer) -> np.ndarray:
-        return self.acq_strategy(optimizer)
+
+        if self.sub_optimizer == "ORTHOMADS":
+            return self.acq_strategy_orthomads(optimizer)
+        elif self.sub_optimizer == "COBYLA":
+            return self.acq_strategy_cobyla(optimizer)
+        else:
+            raise Exception(f"{self.sub_optimizer} is not a valide sub optimizer.")
 
 
-    def acq_strategy(self, optimizer) -> np.ndarray:
+    def acq_strategy_orthomads(self, optimizer) -> np.ndarray:
+
+        def ortho_wrapper(x: np.ndarray) -> np.ndarray:
+            mu = optimizer.obj_surrogate.predict_values(x)
+            s2 = optimizer.obj_surrogate.predict_variances(x)
+            return -self.acq_func(mu, s2, optimizer.f_min).ravel()
+
+        sampler = stats.qmc.LatinHypercube(d=optimizer.num_dim)
+        x0_multistart = sampler.random(self.n_start)
+        x0_multistart = stats.qmc.scale(x0_multistart, optimizer.domain[:, 0], optimizer.domain[:, 1])
+
+        fmin = []
+        xmin = []
+        cmin = []
+        feasible_counter = 0
+
+        constraints = []
+        for c_surrogate in optimizer.cstr_surrogates:
+            constraints.append(
+                c_surrogate.predict_values
+            )
+
+        # time = 0
+        for i in range(x0_multistart.shape[0]):
+            x0 = x0_multistart[i, :]
+
+            # t0 = perf_counter()
+            res = orthomads(ortho_wrapper, x0, bounds=optimizer.domain, constraints=constraints,
+                            max_iter=1_000, verbose=False)
+            # t1 = perf_counter()
+            # time += (t1 - t0)
+
+            print(f"iter={res.num_iter} | fmin={res.fun} |")
+
+            cstr_values = np.full(optimizer.num_cstr, np.inf)
+            for c_id, c_surrogate in enumerate(optimizer.cstr_surrogates):
+                cstr_values[c_id] = c_surrogate.predict_values(res.x.reshape(1, -1)).item()
+
+            if np.all(cstr_values <= 0):
+                feasible_counter += 1
+                fmin.append(res.fun)
+                xmin.append(res.x)
+
+        index = np.array(fmin).argmin()
+        next_x = np.array(xmin)[index, :]
+
+        return next_x
+
+    def acq_strategy_cobyla(self, optimizer) -> np.ndarray:
         """
         Maximize the expected improvement acquisition function to find the next infill location. Handle constraints if
         applicable. The optimization is done with scipy's COBYLA implementation.
@@ -130,6 +187,7 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 
         self.acq_func = acq_func
         self.n_start = 10
+        self.fidelity_crit = "obj-only"
 
         self.mono_fi_strat = MonoFiAcqStrat(acq_func=acq_func, optimizer=optimizer)
 
@@ -143,51 +201,167 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 
         return self.mf_acq_strategy(optimizer)
 
-    def mf_acq_strategy(self, optimizer) -> list:
+
+    def compute_sigma2_red(self, x_pred: np.ndarray, surrogate: SmtMFK) -> np.ndarray:
+
+        # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
+        s2, rho2 = surrogate.mfk.predict_variances_all_levels(x_pred)
+        num_levels = s2.shape[1]
+
+        tot_rho2 = np.ones((x_pred.shape[0], num_levels))
+        s2_red = np.empty((x_pred.shape[0], num_levels))
+
+        for k in range(num_levels):
+            for l in range(k, num_levels-1):
+                tot_rho2[:, k] *= rho2[l][:]
+
+            s2_red[:, k] = s2[:, k] * tot_rho2[:, k]
+
+        # np.array(num_points, num_levels)
+        return s2_red
+
+
+    def compute_norm_squared_cost(self, costs: list[float]) -> np.ndarray:
+
+        num_levels = len(costs)
+        tot_costs2 = np.empty(num_levels)
+
+        for k in range(num_levels):
+            tot_costs2[k] = np.sum(costs[0:k+1])**2
+
+        # normalize the aggregate costs squared by its maximum
+        tot_costs2 /= np.max(tot_costs2)
+
+        return tot_costs2
+
+    def compute_norm_sigma2_red(self, x_pred: np.ndarray, norm_costs2: list[float], surrogate: SmtMFK) -> np.ndarray:
+
+        num_levels = len(norm_costs2)
+
+        s2_red = self.compute_sigma2_red(x_pred, surrogate)
+        s2_norm = np.empty_like(s2_red)
+
+        for k in range(num_levels):
+            s2_norm[:, k] = s2_red[:, k] / norm_costs2[k]
+
+        return s2_norm
+
+
+    def compute_all_s2_red_norm(self, x_pred: np.ndarray, costs: list[float], surrogates: list[SmtMFK]) -> list[np.ndarray]:
+
+        num_pts = x_pred.shape[0]
+        num_levels = len(costs)
+
+        norm_costs2 = self.compute_norm_squared_cost(costs)
+
+        s2_red_norm = [np.empty((num_pts, num_levels)) for _ in range(len(surrogates))]
+
+        for i, surrogate in enumerate(surrogates):
+            s2_red_norm[i] = self.compute_norm_sigma2_red(x_pred, norm_costs2, surrogate)
+
+        return s2_red_norm
+
+
+    def select_fidelity_level(self, x_pred: np.ndarray, costs: list[float], all_surrogates: list[SmtMFK], criterion: str) -> np.ndarray:
+
+
+
+        num_pts: int = x_pred.shape[0]
+        # level: np.ndarray = np.zeros(num_pts)
+
+        if criterion == "obj-only":
+            surrogates = [all_surrogates[0]]
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, surrogates)
+
+            level = s2_red_norm[0].argmax(axis=1)
+
+        elif criterion == "optimistic":
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+
+            # TODO: make it compatible with multiple infill points
+            level = s2_red_norm[0].argmax(axis=1)
+
+            for i in range(1, len(all_surrogates)):
+                level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).min(axis=0)
+
+        elif criterion == "pessimistic":
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+
+            level = s2_red_norm[0].argmax(axis=1)
+
+            for i in range(1, len(all_surrogates)):
+                level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).max(axis=0)
+
+        elif criterion == "average":
+            # s2_red of each surrogate is normalized by the cost. Should it be normalized after the sum?
+            # -> should be the same
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+            s2_red_avg = np.zeros((num_pts, s2_red_norm[0].shape[1]))
+
+            # sum the s2_red from all surrogates
+            for i in range(len(all_surrogates)):
+                s2_red_avg[:, :] += s2_red_norm[i][:, :]
+
+            level = s2_red_avg.argmax(axis=1)
+
+        elif criterion == "cstr-only":
+
+            if len(all_surrogates) == 1:
+                raise Exeption("cstr-only criterion requires one constraint surrogate.")
+
+            surrogates = all_surrogates[1:]
+
+            if len(surrogates) > 1:
+                raise Exception("cstr-only is not implemented for more than 1 constraints.")
+
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, surrogates)
+
+            level = s2_red_norm[0].argmax(axis=1)
+
+        # np.ndarray(num_pts) -> fidelity level for each infill points
+        return level
+
+
+    def mf_acq_strategy(self, optimizer) -> list[np.ndarray]:
 
         # set acquisition function to mono-fidelity strategy
         self.mono_fi_strat.acq_func = self.acq_func
 
         # get next sampling point
-        next_x = self.mono_fi_strat.execute_infill_strategy(optimizer)
+        next_x: list[np.ndarray] = self.mono_fi_strat.execute_infill_strategy(optimizer)
 
-        n_level = optimizer.num_levels
+        num_levels: int = optimizer.num_levels
 
-        # TODO: implement the different multi-fidelity strategies
-        obj_surrogate = optimizer.obj_surrogate
-        obj_cost = obj_surrogate.costs
+        obj_surrogate: Surrogate = optimizer.obj_surrogate
+        cstr_surrogates : list[Surrogate] = optimizer.cstr_surrogates
+        obj_cost: list[float] = optimizer.costs
 
-        # Get the variance reduction and the associated scaling factor of each level
-        # TODO: function should only return the variance -> variance reduction computatio should be done here
-        s2_red, rho2 = obj_surrogate.predict_s2_red_rho2(next_x.reshape(1, -1))
+        all_surrogates: list[Surrogate] = [obj_surrogate]
+        for c_surrogate in cstr_surrogates:
+            all_surrogates.append(c_surrogate)
 
-        tot_cost = np.zeros(n_level)
-        fid_crit = np.zeros(n_level)
+        level: int = self.select_fidelity_level(next_x.reshape(1, -1),
+                                                obj_cost,
+                                                all_surrogates,
+                                                self.fidelity_crit)
 
-        # Compute the highest fidelity level that should be sampled
-        for k in range(0, n_level):
-            tot_cost[k] = np.sum(obj_cost[0:k+1])**2
 
-        norm_tot_cost = tot_cost / np.max(tot_cost)
+        # optimizer.iter_data["s2_red"] = s2_red
+        # optimizer.iter_data["tot_cost2"] = tot_cost
+        # optimizer.iter_data["norm_tot_cost2"] = norm_tot_cost
+        # optimizer.iter_data["fid_crit"] = fid_crit
 
-        fid_crit = s2_red / norm_tot_cost
-
-        optimizer.iter_data["s2_red"] = s2_red
-        optimizer.iter_data["tot_cost2"] = tot_cost
-        optimizer.iter_data["norm_tot_cost2"] = norm_tot_cost
-        optimizer.iter_data["fid_crit"] = fid_crit
-
-        max_level = np.argmax(fid_crit)
+        # max_level = np.argmax(fid_crit)
 
         optimizer.iter_data["infill_x"] = next_x
-        optimizer.iter_data["infill_max_level"] = max_level    # redundant
+        optimizer.iter_data["infill_max_level"] = level    # redundant
 
         # for each index    -> None:            do not sample level
         #                   -> np.ndarray():    sample level at said point
-        next_x_all_lvl = [None] * n_level
-
-        for k in range(max_level+1):
-            if k <= max_level:
+        # warning -> does not work if next_x is more than 1 point
+        next_x_all_lvl: list[np.ndarray] = [None] * num_levels
+        for k in range(num_levels+1):
+            if k <= level:
                 next_x_all_lvl[k] = next_x
 
         return next_x_all_lvl

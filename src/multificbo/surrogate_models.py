@@ -189,7 +189,7 @@ class SmtMFK(Surrogate):
         self.mfk_initialized = True
 
 
-    def train(self, xt: list, yt: list):
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray]) -> None:
 
         if not self.mfk_initialized:
             raise Exception("MFK must be initialized before training.")
@@ -223,7 +223,7 @@ class SmtMFK(Surrogate):
         s2_pred = self.mfk.predict_variances(x_pred)
         return s2_pred
 
-    def predict_s2_red_rho2(self, x_pred: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def predict_variances_all_levels(self, x_pred: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
         Compute the uncertainty reduction and the square scale factor of each level.
 
@@ -236,6 +236,7 @@ class SmtMFK(Surrogate):
 
         """
 
+        # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
         s2_pred, rho2 = self.mfk.predict_variances_all_levels(x_pred)
         s2_red = np.zeros(self.num_levels)
 
