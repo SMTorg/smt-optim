@@ -305,7 +305,7 @@ class Optimizer():
         if self.num_cstr > 0:
             for c_id, c_config in enumerate(self.cstr_config):
 
-                self.cstr_funcs.append([])
+                # self.cstr_funcs.append([])
 
                 if callable(c_config.constraint):
                     c_config.constraint = [c_config.constraint]
@@ -317,7 +317,7 @@ class Optimizer():
                 if len(c_config.constraint) != self.num_levels:
                     raise Exception("ConstraintConfig.constraint must have the same number of levels as the objective.")
 
-                self.cstr_funcs[c_id].append(
+                self.cstr_funcs.append(
                     self._wrap_constraints(c_config.constraint, c_config.type, c_config.value)
                 )
 
@@ -409,7 +409,7 @@ class Optimizer():
         cstr = np.zeros((1, max(1, self.num_cstr)))
 
         for c_id, c_func in enumerate(self.cstr_funcs):
-            cstr[c_id] = c_func[c_id][level](x_new)
+            cstr[0, c_id] = c_func[level](x_new)
 
         return obj, cstr
 
@@ -502,7 +502,7 @@ class Optimizer():
             max_level = 0
             for k in range(self.num_levels):
 
-                # Assumes that all lower fidelity levels must be sampled
+                # if None -> the fidelity k is not to be sampled
                 if self.next_x[k] is None:
                     continue
 
