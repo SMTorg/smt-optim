@@ -214,6 +214,9 @@ class Optimizer():
         self.yt = []
         self.ct = []
         self.f_min = np.inf
+        self.x_min = None
+        self.c_min = None
+
         # self._check_init_points()
         # self._gen_init_train_data()
         # self.update_f_min()
@@ -386,16 +389,26 @@ class Optimizer():
         # self.f_min = np.min(np.where(feasible_mask == True, self.yt[-1], np.inf))
         # print(f"f_min = {self.f_min}")
 
+        previous_f_min = self.f_min
+
         feas_mask = np.all(self.ct[-1] <= self.ctol, axis=1)
         if np.any(feas_mask):
-            next_f_min = np.min(self.yt[-1][feas_mask])
+            local_min_id = self.yt[-1][feas_mask].argmin()
+            # global_min_id = feas_mask[local_min_id]
+
+            self.f_min = self.yt[-1][feas_mask][local_min_id].item()
+            self.x_min = self.xt[-1][feas_mask][local_min_id]
+            self.c_min = self.ct[-1][feas_mask][local_min_id]
+
         else:
-            next_f_min = np.inf
+            self.f_min = np.inf
+            self.x_min = None
+            self.c_min = None
 
-        self._check_f_min(self.f_min, next_f_min)
-        self.f_min = next_f_min
+        self._check_f_min_decreasing(self.f_min, previous_f_min)
 
-    def _check_f_min(self, previous_f_min, next_f_min):
+
+    def _check_f_min_decreasing(self, next_f_min, previous_f_min):
         if previous_f_min < next_f_min:
             warnings.warn("f_min is increasing.")
 
@@ -431,6 +444,8 @@ class Optimizer():
 
         self.iter_data["budget"] = self.compute_used_budget()
         self.iter_data["f_min"] = self.f_min
+        self.iter_data["x_min"] = self.x_min
+        self.iter_data["c_min"] = self.c_min
 
         self.opt_data[0] = self.iter_data
         self.dump_pikle_log()
@@ -542,8 +557,9 @@ class Optimizer():
             for l in range(self.num_levels):
                 self.iter_data[f"n{l + 1}"] = len(self.yt[l])
 
-            # iter_data["x_min"] = self.x_min   # TODO: implement self.x_min
             self.iter_data["f_min"] = self.f_min
+            self.iter_data["x_min"] = self.x_min
+            self.iter_data["c_min"] = self.c_min
 
             self.budget = self.compute_used_budget()
             self.iter_data["budget"] = self.budget
