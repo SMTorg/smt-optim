@@ -51,7 +51,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
         def ortho_wrapper(x: np.ndarray) -> np.ndarray:
             mu = optimizer.obj_surrogate.predict_values(x)
             s2 = optimizer.obj_surrogate.predict_variances(x)
-            return -self.acq_func(mu, s2, optimizer.f_min).ravel()
+            return -self.acq_func(mu, s2, optimizer.f_min_scaled).ravel()
 
         sampler = stats.qmc.LatinHypercube(d=optimizer.num_dim)
         x0_multistart = sampler.random(self.n_start)
@@ -112,7 +112,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
         dim = optimizer.num_dim
         acq_multistart = self.n_start
 
-        f_min = optimizer.f_min
+        f_min = optimizer.f_min_scaled
         bounds = optimizer.domain
 
         num_cstr = optimizer.num_cstr
@@ -263,8 +263,6 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 
 
     def select_fidelity_level(self, x_pred: np.ndarray, costs: list[float], all_surrogates: list[SmtMFK], criterion: str) -> np.ndarray:
-
-
 
         num_pts: int = x_pred.shape[0]
         # level: np.ndarray = np.zeros(num_pts)
@@ -430,7 +428,7 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 #         obj_surrogate = optimizer.obj_surrogate
 #         dim = optimizer.num_dim
 #         n_level = optimizer.num_levels
-#         f_min = optimizer.f_min
+#         f_min = optimizer.f_min_scaled
 #         bounds = optimizer.domain
 #
 #         acq_sampler = stats.qmc.LatinHypercube(d=dim)   # To be verified, but I believe scipy LHS sampler works better
@@ -621,7 +619,7 @@ class MFEI:
     def execute_infill_strategy(self, optimizer) -> list:
 
         self.optimizer = optimizer
-        self.f_min = self.optimizer.f_min
+        self.f_min = self.optimizer.f_min_scaled
 
         x_infill, fid_infill = self.minimize_with_scipy()
 

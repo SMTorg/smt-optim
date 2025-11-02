@@ -154,6 +154,7 @@ class OptimizerConfig:
     log_filename: Optional[str] = "log"                     # name for the logfile -> " log_filename" + ".pkl"
     verbose: Optional[bool] = False                         # True/False print each iteration informations
     callback_func: Optional[Callable] = None                # additional method to call at the end of each iteration
+    scaling: Optional[bool] = False
 
 
 class Optimizer():
@@ -193,6 +194,7 @@ class Optimizer():
         self.log_filename = config.log_filename
         self.verbose = config.verbose
         self.callback_func = config.callback_func
+        self.scaling = config.scaling
 
         #
         self.strategy = strategy
@@ -216,6 +218,11 @@ class Optimizer():
         self.f_min = np.inf
         self.x_min = None
         self.c_min = None
+
+        # self.xt_scaled = []
+        self.yt_scaled = []
+        self.ct_scaled = []
+        self.f_min_scaled = np.inf
 
         # self._check_init_points()
         # self._gen_init_train_data()
@@ -426,6 +433,14 @@ class Optimizer():
 
         return obj, cstr
 
+    def _standardize_data(self, data: np.ndarray) -> tuple[np.ndarray | float]:
+
+        mean = data.mean()
+        std = data.std()
+        std_data = (data - mean)/std
+
+        return std_data, mean, std
+
     def optimize(self):
 
         bo_start = time.perf_counter()
@@ -459,20 +474,41 @@ class Optimizer():
 
             self.iter_data = dict()  # reset iteration data dictionary
 
-            # if self.verbose: print(f"======= iter: {iter_id}/{self.max_iter} =======")
+            # ------- Training data scaling -------
+
+            self.yt_scaled = []
+            self.ct_scaled = []
+
+            for lvl in range(self.num_levels):
+
+                self.yt_scaled.append(self.yt[lvl].copy())
+                self.ct_scaled.append(self.ct[lvl].copy())
+
+                self.f_min_scaled = self.f_min
+
+                if self.scaling:
+                    yt_scaled, yt_mean, yt_std = self._standardize_data(self.yt[lvl])
+
+                    self.yt_scaled[lvl][:] = yt_scaled
+                    self.f_min_scaled = (self.f_min - yt_mean)/yt_std
+
+                    for c_id in range(self.ct[lvl].shape[1]):
+                        self.ct_scaled[lvl][:, c_id] /= self.ct[lvl][:, c_id].std()
+                else:
+                    pass
 
             # ------- Surrogate models training -------
             gp_t0 = time.perf_counter()
 
             # train the objective surrogate model
-            self.obj_surrogate.train(self.xt, self.yt)
+            self.obj_surrogate.train(self.xt, self.yt_scaled)
 
             # if constrained, train the constraint surrogate models
 
             for c_id, c_config in enumerate(self.cstr_config):
                 ct_all_levels = []
                 for lvl in range(self.num_levels):
-                    ct_all_levels.append( self.ct[lvl][:, c_id].reshape(-1, 1) )
+                    ct_all_levels.append( self.ct_scaled[lvl][:, c_id].reshape(-1, 1) )
 
                 self.cstr_surrogates[c_id].train(self.xt, ct_all_levels)
 
