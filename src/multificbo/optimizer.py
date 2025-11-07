@@ -155,6 +155,7 @@ class OptimizerConfig:
     verbose: Optional[bool] = False                         # True/False print each iteration informations
     callback_func: Optional[Callable] = None                # additional method to call at the end of each iteration
     scaling: Optional[bool] = False
+    dynamic_costs: Optional[Union[None, str]] = None        # use sampling time to update the costs
 
 
 class Optimizer():
@@ -195,6 +196,9 @@ class Optimizer():
         self.verbose = config.verbose
         self.callback_func = config.callback_func
         self.scaling = config.scaling
+        self.dynamic_costs = config.dynamic_costs
+
+        self._check_optimizer_config()
 
         #
         self.strategy = strategy
@@ -218,6 +222,7 @@ class Optimizer():
         self.f_min = np.inf
         self.x_min = None
         self.c_min = None
+        self.samples_time = []
 
         # self.xt_scaled = []
         self.yt_scaled = []
@@ -234,7 +239,13 @@ class Optimizer():
         self.opt_data = {}
         self.iter_data = {}
 
-    def _check_objective(self):
+    def _check_optimizer_config(self) -> None:
+
+        if self.dynamic_costs is not None and self.dynamic_costs not in ["samples"]:
+            raise Exception(f"Dynamic costs '{self.dynamic_costs}' is not supported.")
+
+
+    def _check_objective(self) -> None:
 
         if callable(self.obj_func):
             self.obj_func = [self.obj_func]
@@ -305,7 +316,7 @@ class Optimizer():
         return wrapped_cstr_func
 
 
-    def _check_constraints(self):
+    def _check_constraints(self) -> None:
 
         if self.cstr_config is None:
             self.cstr_config = []
@@ -373,20 +384,25 @@ class Optimizer():
 
         for lvl in range(self.num_levels):
 
+            # use num_dim instead?
             xt = np.empty((self.xt_init[lvl].shape[0], self.num_dim))
             yt = np.empty((self.xt_init[lvl].shape[0], 1))
             ct = np.zeros((self.xt_init[lvl].shape[0], max(1, self.num_cstr)))
+            times = np.empty((self.xt_init[lvl].shape[0], self.num_cstr+1))
 
             for i in range(xt.shape[0]):
                 xt[i, :] = self.xt_init[lvl][i, :]
 
-                obj_value, cstr_values = self.sample_point(xt[i, :], lvl)
+                obj_value, cstr_values, t = self.sample_point(xt[i, :], lvl)
                 yt[i, :] = obj_value
                 ct[i, :] = cstr_values
+                times[i, :] = t
 
             self.xt.append(xt)
             self.yt.append(yt)
             self.ct.append(ct)
+
+            self.samples_time.append(times)
 
     def _initialize_acq_strategy(self):
         self.acq_strategy = self.strategy(optimizer=self)
@@ -419,19 +435,28 @@ class Optimizer():
         if previous_f_min < next_f_min:
             warnings.warn("f_min is increasing.")
 
-    def sample_point(self, x_new: np.ndarray, level: int) -> tuple:
+    def sample_point(self, x_new: np.ndarray, level: int) -> tuple[np.ndarray]:
 
         x_new = check_bounds(x_new, self.domain)
 
+        times = np.empty(1+self.num_cstr)    # [obj_time, cstr0_time, cstr1_time, ...]
+
+        t0 = time.perf_counter()
         obj = self.obj_func[level](x_new)
+        t1 = time.perf_counter()
+        times[0] = t1-t0
+
         obj = obj.reshape(1, 1)
 
         cstr = np.zeros((1, max(1, self.num_cstr)))
 
         for c_id, c_func in enumerate(self.cstr_funcs):
+            t0 = time.perf_counter()
             cstr[0, c_id] = c_func[level](x_new)
+            t1 = time.perf_counter()
+            times[c_id+1] = t1-t0
 
-        return obj, cstr
+        return obj, cstr, times
 
     def _standardize_data(self, data: np.ndarray) -> tuple[np.ndarray | float]:
 
@@ -496,6 +521,9 @@ class Optimizer():
                         self.ct_scaled[lvl][:, c_id] /= self.ct[lvl][:, c_id].std()
                 else:
                     pass
+
+            # ------- Update cost ratio -------
+            self.update_costs()
 
             # ------- Surrogate models training -------
             gp_t0 = time.perf_counter()
@@ -566,7 +594,7 @@ class Optimizer():
                     continue
 
                 # sample objective function and constraints
-                next_y, next_c = self.sample_point(self.next_x[k], k)
+                next_y, next_c, next_time = self.sample_point(self.next_x[k], k)
 
                 infill_x.append(self.next_x[k])
                 infill_f.append(next_y)
@@ -576,6 +604,8 @@ class Optimizer():
                 self.xt[k] = np.vstack((self.xt[k], self.next_x[k]))
                 self.yt[k] = np.append(self.yt[k], next_y)
                 self.ct[k] = np.vstack((self.ct[k], next_c))
+
+                self.samples_time[k] = np.vstack((self.samples_time[k], next_time))
 
             if self.callback_func is not None:
                 self.callback_func(self)
@@ -646,6 +676,21 @@ class Optimizer():
             return False
         else:
             return True
+
+    def update_costs(self) -> None:
+        """
+        Update the costs of each level.
+         - If set to None, the costs are never updated.
+         - If set to 'samples', the cost of each level corresponds to it's average time to be sampled.
+
+        :return: None
+        """
+
+        if self.dynamic_costs == "samples":
+            for lvl in range(self.num_levels):
+                # average sampling time per level
+                self.costs[lvl] = self.samples_time[lvl].sum(axis=1).mean().item()
+
 
 
 if __name__ == '__main__':
