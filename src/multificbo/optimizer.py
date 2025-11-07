@@ -4,103 +4,35 @@ from dataclasses import dataclass
 import warnings
 import time
 
-from typing import Any, Callable, List, Optional, Union
+from typing import Callable
 
 import pickle
 
 from multificbo.surrogate_models import Surrogate
 from multificbo.acquisition_strategies import AcquisitionStrategy
 
-def wrap_objective(obj_func, maximize=False, logger=None):
+
+def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
     """
-    Wrap the objective functions to return the opposite in the case of a maximization problem.
+    Wrap function to return factor * (func - step).
 
-    :param obj_func:
-    :return:
-    """
+    :param func: Function to wrap.
+    :type func: Callable
 
-    wrapped_obj_func = []
+    :param factor: Multiplicative factor.
+    :type factor: float
 
-    for func in obj_func:
+    :param step: Additive factor.
+    :type step: float
 
-        def wrapped(x, f=func):
-            start = time.perf_counter()
-            val = f(x)
-            end = time.perf_counter()
-            elapsed = end - start
-
-            if logger:
-                logger.append(elapsed)  # TODO: review how it's stored
-
-            if maximize:
-                return -val
-            return val
-
-        wrapped_obj_func.append(wrapped)
-
-    return wrapped_obj_func
-
-
-def wrap_func(func, factor: float = 1, step: float = 0):
-    """
-    Wrap function to return coeff * (func - step).
-
-    :param x: Function to wrap.
-    :type x: callable
-
-    :param bounds: Multiplicative factor.
-    :type bounds: float
-
-    :return: Additive step.
-    :rtype: float
+    :return: Wrapped function.
+    :rtype: Callable
     """
 
     def wrapped(x, f=func):
         return factor*(f(x) - step)
 
     return wrapped
-
-
-
-
-
-
-
-def wrap_constraints(constraints):
-    """
-    Wrap the constraint functions so to make them have the form c(x) <= 0
-
-    :param constraints:
-    :return:
-    """
-
-    wrapped_c = []
-
-    for c in constraints:
-
-        if callable(c["func"]):
-            c["func"] = [c["func"]]
-
-        n_level = len(c["func"])
-
-        wrapped_ck = []
-
-        for k in range(n_level):
-
-            f = c["func"][k]
-            typ = c.get("type", "less")
-            val = c.get("value", 0)
-
-            if typ == "less":
-                wrapped_ck.append(lambda x, f=f, val=val: f(x) - val)
-            elif typ == "greater":
-                wrapped_ck.append(lambda x, f=f, val=val: val - f(x))
-            else:
-                raise ValueError(f"Unknown constraint type: {typ}. Possible types are 'less' and 'greater'.")
-
-        wrapped_c.append(wrapped_ck)
-
-    return wrapped_c
 
 
 def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
@@ -128,15 +60,15 @@ def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
 
 @dataclass
 class ObjectiveConfig:
-    objective: Union[Callable, List[Callable]]
-    domain: Union[np.ndarray]                       # problem bounds np.ndarray(dim, 2) lower = bounds[:, 0], upper = bounds[:, 1]
+    objective: Callable | list[Callable]
+    domain: np.ndarray                              # problem bounds np.ndarray(dim, 2) lower = bounds[:, 0], upper = bounds[:, 1]
     type: str = "minimize"                          # problem's type -> "minimize" or "maximize")
     surrogate: Surrogate = None
-    costs: List = None                              # cost of each fidelity level
+    costs: list[float] = None                       # cost of each fidelity level
 
 @dataclass
 class ConstraintConfig:
-    constraint: Union[Callable, List[Callable]]
+    constraint: Callable | list[Callable]
     type: str = "less"                              # "less"-> g <= 0; "greater" -> g >= 0
     value: float = 0                                # g <= value (or g >= value if type is " greater")
     tol: float = 1e-4                               # does not work. use OptimizerConfig.ctol instead
@@ -144,23 +76,23 @@ class ConstraintConfig:
 
 @dataclass
 class OptimizerConfig:
-    constraints: Optional[List[ConstraintConfig]] = None
-    ctol: float = 1e-4                                      # tolerance for all constraints
-    max_iter: Optional[int] = None                          # max number of BO iterations
-    max_budget: Optional[float] = float("inf")              # max BO budget
-    max_time: Optional[float] = float("inf")                # max BO elapsed time
-    nt_init: Optional[int] = None                           # number of samples in initial DOE (with LHS)
-    xt_init: Optional[Any] = None                           # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
-    log_filename: Optional[str] = "log"                     # name for the logfile -> " log_filename" + ".pkl"
-    verbose: Optional[bool] = False                         # True/False print each iteration informations
-    callback_func: Optional[Callable] = None                # additional method to call at the end of each iteration
-    scaling: Optional[bool] = False
-    dynamic_costs: Optional[Union[None, str]] = None        # use sampling time to update the costs
+    constraints: list[ConstraintConfig] | None = None
+    ctol: float = 1e-4                              # tolerance for all constraints
+    max_iter: int | None = None                     # max number of BO iterations
+    max_budget: float = float("inf")                # max BO budget
+    max_time: float = float("inf")                  # max BO elapsed time
+    nt_init: int | None = None                      # number of samples in initial DOE (with LHS)
+    xt_init: np.ndarray | None = None               # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
+    log_filename: str = "log"                       # name for the logfile -> " log_filename" + ".pkl"
+    verbose: bool = False                           # True/False print each iteration informations
+    callback_func: Callable | None = None           # additional method to call at the end of each iteration
+    scaling: bool = False                           # standardize the training data
+    dynamic_costs: str | None = None                # use sampling time to update the costs
 
 
 class Optimizer():
 
-    def __init__(self, obj_config: ObjectiveConfig, config: OptimizerConfig, strategy: AcquisitionStrategy):
+    def __init__(self, obj_config: ObjectiveConfig, config: OptimizerConfig, strategy: AcquisitionStrategy, strategy_params: dict | None = None):
 
         # initialize print setting
         self.verbose = config.verbose
@@ -202,6 +134,7 @@ class Optimizer():
 
         #
         self.strategy = strategy
+        self.strategy_params = strategy_params
 
         self.num_dim = 0
         self.num_levels = 0
@@ -291,7 +224,7 @@ class Optimizer():
         by default = "less") and its value (by default = 0).
 
         :param cstr_func: List of callable where each callable is a fidelity level.
-        :type cstr_func: list[callable]
+        :type cstr_func: list[Callable]
 
         :param type: Define constraint's type where "less" is for constraints of type g <= 0 and "greater" is for
                      constraints of type g >= 0.
@@ -405,7 +338,10 @@ class Optimizer():
             self.samples_time.append(times)
 
     def _initialize_acq_strategy(self):
-        self.acq_strategy = self.strategy(optimizer=self)
+        if type(self.strategy_params) is dict:
+            self.acq_strategy = self.strategy(optimizer=self, **self.strategy_params)
+        else:
+            self.acq_strategy = self.strategy(optimizer=self)
 
     def update_f_min(self):
         # feasible_mask = np.any(self.ct[-1] <= 1e-4, axis=1)     # use cstr_tol in ConstraintConfig

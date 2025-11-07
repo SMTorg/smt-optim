@@ -2,9 +2,11 @@ import numpy as np
 import scipy.stats as stats
 import scipy.optimize as so
 from warnings import warn
+import random
+
+from abc import ABC, abstractmethod
 
 from deap import base, creator, tools, algorithms
-import random
 
 # from multificbo.optimizer import Optimizer
 from multificbo.surrogate_models import Surrogate, SmtMFK
@@ -14,13 +16,16 @@ from multificbo.suboptimizers.orthomads import orthomads
 
 
 # TODO: acquisition strategy class template
-class AcquisitionStrategy:
+
+class AcquisitionStrategy(ABC):
     def __init__(self):
         pass
 
+    @abstractmethod
     def compatibility_check(self, optimizer):
         raise Exception("Compatibility check not implemented.")
 
+    @abstractmethod
     def execute_infill_strategy(self, optimizer):
         raise Exception("Acquisition Strategy not implemented.")
 
@@ -35,6 +40,9 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         if optimizer is not None:
             self.n_start *= optimizer.num_dim
+
+    def compatibility_check(self, optimizer):
+        raise Exception("Compatibility check not implemented.")
 
     def execute_infill_strategy(self, optimizer) -> np.ndarray:
 
@@ -193,6 +201,9 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 
         if optimizer is not None:
             self.n_start *= optimizer.num_dim
+
+    def compatibility_check(self, optimizer):
+        raise Exception("Compatibility check not implemented.")
 
 
     def execute_infill_strategy(self, optimizer) -> list:
@@ -500,7 +511,7 @@ class MultiFiAcqStrat(AcquisitionStrategy):
 #
 #         return next_x_all_lvl
 
-class MFEI:
+class MFEI(AcquisitionStrategy):
 
     def __init__(self, acq_func=expected_improvement, optimizer=None):
 
@@ -526,6 +537,9 @@ class MFEI:
 
             self.obj_surrogate = self.optimizer.obj_surrogate
             self.cstr_surrogates = self.optimizer.cstr_surrogates
+
+    def compatibility_check(self, optimizer):
+        raise Exception("Compatibility check not implemented.")
 
 
     def augmented_ei(self, x, level):
@@ -634,7 +648,7 @@ class MFEI:
 
 
 
-class VFPI:
+class VFPI(AcquisitionStrategy):
 
     def __init__(self, acq_func=expected_improvement, optimizer=None):
         super().__init__()
@@ -652,6 +666,9 @@ class VFPI:
             self.n_start *= self.optimizer.num_dim
         else:
             self.mfck = None
+
+    def compatibility_check(self, optimizer):
+        raise Exception("Compatibility check not implemented.")
 
     def predicted_f_min(self, level):
 
