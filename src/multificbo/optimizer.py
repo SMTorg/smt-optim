@@ -382,7 +382,11 @@ class Optimizer():
         t1 = time.perf_counter()
         times[0] = t1-t0
 
-        obj = obj.reshape(1, 1)
+        # TODO: review obj_func output
+        if type(obj) is float:
+            obj = np.array([[obj]])
+        elif type(obj) is np.ndarray:
+            obj = obj.reshape(1, 1)
 
         cstr = np.zeros((1, max(1, self.num_cstr)))
 
@@ -566,6 +570,9 @@ class Optimizer():
             self.budget = self.compute_used_budget()
             self.iter_data["budget"] = self.budget
 
+            for lvl in range(self.num_levels):
+                self.iter_data[f"avg_f_time_lvl_{lvl}"] = self.samples_time[lvl].sum(axis=1).mean().item()
+
             # elapsed time since optimization start
             self.bo_time = time.perf_counter() - bo_start
             self.iter_data["bo_time"] = self.bo_time
@@ -591,6 +598,7 @@ class Optimizer():
             with open(f"{self.log_filename}.pkl", 'wb') as file:
                 pickle.dump(self.opt_data, file)
         except Exception as e:
+            # TODO: use warnings.warn
             raise Warning(f"Error while saving optimization data: {e}")
 
     def compute_used_budget(self):

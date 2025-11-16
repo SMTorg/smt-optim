@@ -31,15 +31,19 @@ class AcquisitionStrategy(ABC):
 
 
 class MonoFiAcqStrat(AcquisitionStrategy):
-    def __init__(self, acq_func=log_ei, optimizer=None):
+    def __init__(self, optimizer=None, **kwargs):
         super().__init__()
 
-        self.acq_func = acq_func
-        self.sub_optimizer = "COBYLA"
-        self.n_start = 10
+        self.optimizer = optimizer
+        self.acq_func = kwargs.pop("acq_func", log_ei)
+        self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
+        self.n_start = kwargs.pop("n_start", None)
 
-        if optimizer is not None:
-            self.n_start *= optimizer.num_dim
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
+
+        if self.optimizer is not None and self.n_start is None:
+            self.n_start = 10*optimizer.num_dim
 
     def compatibility_check(self, optimizer):
         raise Exception("Compatibility check not implemented.")
@@ -190,17 +194,28 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
 
 class MultiFiAcqStrat(AcquisitionStrategy):
-    def __init__(self, acq_func=log_ei, optimizer=None):
+    def __init__(self, optimizer=None, **kwargs):
         super().__init__()
 
-        self.acq_func = acq_func
-        self.n_start = 10
-        self.fidelity_crit = "obj-only"
+        self.optimizer = optimizer
+        self.acq_func = kwargs.pop("acq_func", log_ei)
+        self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
+        self.n_start = kwargs.pop("n_start", None)
 
-        self.mono_fi_strat = MonoFiAcqStrat(acq_func=acq_func, optimizer=optimizer)
+        # possible criteria : obj-only, optimistic, pessimistic, average, cstr-only (only 1 cstr)
+        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")
 
-        if optimizer is not None:
-            self.n_start *= optimizer.num_dim
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
+
+        if self.optimizer is not None and self.n_start is None:
+            self.n_start = 10*optimizer.num_dim
+
+        self.mono_fi_strat = MonoFiAcqStrat(optimizer=optimizer,
+                                            acq_func=self.acq_func,
+                                            sub_optimizer=self.sub_optimizer,
+                                            n_start=self.n_start,
+                                            )
 
     def compatibility_check(self, optimizer):
         raise Exception("Compatibility check not implemented.")
