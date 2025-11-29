@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 from abc import ABC, abstractmethod
 
@@ -59,6 +60,23 @@ def check_theta_bounds(theta: np.ndarray, theta_bounds: np.ndarray) -> np.ndarra
     theta = np.where(upper_disc, theta_bounds[1] - np.sqrt(EPSILON), theta)
 
     return theta
+
+
+def filter_nan_values(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray]:
+    # TODO: filter inf and similar non numeric values and add doc
+    valid_mask = ~np.isnan(y).ravel()
+    x_val = x[valid_mask]
+    y_val = y[valid_mask]
+    return x_val, y_val
+
+def clean_training_data(x: list[np.ndarray], y: list[np.ndarray]) -> tuple[np.ndarray]:
+    # TODO: add doc
+    num_level = len(x)
+
+    for lvl in range(num_level):
+        x[lvl], y[lvl] = filter_nan_values(x[lvl], y[lvl])
+
+    return x, y
 
 
 class SmtKRG(Surrogate):
@@ -135,8 +153,10 @@ class SmtKRG(Surrogate):
         except:
             warn("Error changing KRG parameters.")
 
-        self.xt = xt[-1]
-        self.yt = yt[-1]
+
+        self.xt = xt[-1].copy()
+        self.yt = yt[-1].copy()
+        self.xt, self.yt = filter_nan_values(self.xt, self.yt)
 
         self.krg.set_training_values(self.xt, self.yt)
         self.krg.train()
@@ -201,8 +221,10 @@ class SmtMFK(Surrogate):
         except:
             warn("Error changing MFK parameters.")
 
-        self.xt = xt
-        self.yt = yt
+        # TODO: data should be cleaned in the Optimizer class
+        self.xt = copy.deepcopy(xt)
+        self.yt = copy.deepcopy(yt)
+        self.xt, self.yt = clean_training_data(self.xt, self.yt)
 
         for k in range(self.num_levels-1):
             self.mfk.set_training_values(self.xt[k], self.yt[k], name=k)

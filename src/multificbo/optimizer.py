@@ -3,6 +3,10 @@ import scipy.stats as stats
 from dataclasses import dataclass
 import warnings
 import time
+import json
+import csv
+
+import os
 
 from typing import Callable
 
@@ -34,6 +38,9 @@ def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
 
     return wrapped
 
+def wrap_array(array: np.ndarray, factor: float = 1., step: float = 0.) -> np.ndarray:
+    return factor*(array - step)
+
 
 def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
     """
@@ -56,6 +63,28 @@ def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
         warnings.warn(f"Infill point was outside of the bounds. L1 correction was applied: (initial = {x}; corrected = {x_corrected}).")
 
     return x_corrected
+
+# def compute_rscv(self, cstr_array: np.ndarray, cstr_config: list[ConstraintConfig], g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+def compute_rscv(cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+
+    scv = np.full_like(cstr_array, 0.0)     # Square Constraint Violation
+
+    for c_id, c_config in enumerate(cstr_config):
+
+        if c_config.type in ["less", "greater"]:
+            valid_mask = cstr_array[:, c_id] <= g_tol
+            scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+
+        elif c_config.type == "equal":
+            valid_mask = np.abs(cstr_array[:, c_id]) <= h_tol
+            scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+
+        else:
+            raise Exception(f"{c_config.type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'.")
+
+    rscv = np.sqrt(scv.sum(axis=1))
+
+    return rscv
 
 
 @dataclass
@@ -83,9 +112,10 @@ class OptimizerConfig:
     max_time: float = float("inf")                  # max BO elapsed time
     nt_init: int | None = None                      # number of samples in initial DOE (with LHS)
     xt_init: np.ndarray | None = None               # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
-    log_filename: str = "log"                       # name for the logfile -> " log_filename" + ".pkl"
+    log_filename: str = "log"                       # --- DEPRECATED --- name for the logfile -> " log_filename" + ".pkl"
+    results_dir: str = "bo_results"                 # name for the results directory
     verbose: bool = False                           # True/False print each iteration informations
-    callback_func: Callable | None = None           # additional method to call at the end of each iteration
+    callback_func: list[Callable] | Callable | None = None      # additional method to call at the end of each iteration
     scaling: bool = False                           # standardize the training data
     dynamic_costs: str | None = None                # use sampling time to update the costs
 
@@ -99,7 +129,8 @@ class Optimizer():
 
         self.opt_data = {}
 
-        self.log_filename = config.log_filename
+        self.log_filename = config.log_filename     # DEPRECATED -> use results_dir instead
+        self.results_dir = config.results_dir
 
         # initialize objective function
         self.obj_config = obj_config
@@ -113,6 +144,8 @@ class Optimizer():
         self.cstr_config = config.constraints
         self.cstr_funcs = []
         self.ctol = config.ctol
+
+        self.iter = 0
 
         # get stopping criteria
         self.max_iter = config.max_iter
@@ -131,6 +164,7 @@ class Optimizer():
         self.dynamic_costs = config.dynamic_costs
 
         self._check_optimizer_config()
+        self._setup_logging()
 
         #
         self.strategy = strategy
@@ -147,12 +181,17 @@ class Optimizer():
 
         self.obj_surrogate = None
         self.cstr_surrogates = []
+        self.g_surrogates = []          # inequality constraints
+        self.h_surrogates = []          # equality constraints
+
         self._initialize_surrogates()
 
+        self.data = []
         self.xt = []
         self.yt = []
         self.ct = []
         self.f_min = np.inf
+        self.rscv_min = np.inf
         self.x_min = None
         self.c_min = None
         self.samples_time = []
@@ -177,6 +216,31 @@ class Optimizer():
         if self.dynamic_costs is not None and self.dynamic_costs not in ["samples"]:
             raise Exception(f"Dynamic costs '{self.dynamic_costs}' is not supported.")
 
+        if callable(self.callback_func):
+            self.callback_func = [self.callback_func]
+
+
+    def _setup_logging(self):
+
+        if self.log_filename is not "log":
+            warnings.warn("'OptimizerConfig.log_filename' is deprecated. Use 'OptimizerConfig.results_dir' instead.")
+
+        results_dir = self.results_dir
+
+        # if results_dir already exists, append '_idx' to it to avoid overwriting existing data
+        idx = 1
+        while os.path.exists(results_dir):
+            results_dir = self.results_dir + f"_{idx}"
+            idx += 1
+        self.results_dir = results_dir
+
+        # create results_dir directory
+        os.makedirs(self.results_dir)
+
+        # create the DOE subdirectory (used to save the DOEs from each level)
+        doe_path = os.path.join(self.results_dir, "DOE/")
+        os.makedirs(doe_path, exist_ok=True)
+
 
     def _check_objective(self) -> None:
 
@@ -194,7 +258,7 @@ class Optimizer():
         else:
             raise Exception("ObjectiveConfig.type must be 'minimize' or 'maximize'.")
 
-        self.obj_func = self._wrap_objectives(self.obj_func, maximize=maximize)
+        # self.obj_func = self._wrap_objectives(self.obj_func, maximize=maximize)
 
         self.num_dim = self.domain.shape[0]
         self.num_levels = len(self.obj_func)
@@ -236,9 +300,8 @@ class Optimizer():
         :return:
         """
 
-        if type == "less":
-            factor = 1
-        elif type == "greater":
+        factor = 1
+        if type == "greater":
             factor = -1
 
         wrapped_cstr_func = []
@@ -247,6 +310,33 @@ class Optimizer():
             wrapped_cstr_func.append(wrap_func(func, factor=factor, step=value))
 
         return wrapped_cstr_func
+
+    def _wrap_training_data(self):
+
+        self.yt = []
+        self.ct = []
+
+        for lvl in range(self.num_levels):
+
+            factor = 1.
+            if self.obj_type == "maximize":
+                factor = -1.
+
+            # wrap the objective values
+            self.yt.append(wrap_array(self.data[lvl][:, 0].reshape(-1, 1), factor=factor))
+
+            self.ct.append(np.empty((self.xt[lvl].shape[0], self.num_cstr)))
+
+            # wrap the constraint values
+            for c_id, c_config in enumerate(self.cstr_config):
+
+                factor = 1.
+                if c_config.type == "greater":
+                    factor = -1.
+
+                self.ct[lvl][:, c_id] = wrap_array(self.data[lvl][:, c_id+1],
+                                                   factor=factor,
+                                                   step=c_config.value)
 
 
     def _check_constraints(self) -> None:
@@ -271,9 +361,9 @@ class Optimizer():
                 if len(c_config.constraint) != self.num_levels:
                     raise Exception("ConstraintConfig.constraint must have the same number of levels as the objective.")
 
-                self.cstr_funcs.append(
-                    self._wrap_constraints(c_config.constraint, c_config.type, c_config.value)
-                )
+                self.cstr_funcs.append( c_config.constraint )
+                #     self._wrap_constraints(c_config.constraint, c_config.type, c_config.value)
+                # )
 
     def _setup_stopping_criteria(self):
 
@@ -308,32 +398,43 @@ class Optimizer():
 
         self.obj_surrogate = self.obj_config.surrogate(optimizer=self)
 
-        for c_config in self.cstr_config:
+        for c_id, c_config in enumerate(self.cstr_config):
             self.cstr_surrogates.append(
                 c_config.surrogate(optimizer=self)
             )
+
+            if c_config.type in ["less", "greater"]:
+                self.g_surrogates.append(self.cstr_surrogates[c_id])
+            elif c_config.type == "equal":
+                self.h_surrogates.append(self.cstr_surrogates[c_id])
 
     def _gen_init_train_data(self):
 
         for lvl in range(self.num_levels):
 
             # use num_dim instead?
+
             xt = np.empty((self.xt_init[lvl].shape[0], self.num_dim))
-            yt = np.empty((self.xt_init[lvl].shape[0], 1))
-            ct = np.zeros((self.xt_init[lvl].shape[0], max(1, self.num_cstr)))
+
+            self.data.append(np.empty((self.xt_init[lvl].shape[0], self.num_cstr+1)))
+            # yt = np.empty((self.xt_init[lvl].shape[0], 1))
+            # ct = np.zeros((self.xt_init[lvl].shape[0], max(1, self.num_cstr)))
             times = np.empty((self.xt_init[lvl].shape[0], self.num_cstr+1))
 
             for i in range(xt.shape[0]):
                 xt[i, :] = self.xt_init[lvl][i, :]
 
                 obj_value, cstr_values, t = self.sample_point(xt[i, :], lvl)
-                yt[i, :] = obj_value
-                ct[i, :] = cstr_values
+                self.data[lvl][i, 0] = obj_value
+                self.data[lvl][i, 1:] = cstr_values
+                # yt[i, :] = obj_value
+                # ct[i, :] = cstr_values
                 times[i, :] = t
 
             self.xt.append(xt)
-            self.yt.append(yt)
-            self.ct.append(ct)
+
+            # self.yt.append(yt)
+            # self.ct.append(ct)
 
             self.samples_time.append(times)
 
@@ -350,7 +451,17 @@ class Optimizer():
 
         previous_f_min = self.f_min
 
-        feas_mask = np.all(self.ct[-1] <= self.ctol, axis=1)
+        #feas_mask = np.all(self.ct[-1] <= self.ctol, axis=1)
+        valid_cstr = np.full((self.ct[-1].shape[0], self.num_cstr), False)
+
+        for c_id, c_config in enumerate(self.cstr_config):
+            if c_config.type in ["less", "greater"]:
+                valid_cstr[:, c_id] = np.where(self.ct[-1][:, c_id] <= self.ctol, True, False)
+            elif c_config.type == "equal":
+                valid_cstr[:, c_id] = np.where(np.abs(self.ct[-1][:, c_id]) <= self.ctol, True, False)
+
+        feas_mask = np.all(valid_cstr, axis=1)
+
         if np.any(feas_mask):
             local_min_id = self.yt[-1][feas_mask].argmin()
             # global_min_id = feas_mask[local_min_id]
@@ -365,6 +476,10 @@ class Optimizer():
             self.c_min = None
 
         self._check_f_min_decreasing(self.f_min, previous_f_min)
+
+    def update_rscv_min(self):
+        rscv = compute_rscv(self.ct[-1], self.cstr_config, g_tol=0.0, h_tol=0.0)
+        self.rscv_min = rscv.min()
 
 
     def _check_f_min_decreasing(self, next_f_min, previous_f_min):
@@ -396,6 +511,9 @@ class Optimizer():
             t1 = time.perf_counter()
             times[c_id+1] = t1-t0
 
+        # TODO: save point to DoE log
+        self.add_sample_to_doe_log(level, x_new, obj, cstr, np.sum(times))
+
         return obj, cstr, times
 
     def _standardize_data(self, data: np.ndarray) -> tuple[np.ndarray | float]:
@@ -413,8 +531,11 @@ class Optimizer():
         # generate initial doe
         self._gen_init_train_data()
 
+        self._wrap_training_data()
+
         # update f_min
         self.update_f_min()
+        self.update_rscv_min()
 
         iter_id = 0
         self.iter = iter_id
@@ -422,6 +543,7 @@ class Optimizer():
         for l in range(self.num_levels):
             self.iter_data[f"n{l + 1}"] = len(self.yt[l])
 
+        self.budget = self.compute_used_budget()
         self.iter_data["budget"] = self.compute_used_budget()
         self.iter_data["f_min"] = self.f_min
         self.iter_data["x_min"] = self.x_min
@@ -432,6 +554,10 @@ class Optimizer():
 
         self.continue_bo = True
 
+        if self.verbose: print(
+            f"| iter= {iter_id}/{self.max_iter} | budget={self.budget}/{self.max_budget} | f_min={self.f_min:.3e} | rscv_min={self.rscv_min:.3e} |"
+            )
+
         while self.continue_bo:
 
             iter_id += 1
@@ -439,7 +565,10 @@ class Optimizer():
 
             self.iter_data = dict()  # reset iteration data dictionary
 
-            # ------- Training data scaling -------
+            # ------- Wrap training data -------
+            self._wrap_training_data()
+
+            # ------- Scale training data -------
 
             self.yt_scaled = []
             self.ct_scaled = []
@@ -541,14 +670,21 @@ class Optimizer():
                 infill_c.append(next_c)
 
                 # add infill evaluation to the training data
+                qoi = np.empty(self.num_cstr+1)
+                qoi[0] = next_y
+                qoi[1:] = next_c
                 self.xt[k] = np.vstack((self.xt[k], self.next_x[k]))
-                self.yt[k] = np.append(self.yt[k], next_y)
-                self.ct[k] = np.vstack((self.ct[k], next_c))
+                # self.yt[k] = np.append(self.yt[k], next_y)
+                # self.ct[k] = np.vstack((self.ct[k], next_c))
+                self.data[k] = np.vstack((self.data[k], qoi))
 
                 self.samples_time[k] = np.vstack((self.samples_time[k], next_time))
 
+                # self.dump_csv_doe(k)
+
             if self.callback_func is not None:
-                self.callback_func(self)
+                for func in self.callback_func:
+                    func(self)
 
             # log infill point, objective value and constraints values
             self.iter_data["infill_x"] = infill_x
@@ -557,8 +693,10 @@ class Optimizer():
 
             self.iter_data["max_f_level"] = max_level
 
+            self._wrap_training_data()
             # update f_min
             self.update_f_min()
+            self.update_rscv_min()
 
             for l in range(self.num_levels):
                 self.iter_data[f"n{l + 1}"] = len(self.yt[l])
@@ -584,10 +722,11 @@ class Optimizer():
             self.opt_data[iter_id] = self.iter_data
 
             self.dump_pikle_log()
+            self.dump_json_log()
 
             # Display the iteration number, best feasible objective and fidelity level sampled
             if self.verbose : print(
-                f"| iter= {iter_id}/{self.max_iter} | budget={self.budget}/{self.max_budget} | f_min={self.f_min:.3e} | lvl={max_level}/{self.num_levels - 1} | gp_time={gp_time:.3f} | acq_time={acq_time:.3f}")
+                f"| iter= {iter_id}/{self.max_iter} | budget={self.budget}/{self.max_budget} | f_min={self.f_min:.3e} | rscv_min={self.rscv_min:.3e} | lvl={max_level}/{self.num_levels - 1} | gp_time={gp_time:.3f} | acq_time={acq_time:.3f}")
 
             # ------- End of optimization loop -------
 
@@ -595,11 +734,134 @@ class Optimizer():
 
     def dump_pikle_log(self):
         try:
-            with open(f"{self.log_filename}.pkl", 'wb') as file:
+
+            path = os.path.join(self.results_dir, "opt_data.pkl")
+
+            with open(path, 'wb') as file:
                 pickle.dump(self.opt_data, file)
+
         except Exception as e:
             # TODO: use warnings.warn
-            raise Warning(f"Error while saving optimization data: {e}")
+            warnings.warn(f"Error while saving optimization data: {e}")
+
+
+    def dump_json_log(self):
+        try:
+
+            path = os.path.join(self.results_dir, "opt_data.json")
+
+            with open(path, 'w') as file:
+                safe_data = self._json_safe(self.opt_data)
+                json.dump(safe_data, file, indent=2)
+
+        except Exception as e:
+            # TODO: use warnings.warn
+            warnings.warn(f"Error while saving optimization data: {e}")
+
+    def _json_safe(self, obj):
+        try:
+            if obj is None or isinstance(obj, (bool, int, float, str)):
+                return obj
+
+            if isinstance(obj, (np.integer, np.floating)):
+                return obj.item()
+
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+
+            if isinstance(obj, dict):
+                safe = {}
+                for k, v in obj.items():
+                    try:
+                        safe[str(k)] = self._json_safe(v)
+                    except:
+                        safe[str(k)] = None
+                return safe
+
+            if isinstance(obj, (list, tuple)):
+                out = []
+                for v in obj:
+                    try:
+                        out.append(self._json_safe(v))
+                    except Exception:
+                        out.append(None)
+                return out
+
+            json.dumps(obj)
+            return obj
+
+        except Exception as e:
+            warnings.warn(f"Failed to convert: {obj}. Error message: {e}")
+            return None
+
+
+    def add_sample_to_doe_log(self, level: int, x: np.ndarray, obj: float, cstrs: np.ndarray, time: float) -> None:
+
+        try:
+            row = dict()
+
+            row["iter"] = self.iter
+            row["budget"] = np.nan # self.budget
+
+            for i in range(x.shape[0]):
+                row[f"x{i}"] = x[i]
+
+            row["f"] = obj.item()
+
+            for i in range(cstrs.shape[1]):
+                row[f"c{i}"] = cstrs[0, i]
+
+            row["time"] = time
+
+            path = os.path.join(self.results_dir, "DOE", f"doe_level_{level}.csv")
+            file_exists = os.path.isfile(path)
+
+            # possibly does not work on Windows -> to be tested
+            with open(path, 'a') as file:
+                writer = csv.DictWriter(file, fieldnames=row.keys())
+
+                if not file_exists:
+                    writer.writeheader()
+
+                writer.writerow(row)
+
+        except Exception as e:
+            print(f"Error while logging the DoE: {e}")
+
+
+    def dump_csv_doe(self, level):
+        pass
+
+        try:
+            row = dict()
+
+            row["iter"] = self.iter
+            row["budget"] = self.budget
+
+            x = self.xt[level][-1, :]
+            print(f"x = {x}")
+            for i in range(len(x)):
+                row[f"x{i}"] = x[i]
+
+            row["f"] = self.data[level][-1, 0]
+
+            for i in range(self.num_cstr):
+                row[f"c{i}"] = self.data[level][-1, i+1]
+
+            path = f"DoE/{self.log_filename}_{level}.csv"
+            file_exists = os.path.isfile(path)
+            print(f"file exists = {file_exists}")
+
+            with open(path, 'w') as file:
+                writer = csv.DictWriter(file, fieldnames=row.keys())
+
+                if not file_exists:
+                    writer.writeheader()
+
+                writer.writerow(row)
+
+        except Exception as e:
+            print(f"Error while logging the DoE: {e}")
 
     def compute_used_budget(self):
 
