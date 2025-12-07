@@ -38,7 +38,7 @@ def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
 
     return wrapped
 
-def wrap_array(array: np.ndarray, factor: float = 1., step: float = 0.) -> np.ndarray:
+def wrap_array(array: np.ndarray, factor: float | np.ndarray = 1., step: float | np.ndarray = 0.) -> np.ndarray:
     return factor*(array - step)
 
 
@@ -174,6 +174,10 @@ class Optimizer():
         self.num_levels = 0
         self.num_cstr = 0
 
+        self.yt_factor = None
+        self.ct_factor = None
+        self.ct_step = None
+
         self._check_objective()
         self._check_constraints()
         self._setup_stopping_criteria()
@@ -196,7 +200,7 @@ class Optimizer():
         self.c_min = None
         self.samples_time = []
 
-        # self.xt_scaled = []
+        self.xt_scaled = []
         self.yt_scaled = []
         self.ct_scaled = []
         self.f_min_scaled = np.inf
@@ -222,7 +226,7 @@ class Optimizer():
 
     def _setup_logging(self):
 
-        if self.log_filename is not "log":
+        if self.log_filename != "log":
             warnings.warn("'OptimizerConfig.log_filename' is deprecated. Use 'OptimizerConfig.results_dir' instead.")
 
         results_dir = self.results_dir
@@ -253,91 +257,23 @@ class Optimizer():
 
         if self.obj_type == "minimize":
             maximize = False
+            self.yt_factor = 1.
         elif self.obj_type == "maximize":
             maximize = True
+            self.yt_factor = -1.
         else:
             raise Exception("ObjectiveConfig.type must be 'minimize' or 'maximize'.")
 
         # self.obj_func = self._wrap_objectives(self.obj_func, maximize=maximize)
 
         self.num_dim = self.domain.shape[0]
+
         self.num_levels = len(self.obj_func)
 
         if len(self.costs) != self.num_levels:
             raise Exception("ObjectiveConfig.costs must have the same number of levels as the objective.")
 
         # TODO: check costs are in ascending order
-
-    def _wrap_objectives(self, obj_func: list, maximize: bool = False) -> list:
-
-        wrapped_obj_func = []
-
-        if maximize:
-            factor = -1
-        else:
-            factor = 1
-
-        for func in obj_func:
-            wrapped_obj_func.append(wrap_func(func, factor=factor))
-
-        return wrapped_obj_func
-
-    def _wrap_constraints(self, cstr_func: list, type: str, value: float):
-        """
-        Wrap all the fidelity levels of a given constraint to match the constraint's type (less or greater;
-        by default = "less") and its value (by default = 0).
-
-        :param cstr_func: List of callable where each callable is a fidelity level.
-        :type cstr_func: list[Callable]
-
-        :param type: Define constraint's type where "less" is for constraints of type g <= 0 and "greater" is for
-                     constraints of type g >= 0.
-        :type type: str
-
-        :param value: Limit value of the constraint g <= value
-        :type value: float
-
-        :return:
-        """
-
-        factor = 1
-        if type == "greater":
-            factor = -1
-
-        wrapped_cstr_func = []
-
-        for func in cstr_func:
-            wrapped_cstr_func.append(wrap_func(func, factor=factor, step=value))
-
-        return wrapped_cstr_func
-
-    def _wrap_training_data(self):
-
-        self.yt = []
-        self.ct = []
-
-        for lvl in range(self.num_levels):
-
-            factor = 1.
-            if self.obj_type == "maximize":
-                factor = -1.
-
-            # wrap the objective values
-            self.yt.append(wrap_array(self.data[lvl][:, 0].reshape(-1, 1), factor=factor))
-
-            self.ct.append(np.empty((self.xt[lvl].shape[0], self.num_cstr)))
-
-            # wrap the constraint values
-            for c_id, c_config in enumerate(self.cstr_config):
-
-                factor = 1.
-                if c_config.type == "greater":
-                    factor = -1.
-
-                self.ct[lvl][:, c_id] = wrap_array(self.data[lvl][:, c_id+1],
-                                                   factor=factor,
-                                                   step=c_config.value)
-
 
     def _check_constraints(self) -> None:
 
@@ -347,9 +283,20 @@ class Optimizer():
         self.num_cstr = len(self.cstr_config)
 
         if self.num_cstr > 0:
+
+            self.ct_factor = np.empty(self.num_cstr)
+            self.ct_step = np.empty(self.num_cstr)
+
             for c_id, c_config in enumerate(self.cstr_config):
 
                 # self.cstr_funcs.append([])
+
+                if c_config.type == "greater":
+                    self.ct_factor[c_id] = -1.
+                else:
+                    self.ct_factor[c_id] = 1.
+
+                self.ct_step[c_id] = c_config.value
 
                 if callable(c_config.constraint):
                     c_config.constraint = [c_config.constraint]
@@ -417,8 +364,8 @@ class Optimizer():
             xt = np.empty((self.xt_init[lvl].shape[0], self.num_dim))
 
             self.data.append(np.empty((self.xt_init[lvl].shape[0], self.num_cstr+1)))
-            # yt = np.empty((self.xt_init[lvl].shape[0], 1))
-            # ct = np.zeros((self.xt_init[lvl].shape[0], max(1, self.num_cstr)))
+            yt = np.empty((self.xt_init[lvl].shape[0], 1))
+            ct = np.zeros((self.xt_init[lvl].shape[0], max(1, self.num_cstr)))
             times = np.empty((self.xt_init[lvl].shape[0], self.num_cstr+1))
 
             for i in range(xt.shape[0]):
@@ -427,14 +374,14 @@ class Optimizer():
                 obj_value, cstr_values, t = self.sample_point(xt[i, :], lvl)
                 self.data[lvl][i, 0] = obj_value
                 self.data[lvl][i, 1:] = cstr_values
-                # yt[i, :] = obj_value
-                # ct[i, :] = cstr_values
+                yt[i, :] = obj_value
+                ct[i, :] = cstr_values
                 times[i, :] = t
 
             self.xt.append(xt)
 
-            # self.yt.append(yt)
-            # self.ct.append(ct)
+            self.yt.append(yt)
+            self.ct.append(ct)
 
             self.samples_time.append(times)
 
@@ -531,7 +478,7 @@ class Optimizer():
         # generate initial doe
         self._gen_init_train_data()
 
-        self._wrap_training_data()
+        self.scale_training_data()
 
         # update f_min
         self.update_f_min()
@@ -543,6 +490,7 @@ class Optimizer():
         for l in range(self.num_levels):
             self.iter_data[f"n{l + 1}"] = len(self.yt[l])
 
+        self.update_costs()
         self.budget = self.compute_used_budget()
         self.iter_data["budget"] = self.compute_used_budget()
         self.iter_data["f_min"] = self.f_min
@@ -555,7 +503,7 @@ class Optimizer():
         self.continue_bo = True
 
         if self.verbose: print(
-            f"| iter= {iter_id}/{self.max_iter} | budget={self.budget}/{self.max_budget} | f_min={self.f_min:.3e} | rscv_min={self.rscv_min:.3e} |"
+            f"| iter= {iter_id}/{self.max_iter} | budget={self.budget:.3f}/{self.max_budget:.3f} | f_min={self.f_min:.3e} | rscv_min={self.rscv_min:.3e} |"
             )
 
         while self.continue_bo:
@@ -566,30 +514,10 @@ class Optimizer():
             self.iter_data = dict()  # reset iteration data dictionary
 
             # ------- Wrap training data -------
-            self._wrap_training_data()
+            # self._wrap_training_data()
 
             # ------- Scale training data -------
-
-            self.yt_scaled = []
-            self.ct_scaled = []
-
-            for lvl in range(self.num_levels):
-
-                self.yt_scaled.append(self.yt[lvl].copy())
-                self.ct_scaled.append(self.ct[lvl].copy())
-
-                self.f_min_scaled = self.f_min
-
-                if self.scaling:
-                    yt_scaled, yt_mean, yt_std = self._standardize_data(self.yt[lvl])
-
-                    self.yt_scaled[lvl][:] = yt_scaled
-                    self.f_min_scaled = (self.f_min - yt_mean)/yt_std
-
-                    for c_id in range(self.ct[lvl].shape[1]):
-                        self.ct_scaled[lvl][:, c_id] /= self.ct[lvl][:, c_id].std()
-                else:
-                    pass
+            self.scale_training_data()
 
             # ------- Update cost ratio -------
             self.update_costs()
@@ -598,7 +526,7 @@ class Optimizer():
             gp_t0 = time.perf_counter()
 
             # train the objective surrogate model
-            self.obj_surrogate.train(self.xt, self.yt_scaled)
+            self.obj_surrogate.train(self.xt_scaled, self.yt_scaled)
 
             # if constrained, train the constraint surrogate models
 
@@ -607,7 +535,7 @@ class Optimizer():
                 for lvl in range(self.num_levels):
                     ct_all_levels.append( self.ct_scaled[lvl][:, c_id].reshape(-1, 1) )
 
-                self.cstr_surrogates[c_id].train(self.xt, ct_all_levels)
+                self.cstr_surrogates[c_id].train(self.xt_scaled, ct_all_levels)
 
             gp_t1 = time.perf_counter()
             gp_time = gp_t1 - gp_t0  # elapsed time for training the models
@@ -656,6 +584,10 @@ class Optimizer():
 
                 max_level = k
 
+                if self.scaling:
+                    self.next_x[k] *= self.domain[:, 1] - self.domain[:, 0]
+                    self.next_x[k] += self.domain[:, 0]
+
                 # Check if the infill point is already in the training data
                 # TODO: what to do if the next infill location is already in the training data?
                 if np.any(np.all(self.xt[k] == self.next_x[k], axis=1)):
@@ -674,8 +606,8 @@ class Optimizer():
                 qoi[0] = next_y
                 qoi[1:] = next_c
                 self.xt[k] = np.vstack((self.xt[k], self.next_x[k]))
-                # self.yt[k] = np.append(self.yt[k], next_y)
-                # self.ct[k] = np.vstack((self.ct[k], next_c))
+                self.yt[k] = np.vstack((self.yt[k], next_y))
+                self.ct[k] = np.vstack((self.ct[k], next_c))
                 self.data[k] = np.vstack((self.data[k], qoi))
 
                 self.samples_time[k] = np.vstack((self.samples_time[k], next_time))
@@ -693,7 +625,8 @@ class Optimizer():
 
             self.iter_data["max_f_level"] = max_level
 
-            self._wrap_training_data()
+            # self._wrap_training_data()
+
             # update f_min
             self.update_f_min()
             self.update_rscv_min()
@@ -711,6 +644,8 @@ class Optimizer():
             for lvl in range(self.num_levels):
                 self.iter_data[f"avg_f_time_lvl_{lvl}"] = self.samples_time[lvl].sum(axis=1).mean().item()
 
+            self.iter_data["costs"] = self.costs
+
             # elapsed time since optimization start
             self.bo_time = time.perf_counter() - bo_start
             self.iter_data["bo_time"] = self.bo_time
@@ -726,7 +661,7 @@ class Optimizer():
 
             # Display the iteration number, best feasible objective and fidelity level sampled
             if self.verbose : print(
-                f"| iter= {iter_id}/{self.max_iter} | budget={self.budget}/{self.max_budget} | f_min={self.f_min:.3e} | rscv_min={self.rscv_min:.3e} | lvl={max_level}/{self.num_levels - 1} | gp_time={gp_time:.3f} | acq_time={acq_time:.3f}")
+                f"| iter= {iter_id}/{self.max_iter} | budget={self.budget:.3f}/{self.max_budget:.3f} | f_min={self.f_min:.3e} | rscv_min={self.rscv_min:.3e} | lvl={max_level}/{self.num_levels - 1} | gp_time={gp_time:.3f} | acq_time={acq_time:.3f}")
 
             # ------- End of optimization loop -------
 
@@ -897,7 +832,45 @@ class Optimizer():
                 # average sampling time per level
                 self.costs[lvl] = self.samples_time[lvl].sum(axis=1).mean().item()
 
+    def scale_training_data(self):
 
+        self.xt_scaled = []
+        self.yt_scaled = []
+        self.ct_scaled = []
+
+        for lvl in range(self.num_levels):
+
+            self.xt_scaled.append(self.xt[lvl].copy())
+
+            # transform the objective into a minimization problem
+            self.yt_scaled.append(wrap_array(self.yt[lvl], factor=self.yt_factor))
+
+            # transform the constraints to define the feasible domain as: g <= 0 and h == 0
+            self.ct_scaled.append(wrap_array(self.ct[lvl], factor=self.ct_factor, step=self.ct_step))
+
+            if self.scaling:
+                # scale xt between 0 and 1
+                self.xt_scaled[lvl][:] -= self.domain[:, 0]
+                self.xt_scaled[lvl][:] /= (self.domain[:, 1] - self.domain[:, 0])
+
+                # update scaled domain boundaries
+                self.domain_scaled = np.empty((self.num_dim, 2))
+                self.domain_scaled[:, 0] = 0.
+                self.domain_scaled[:, 1] = 1.
+
+
+                # scaled objective to unit std
+                yt_scaled, yt_mean, yt_std = self._standardize_data(self.yt[lvl])
+                self.yt_scaled[lvl] = yt_scaled
+
+                # update minimum objective
+                self.f_min_scaled = (self.f_min - yt_mean) / yt_std
+
+                # scaled constraints to unit std
+                for c_id in range(self.ct[lvl].shape[1]):
+                    self.ct_scaled[lvl][:, c_id] /= self.ct[lvl][:, c_id].std()
+            else:
+                self.domain_scaled = self.domain.copy()
 
 if __name__ == '__main__':
     pass
