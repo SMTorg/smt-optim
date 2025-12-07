@@ -3,6 +3,7 @@ import scipy.stats as stats
 import scipy.optimize as so
 from warnings import warn
 import random
+from time import perf_counter
 
 from abc import ABC, abstractmethod
 
@@ -28,6 +29,464 @@ class AcquisitionStrategy(ABC):
     @abstractmethod
     def execute_infill_strategy(self, optimizer):
         raise Exception("Acquisition Strategy not implemented.")
+
+class MFSEGO_EQ(AcquisitionStrategy):
+    def __init__(self, optimizer=None, **kwargs):
+        super().__init__()
+
+        self.optimizer = optimizer
+        self.acq_func = kwargs.pop("acq_func", log_ei)                  # expected_improvement, log_ei
+        self.fmin_crit = kwargs.pop("fmin_crit", "min_rscv")            # min_rscv, fmin, mean_rscv
+        # self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
+        self.n_start = kwargs.pop("n_start", None)
+        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")    # obj-only, average, optimistic, pessimistic
+        self.select_fidelity = kwargs.pop("select_fidelity", True)
+        self.min_rscv_first = kwargs.pop("min_rscv_first", False)
+        self.filter_rscv = kwargs.pop("filter_rscv", False)
+        self.optimize_best = kwargs.pop("optimize_best", False)
+        self.relax_constraints = kwargs.pop("relax_constraints", False)
+
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
+
+        if self.optimizer is not None and self.n_start is None:
+            self.n_start = 10*optimizer.num_dim
+
+    def compatibility_check(self, optimizer):
+        raise Exception("Compatibility check not implemented.")
+
+    def execute_infill_strategy(self, optimizer) -> list[np.ndarray]:
+
+        acq_data = {}
+
+        self.fmin = self.get_fmin(optimizer, fmin_crit=self.fmin_crit)
+        acq_data["fmin"] = self.fmin
+
+        # generate starting points for the multistart optimization
+        gen_t0 = perf_counter()
+        multi_x0 = self.generate_multistart_points(optimizer)
+        gen_t1 = perf_counter()
+        acq_data["generate_init_points_time"] = gen_t1 - gen_t0
+
+        multi_x = np.empty_like(multi_x0)
+        multi_f = np.empty(multi_x0.shape[0])
+        multi_c = np.empty((multi_x0.shape[0], optimizer.num_cstr))
+        multi_success = np.full(multi_x0.shape[0], False)
+
+        # scipy objective wrapper
+        def scipy_acq_func(x):
+            x = x.reshape(1, -1)
+            mu = optimizer.obj_surrogate.predict_values(x)
+            s2 = optimizer.obj_surrogate.predict_variances(x)
+            return -self.acq_func(mu, s2, self.fmin).item()
+
+        # scipy constraint wrapper (for scipy, the feasible domain is g >= 0)
+        scipy_cstr = []
+        for c_id, c_config in enumerate(optimizer.cstr_config):
+
+            if c_config.type in ["less", "greater"]:
+                c_type = "ineq"
+            elif c_config.type == "equal":
+                c_type = "eq"
+            else:
+                raise Exception(f"Unexpected constraint type: {c_config.type}")
+
+            def wrap_constraint(mu_func, s2_func, type, relax=False):
+
+                def sp_constraint(x):
+                    x = x.reshape(1, -1)
+                    mu = mu_func(x).item()
+
+                    if relax:
+                        s = np.sqrt(s2_func(x).item())
+                        if type == "ineq":
+                            return -(mu - 3*s)
+                        elif type == "eq":
+                            return -(np.abs(mu) - 3*s)
+
+                    return -mu
+
+                return sp_constraint
+
+
+            mu_func = optimizer.cstr_surrogates[c_id].predict_values
+            s2_func = optimizer.cstr_surrogates[c_id].predict_variances
+            sp_cstr_func = wrap_constraint(mu_func, s2_func, c_type, relax=self.relax_constraints)
+
+            if self.relax_constraints:
+                c_type = "ineq"
+
+            scipy_cstr.append(
+                {
+                    "type": c_type,
+                    "fun": lambda x, f=sp_cstr_func: f(x),
+                }
+            )
+
+
+        for i in range(multi_x0.shape[0]):
+
+            # for cstr in scipy_cstr:
+            #     print(f"ini c value = {-cstr["fun"](multi_x0[i, :])}")
+
+            res = so.minimize(scipy_acq_func,
+                              x0=multi_x0[i, :],
+                              bounds=optimizer.domain_scaled,
+                              constraints=scipy_cstr,
+                              method="SLSQP",
+                              tol=1e-8,
+                              options={"maxiter": 200*optimizer.num_dim})
+
+
+            # apply L1 correction for the bounds
+            x_corrected = np.where(res.x < optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 0], res.x)
+            x_corrected = np.where(x_corrected > optimizer.domain_scaled[:, 1], optimizer.domain_scaled[:, 1], res.x)
+
+            multi_x[i, :] = x_corrected
+            multi_f[i] = scipy_acq_func(x_corrected)
+
+            if optimizer.num_cstr > 0:
+                for c_id in range(len(scipy_cstr)):
+                    multi_c[i, c_id] = -scipy_cstr[c_id]["fun"](x_corrected)
+
+            multi_success[i] = res.success
+
+            # print(f"{i+1}/{self.n_start} | f={multi_f[i]} | Delta_x={np.linalg.norm(multi_x0[i, :] - x_corrected)} | c={multi_c[i, :]} | {res.success} | {res.message} | time={t1-t0:.3f}")
+
+        if optimizer.num_cstr == 0:
+            feas_mask = np.full(multi_x0.shape[0], True)
+        else:
+
+            rscv = self.compute_rscv(multi_c, optimizer.cstr_config, g_tol=1e-8, h_tol=1e-8)
+
+            if self.filter_rscv:
+                feas_mask = np.where(rscv <= 0, True, False)
+            else:
+                feas_mask = np.full(multi_x0.shape[0], True)
+
+        if np.any(feas_mask):
+            idx = np.argmin(np.where(feas_mask, multi_f, np.inf))
+        else:
+            idx = np.argmin(rscv)
+
+        success_rate = np.count_nonzero(multi_success)/multi_success.shape[0]
+
+        # f_min: float = multi_f[idx]
+        x_min: np.ndarray = multi_x[idx, :]
+
+        acq_data["multi_idx"] = idx
+        acq_data["multi_x"] = multi_x
+        acq_data["multi_f"] = multi_f
+        acq_data["multi_c"] = multi_c
+        acq_data["acq_success"] = success_rate
+
+        if optimizer.num_cstr > 0:
+            acq_data["rscv"] = rscv
+
+        if self.optimize_best:
+
+            if optimizer.num_cstr > 0:
+                optimized_cstr = np.empty(optimizer.num_cstr)
+
+            res = so.minimize(scipy_acq_func,
+                              x0=x_min,
+                              bounds=optimizer.domain_scaled,
+                              constraints=scipy_cstr,
+                              method="SLSQP",
+                              tol=1e-15,
+                              options={"maxiter": 50 * optimizer.num_dim})
+
+
+            optimized_x = np.clip(res.x, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
+            acq_data["optimized_x"] = optimized_x
+
+            optimized_l2 = np.linalg.norm(optimized_x - x_min)
+            acq_data["optimized_l2"] = optimized_l2
+
+            optimized_acq = scipy_acq_func(optimized_x)
+            acq_data["optimized_acq"] = optimized_acq
+
+            if optimizer.num_cstr > 0:
+                for c_id in range(len(scipy_cstr)):
+                    optimized_cstr[c_id] = -scipy_cstr[c_id]["fun"](optimized_x)
+                    acq_data["optimized_cstr"] = optimized_cstr
+
+            # update x_min
+            x_min = optimized_x
+
+        # select highest fidelity level to sample
+        fid_crit_t0 = perf_counter()
+        if optimizer.num_levels > 1 and self.select_fidelity:
+
+            all_surrogates = [optimizer.obj_surrogate]
+            for c_surrogate in optimizer.cstr_surrogates:
+                all_surrogates.append(c_surrogate)
+
+            levels, s2_red_norm = self.select_fidelity_level(x_min.reshape(1, -1),
+                                                             optimizer.costs,
+                                                             all_surrogates,
+                                                             self.fidelity_crit)
+            level = levels.item()
+
+        else:
+            level = optimizer.num_levels-1
+
+        acq_data["infill_level"] = level
+        acq_data["normalized_s2_reduction"] = s2_red_norm
+
+        next_x = []
+        for lvl in range(optimizer.num_levels):
+            if lvl <= level:
+                next_x.append(x_min)
+            else:
+                next_x.append(None)
+        fid_crit_t1 = perf_counter()
+        acq_data["fid_crit_time"] = fid_crit_t1 - fid_crit_t0
+
+        # log expected values
+        expected_values = np.empty(optimizer.num_cstr+1)
+        expected_values[0] = optimizer.obj_surrogate.predict_values(x_min.reshape(1, -1)).item()
+
+        if optimizer.scaling:
+            yt_scaled, yt_mean, yt_std = optimizer._standardize_data(optimizer.yt[-1])
+            expected_values[0] *= yt_std
+            expected_values[0] +=  yt_mean
+
+        for c_id, c_surrogate in enumerate(optimizer.cstr_surrogates):
+            expected_values[c_id+1] = c_surrogate.predict_values(x_min.reshape(1, -1)).item()
+            if optimizer.scaling:
+                yt_scaled, yt_mean, yt_std = optimizer._standardize_data(optimizer.ct[-1][:, c_id])
+                expected_values[c_id+1] *= yt_std
+
+        acq_data["expected_values"] = expected_values
+
+        optimizer.iter_data["acquisition"] = acq_data
+
+        return next_x
+
+
+    def get_fmin(self, optimizer, rscv_tol: float = 0.0, fmin_crit: str = "min_rscv") -> float:
+
+        # no constraint
+        if optimizer.num_cstr == 0 or fmin_crit == "fmin":
+            idx = optimizer.yt_scaled[-1].argmin()
+
+        elif fmin_crit == "min_rscv":
+            ct_rscv = self.compute_rscv(optimizer.ct_scaled[-1], optimizer.cstr_config)
+            feas_mask = np.where(ct_rscv <= rscv_tol, True, False)
+
+            if np.any(feas_mask):
+                idx = np.argmin(np.where(feas_mask, optimizer.yt_scaled[-1][:, 0], np.inf))
+            else:
+                idx = np.argmin(ct_rscv)
+
+        elif fmin_crit == "mean_rscv":
+            rscv = self.compute_rscv(optimizer.yt_scaled[-1], optimizer.cstr_config)
+            mean_rscv = rscv.mean()
+
+            feas_mask = np.where(rscv <= mean_rscv, True, False)
+            idx = np.argmin(np.where(feas_mask, optimizer.yt_scaled[-1][:, 0], np.inf))
+
+        else:
+            raise Exception(f"{fmin_crit} is not a valid fmin_crit")
+
+        fmin = optimizer.yt_scaled[-1][idx, 0]
+
+        return fmin
+
+
+    def generate_multistart_points(self, optimizer) -> np.ndarray:
+
+        sampler = stats.qmc.LatinHypercube(d=optimizer.domain_scaled.shape[0])
+
+        # LHS filter
+        large_x0 = sampler.random(10*self.n_start)
+        large_x0 = stats.qmc.scale(large_x0, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
+
+        mu = optimizer.obj_surrogate.predict_values(large_x0)
+        s2 = optimizer.obj_surrogate.predict_variances(large_x0)
+        large_f = -self.acq_func(mu, s2, self.fmin)
+
+        # no constraints -> selects the best starting points
+        if optimizer.num_cstr == 0:
+            sorted_idx = np.argsort(large_f.ravel())
+
+        # with constraints -> selects the best points with the lowest constraint violation
+        else:
+            large_c = np.empty((large_x0.shape[0], optimizer.num_cstr))
+
+            for c_id, c_surrogate in enumerate(optimizer.cstr_surrogates):
+                large_c[:, c_id] = c_surrogate.predict_values(large_x0).ravel()
+
+            rscv = self.compute_rscv(large_c, optimizer.cstr_config)
+            sorted_idx = np.lexsort((large_f.ravel(), rscv))
+            rscv = rscv[sorted_idx][:self.n_start]
+
+        multi_x0 = large_x0[sorted_idx][:self.n_start, :]
+
+        # with constraints -> try to reduce the starting point RSCV
+        if optimizer.num_cstr > 0 and self.min_rscv_first:
+
+            def min_rscv(x):
+                cstr_values = np.empty((1, len(optimizer.cstr_surrogates)))
+                for c_id, c_surrogate in enumerate(optimizer.cstr_surrogates):
+                    cstr_values[0, c_id] = c_surrogate.predict_values(x.reshape(1, -1)).item()
+                return self.compute_rscv(cstr_values, optimizer.cstr_config).item()
+
+
+            for i in range(multi_x0.shape[0]):
+                # try to reduce the constraint violation if the starting point is not feasible
+                if rscv[i] != 0.0:
+                    res = so.minimize(min_rscv,
+                                      x0=multi_x0[i, :],
+                                      bounds=optimizer.domain_scaled,
+                                      method="COBYLA",
+                                      tol=1e-8,
+                                      options={"maxiter": 50*optimizer.num_dim})
+
+                    rscv[i] = res.fun
+                    multi_x0[i, :] = res.x
+
+        return multi_x0
+
+
+    def compute_rscv(self, cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+
+        scv = np.full_like(cstr_array, 0.0)     # Square Constraint Violation
+
+        for c_id, c_config in enumerate(cstr_config):
+
+            if c_config.type in ["less", "greater"]:
+                valid_mask = cstr_array[:, c_id] <= g_tol
+                scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+
+            elif c_config.type == "equal":
+                valid_mask = np.abs(cstr_array[:, c_id]) <= h_tol
+                scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+
+            else:
+                raise Exception(f"{c_config.type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'.")
+
+        rscv = np.sqrt(scv.sum(axis=1))
+
+        return rscv
+
+    def compute_sigma2_red(self, x_pred: np.ndarray, surrogate: SmtMFK) -> np.ndarray:
+
+        # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
+        s2, rho2 = surrogate.mfk.predict_variances_all_levels(x_pred)
+        num_levels = s2.shape[1]
+
+        tot_rho2 = np.ones((x_pred.shape[0], num_levels))
+        s2_red = np.empty((x_pred.shape[0], num_levels))
+
+        for k in range(num_levels):
+            for l in range(k, num_levels-1):
+                tot_rho2[:, k] *= rho2[l][:]
+
+            s2_red[:, k] = s2[:, k] * tot_rho2[:, k]
+
+        # np.array(num_points, num_levels)
+        return s2_red
+
+
+    def compute_norm_squared_cost(self, costs: list[float]) -> np.ndarray:
+
+        num_levels = len(costs)
+        tot_costs2 = np.empty(num_levels)
+
+        for k in range(num_levels):
+            tot_costs2[k] = np.sum(costs[0:k+1])**2
+
+        # normalize the aggregate costs squared by its maximum
+        tot_costs2 /= np.max(tot_costs2)
+
+        return tot_costs2
+
+    def compute_norm_sigma2_red(self, x_pred: np.ndarray, norm_costs2: list[float], surrogate: SmtMFK) -> np.ndarray:
+
+        num_levels = len(norm_costs2)
+
+        s2_red = self.compute_sigma2_red(x_pred, surrogate)
+        s2_norm = np.empty_like(s2_red)
+
+        for k in range(num_levels):
+            s2_norm[:, k] = s2_red[:, k] / norm_costs2[k]
+
+        return s2_norm
+
+
+    def compute_all_s2_red_norm(self, x_pred: np.ndarray, costs: list[float], surrogates: list[SmtMFK]) -> list[np.ndarray]:
+
+        num_pts = x_pred.shape[0]
+        num_levels = len(costs)
+
+        norm_costs2 = self.compute_norm_squared_cost(costs)
+
+        s2_red_norm = [np.empty((num_pts, num_levels)) for _ in range(len(surrogates))]
+
+        for i, surrogate in enumerate(surrogates):
+            s2_red_norm[i] = self.compute_norm_sigma2_red(x_pred, norm_costs2, surrogate)
+
+        return s2_red_norm
+
+
+    def select_fidelity_level(self, x_pred: np.ndarray, costs: list[float], all_surrogates: list[SmtMFK], criterion: str) -> np.ndarray:
+
+        num_pts: int = x_pred.shape[0]
+        # level: np.ndarray = np.zeros(num_pts)
+
+        if criterion == "obj-only":
+            surrogates = [all_surrogates[0]]
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, surrogates)
+            level = s2_red_norm[0].argmax(axis=1)
+
+        elif criterion == "optimistic":
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+
+            # TODO: make it compatible with multiple infill points
+            level = s2_red_norm[0].argmax(axis=1)
+
+            for i in range(1, len(all_surrogates)):
+                level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).min(axis=0)
+
+        elif criterion == "pessimistic":
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+
+            level = s2_red_norm[0].argmax(axis=1)
+
+            for i in range(1, len(all_surrogates)):
+                level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).max(axis=0)
+
+        elif criterion == "average":
+            # s2_red of each surrogate is normalized by the cost. Should it be normalized after the sum?
+            # -> should be the same
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+            s2_red_avg = np.zeros((num_pts, s2_red_norm[0].shape[1]))
+
+            # sum the s2_red from all surrogates
+            for i in range(len(all_surrogates)):
+                s2_red_avg[:, :] += s2_red_norm[i][:, :]
+
+            level = s2_red_avg.argmax(axis=1)
+
+        elif criterion == "cstr-only":
+
+            if len(all_surrogates) == 1:
+                raise Exception("cstr-only criterion requires one constraint surrogate.")
+
+            surrogates = all_surrogates[1:]
+
+            if len(surrogates) > 1:
+                raise Exception("cstr-only is not implemented for more than 1 constraints.")
+
+            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, surrogates)
+
+            level = s2_red_norm[0].argmax(axis=1)
+
+        # np.ndarray(num_pts) -> fidelity level for each infill points
+        return level, s2_red_norm
+
 
 
 class MonoFiAcqStrat(AcquisitionStrategy):
@@ -343,7 +802,7 @@ class MultiFiAcqStrat(AcquisitionStrategy):
             level = s2_red_norm[0].argmax(axis=1)
 
         # np.ndarray(num_pts) -> fidelity level for each infill points
-        return level
+        return level, s2_red_norm
 
 
     def mf_acq_strategy(self, optimizer) -> list[np.ndarray]:
