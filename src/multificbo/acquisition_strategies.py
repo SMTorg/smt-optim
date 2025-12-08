@@ -61,6 +61,7 @@ class MFSEGO_EQ(AcquisitionStrategy):
 
         self.fmin = self.get_fmin(optimizer, fmin_crit=self.fmin_crit)
         acq_data["fmin"] = self.fmin
+        acq_data["fmin_descaled"] = self.fmin * optimizer.yt[-1].std(axis=0) + optimizer.yt[-1].mean()
 
         # generate starting points for the multistart optimization
         gen_t0 = perf_counter()
@@ -139,15 +140,17 @@ class MFSEGO_EQ(AcquisitionStrategy):
 
 
             # apply L1 correction for the bounds
-            x_corrected = np.where(res.x < optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 0], res.x)
-            x_corrected = np.where(x_corrected > optimizer.domain_scaled[:, 1], optimizer.domain_scaled[:, 1], res.x)
+            # x_corrected = np.where(res.x < optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 0], res.x)
+            # x_corrected = np.where(x_corrected > optimizer.domain_scaled[:, 1], optimizer.domain_scaled[:, 1], res.x)
 
-            multi_x[i, :] = x_corrected
-            multi_f[i] = scipy_acq_func(x_corrected)
+            x_clipped = np.clip(res.x, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
+
+            multi_x[i, :] = x_clipped
+            multi_f[i] = -scipy_acq_func(x_clipped)
 
             if optimizer.num_cstr > 0:
                 for c_id in range(len(scipy_cstr)):
-                    multi_c[i, c_id] = -scipy_cstr[c_id]["fun"](x_corrected)
+                    multi_c[i, c_id] = -scipy_cstr[c_id]["fun"](x_clipped)
 
             multi_success[i] = res.success
 
@@ -157,17 +160,17 @@ class MFSEGO_EQ(AcquisitionStrategy):
             feas_mask = np.full(multi_x0.shape[0], True)
         else:
 
-            rscv = self.compute_rscv(multi_c, optimizer.cstr_config, g_tol=1e-8, h_tol=1e-8)
+            rscv = self.compute_rscv(multi_c, optimizer.cstr_config, g_tol=0., h_tol=0.)
 
             if self.filter_rscv:
-                feas_mask = np.where(rscv <= 0, True, False)
+                feas_mask = np.where(rscv <= 1e-4, True, False)
             else:
                 feas_mask = np.full(multi_x0.shape[0], True)
 
         if np.any(feas_mask):
-            idx = np.argmin(np.where(feas_mask, multi_f, np.inf))
+            idx = np.argmax(np.where(feas_mask, multi_f, np.inf))
         else:
-            idx = np.argmin(rscv)
+            idx = np.argmax(rscv)
 
         success_rate = np.count_nonzero(multi_success)/multi_success.shape[0]
 
@@ -232,12 +235,14 @@ class MFSEGO_EQ(AcquisitionStrategy):
             level = optimizer.num_levels-1
 
         acq_data["infill_level"] = level
-        acq_data["normalized_s2_reduction"] = s2_red_norm
+
+        if optimizer.num_levels > 1 and self.select_fidelity:
+            acq_data["normalized_s2_reduction"] = s2_red_norm
 
         next_x = []
         for lvl in range(optimizer.num_levels):
             if lvl <= level:
-                next_x.append(x_min)
+                next_x.append(x_min.copy())
             else:
                 next_x.append(None)
         fid_crit_t1 = perf_counter()
@@ -301,6 +306,7 @@ class MFSEGO_EQ(AcquisitionStrategy):
 
         # LHS filter
         large_x0 = sampler.random(10*self.n_start)
+        # large_x0 = sampler.random(self.n_start)
         large_x0 = stats.qmc.scale(large_x0, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
 
         mu = optimizer.obj_surrogate.predict_values(large_x0)
@@ -562,6 +568,7 @@ class MonoFiAcqStrat(AcquisitionStrategy):
 
         index = np.array(fmin).argmin()
         next_x = np.array(xmin)[index, :]
+
 
         return next_x
 

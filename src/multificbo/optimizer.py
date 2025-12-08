@@ -584,6 +584,7 @@ class Optimizer():
 
                 max_level = k
 
+                # unscale infill point
                 if self.scaling:
                     self.next_x[k] *= self.domain[:, 1] - self.domain[:, 0]
                     self.next_x[k] += self.domain[:, 0]
