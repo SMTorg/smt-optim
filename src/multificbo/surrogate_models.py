@@ -113,6 +113,7 @@ class SmtKRG(Surrogate):
         if type(self.optimizer.domain) is np.ndarray:
             self.krg = KRG(print_global=False,
                            n_start=self.n_start,
+                           hyper_opt="Cobyla",
                            random_state=None)
 
         # KRG for mixed integer domain
@@ -202,6 +203,7 @@ class SmtMFK(Surrogate):
 
         self.mfk = MFK(print_global=False,
                        n_start=self.n_start,
+                       hyper_opt="Cobyla",
                        random_state=None)
 
         self.theta_bounds = self.mfk.options["theta_bounds"]
@@ -309,6 +311,7 @@ class SmtMFCK(Surrogate):
 
         self.mfck = MFCK(print_global=False,
                          n_start=self.n_start,
+                         hyper_opt="Cobyla",
                          random_state=None)
 
         self.mfck.options["lambda"] = 0.0

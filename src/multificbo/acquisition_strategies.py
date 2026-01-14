@@ -43,6 +43,7 @@ class MFSEGO_EQ(AcquisitionStrategy):
         self.filter_rscv = kwargs.pop("filter_rscv", False)
         self.optimize_best = kwargs.pop("optimize_best", False)
         self.relax_constraints = kwargs.pop("relax_constraints", False)
+        self.cr_override = kwargs.pop("cr_override", None)                  # override optimizer Cost Ratio
 
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
@@ -223,8 +224,13 @@ class MFSEGO_EQ(AcquisitionStrategy):
             for c_surrogate in optimizer.cstr_surrogates:
                 all_surrogates.append(c_surrogate)
 
+            if self.cr_override is not None:
+                costs = self.cr_override
+            else:
+                costs = optimizer.costs
+
             levels, s2_red_norm = self.select_fidelity_level(x_min.reshape(1, -1),
-                                                             optimizer.costs,
+                                                             costs,
                                                              all_surrogates,
                                                              self.fidelity_crit)
             level = levels.item()
@@ -1147,7 +1153,7 @@ class VFPI(AcquisitionStrategy):
     def compatibility_check(self, optimizer):
         raise Exception("Compatibility check not implemented.")
 
-    def predicted_f_min(self, level: int):
+    def predicted_f_min(self, level: int) -> tuple[float, np.ndarray]:
 
         dim = self.optimizer.num_dim
         bounds = self.optimizer.domain_scaled
@@ -1170,7 +1176,10 @@ class VFPI(AcquisitionStrategy):
             res = so.minimize(f_min_scipy_wrapper,
                               acq_x0[i, :],
                               method="L-BFGS-B",
-                              bounds=bounds)
+                              bounds=bounds,
+                              tol=4.4e-8)
+
+            # TODO: check bounds -> apply L1 correction if applicable
 
             all_f_min.append(res.fun)
             all_x_min.append(res.x)
@@ -1261,6 +1270,7 @@ class VFPI(AcquisitionStrategy):
         self.f_min, _ = self.predicted_f_min(-1)
 
         self.acq_data["model_fmin"] = self.f_min
+        # self.acq_data["model_fmin_descaled"] = self.f_min * optimizer.yt[-1].std(axis=0) + optimizer.yt[-1].mean()
 
         self.num_dim = optimizer.num_dim
         self.bounds = optimizer.domain_scaled
