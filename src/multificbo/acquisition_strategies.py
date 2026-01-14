@@ -7,8 +7,6 @@ from time import perf_counter
 
 from abc import ABC, abstractmethod
 
-from deap import base, creator, tools, algorithms
-
 # from multificbo.optimizer import Optimizer
 from multificbo.surrogate_models import Surrogate, SmtMFK
 from multificbo.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
@@ -1136,11 +1134,9 @@ class VFPI(AcquisitionStrategy):
 
         self.optimizer = optimizer
         self.acq_func = acq_func
-        self.n_start = 10
+        self.n_start = 50 # 10
 
         self.f_min = np.inf
-
-        self.sub_optimizer = "COBYLA"
 
         if self.optimizer is not None:
             self.mfck = self.optimizer.obj_surrogate.mfck
@@ -1151,10 +1147,10 @@ class VFPI(AcquisitionStrategy):
     def compatibility_check(self, optimizer):
         raise Exception("Compatibility check not implemented.")
 
-    def predicted_f_min(self, level):
+    def predicted_f_min(self, level: int):
 
         dim = self.optimizer.num_dim
-        bounds = self.optimizer.domain
+        bounds = self.optimizer.domain_scaled
         acq_multistart = self.n_start
         acq_sampler = stats.qmc.LatinHypercube(d=dim)   # To be verified, but I believe scipy LHS sampler works better
 
@@ -1167,13 +1163,13 @@ class VFPI(AcquisitionStrategy):
         def f_min_scipy_wrapper(x: np.ndarray):
             x = x.reshape(1, dim)
             means, vars = self.mfck.predict_all_levels(x)
-            return means[level].ravel()
+            return means[level].item()
 
         for i in range(acq_x0.shape[0]):
 
             res = so.minimize(f_min_scipy_wrapper,
                               acq_x0[i, :],
-                              method="COBYLA",
+                              method="L-BFGS-B",
                               bounds=bounds)
 
             all_f_min.append(res.fun)
@@ -1217,7 +1213,14 @@ class VFPI(AcquisitionStrategy):
 
         return penalty
 
-    def epi(self, x, level) -> np.ndarray:
+    def epi(self, x: np.ndarray, level: int) -> np.ndarray:
+        """
+        Extended Probability of Improvement
+
+        :param x:
+        :param level:
+        :return:
+        """
 
         x = x.reshape(1, -1)
 
@@ -1236,25 +1239,31 @@ class VFPI(AcquisitionStrategy):
         # density penalty
         density = self.sample_density(x, level, self.mfck)
 
-        # constraints penalty
-        satisfying = 1.0
+        # probability of feasibility
+        pof = 1.0
 
-        # TODO: should use the different fidelity level predictions
         for c_id in range(self.num_cstr):
-            g_pred = self.optimizer.cstr_surrogates[c_id].predict_values(x)
-            s2_pred = self.optimizer.cstr_surrogates[c_id].predict_variances(x)
+            # g_pred = self.optimizer.cstr_surrogates[c_id].predict_values(x)
+            # s2_pred = self.optimizer.cstr_surrogates[c_id].predict_variances(x)
 
-            satisfying *= stats.norm.cdf(g_pred / np.sqrt(s2_pred))
+            # TODO: add predict_all_levels() to mfck wrapper
+            g_pred, s2_pred = self.optimizer.cstr_surrogates[c_id].mfck.predict_all_levels(x)
 
-        return pi * corr * cost_ratio * density * satisfying
+            pof *= stats.norm.cdf(-g_pred[level] / np.sqrt(s2_pred[level].reshape(1, 1)))
+
+        return pi * corr * cost_ratio * density * pof
 
     def execute_infill_strategy(self, optimizer) -> list:
+
+        self.acq_data = {}
 
         self.current_level = 0
         self.f_min, _ = self.predicted_f_min(-1)
 
+        self.acq_data["model_fmin"] = self.f_min
+
         self.num_dim = optimizer.num_dim
-        self.bounds = optimizer.domain
+        self.bounds = optimizer.domain_scaled
 
         self.num_cstr = optimizer.num_cstr
 
@@ -1263,15 +1272,7 @@ class VFPI(AcquisitionStrategy):
 
         self.optimizer = optimizer
 
-        if self.sub_optimizer == "COBYLA":
-            x_infill, fid_infill = self.minimize_with_scipy()
-
-        elif self.sub_optimizer == "DEAP":
-            x_infill, fid_infill = self.minimize_with_deap(self.epi,
-                                                           self.bounds,
-                                                           self.num_levels)
-        else:
-            raise Exception(f"Unknown sub optimizer: {self.sub_optimizer}")
+        x_infill, fid_infill = self.minimize_with_scipy()
 
         infill = []
         for lvl in range(self.num_levels):
@@ -1279,6 +1280,10 @@ class VFPI(AcquisitionStrategy):
                 infill.append(x_infill)
             else:
                 infill.append(None)
+
+        self.acq_data["infill"] = infill
+
+        self.optimizer.iter_data["acquisition"] = self.acq_data
 
         return infill
 
@@ -1289,11 +1294,12 @@ class VFPI(AcquisitionStrategy):
 
         def epi_scipy_wrapper(x: np.ndarray) -> float:
             x = x.reshape(1, -1)
-            epi = self.epi(x, self.current_level).ravel()
+            epi = self.epi(x, self.current_level).item()
             return -epi
 
         dim = self.optimizer.num_dim
-        bounds = self.optimizer.domain
+        bounds = self.optimizer.domain_scaled
+
         acq_multistart = self.n_start
         acq_sampler = stats.qmc.LatinHypercube(d=self.num_dim)   # To be verified, but I believe scipy LHS sampler works better
 
@@ -1302,7 +1308,9 @@ class VFPI(AcquisitionStrategy):
 
         all_epi_f = []
         all_epi_x = []
-        all_epi_fid = []
+        all_epi_level = []
+        all_epi_success = 0
+        all_epi_nit = []
 
         for lvl in range(self.num_levels):
             self.current_level = lvl
@@ -1311,129 +1319,61 @@ class VFPI(AcquisitionStrategy):
 
                 res = so.minimize(epi_scipy_wrapper,
                                   acq_x0[i, :],
-                                  method="COBYLA",
+                                  method="L-BFGS-B",
                                   bounds=bounds,
-                                  tol=1e-4)
+                                  jac="3-point",
+                                  tol=4.4e-8)
 
-                all_epi_f.append(res.fun)
+                # check bounds -> apply L1 correction if necessary
+
+                all_epi_f.append(-res.fun)
                 all_epi_x.append(res.x)
-                all_epi_fid.append(self.current_level)
+                all_epi_level.append(self.current_level)
+
+                if res.success:
+                    all_epi_success += 1
+
+                all_epi_nit.append(res.nit)
+
+        all_epi_success /= (2*acq_x0.shape[0])
+
+        idx = np.argmax(all_epi_f)
+        x_infill = all_epi_x[idx]
+        level_infill = all_epi_level[idx]
+
+        self.acq_data["epi_f"] = all_epi_f
+        self.acq_data["epi_x"] = all_epi_x
+        self.acq_data["epi_level"] = all_epi_level
+        self.acq_data["epi_success"] = all_epi_success
+        self.acq_data["epi_nit"] = all_epi_nit
+
+        return x_infill, level_infill
 
 
-        epi_max_index = np.argmin(all_epi_f)
-        x_infill = all_epi_x[epi_max_index]
-        fid_infill = all_epi_fid[epi_max_index]
+class VFEI(AcquisitionStrategy):
 
-        return x_infill, fid_infill
+    def __init__(self, optimizer=None):
+        super().__init__()
+
+        self.optimizer = optimizer
+        self.acq_func = acq_func
+        self.n_start = 10
+
+        self.f_min = np.inf
+
+        if self.optimizer is not None:
+            self.mfck = self.optimizer.obj_surrogate.mfck
+            self.n_start *= self.optimizer.num_dim
+        else:
+            self.mfck = None
+
+    def compatibility_check(self, optimizer):
+        raise Exception("Compatibility check not implemented.")
+
+    def execute_infill_strategy(self, optimizer) -> list:
 
 
-    def minimize_with_deap(self, epi_func, bounds, num_levels,
-                           pop_size=50, ngen=40, seed=None):
-        """
-        Minimize an acquisition function jointly over x and fidelity level using DEAP.
 
-        :param epi_func: Callable function to minimize, of the form ``epi_func(x, fid)``.
-        :type epi_func: callable
 
-        :param bounds: Bounds for the continuous design variables.
-        :type bounds: list[tuple[float, float]]
+        pass
 
-        :param num_levels: Number of discrete fidelity levels (0 .. num_levels - 1).
-        :type num_levels: int
-
-        :param pop_size: Population size.
-        :type pop_size: int
-
-        :param ngen: Number of generations.
-        :type ngen: int
-
-        :param seed: Random seed for reproducibility.
-        :type seed: int, optional
-
-        :return: A tuple ``(best_x, best_fid)`` where:
-                 - ``best_x`` is the best variable found
-                 - ``best_fig`` is the corresponding fidelity level
-        :rtype: tuple[np.ndarray, int]
-        """
-
-        num_dim = self.bounds.shape[0]
-
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
-
-        # define DEAP classes (guard against re-creation if function is called multiple times)
-        if "FitnessMin" not in creator.__dict__:
-            creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-        if "Individual" not in creator.__dict__:
-            creator.create("Individual", list, fitness=creator.FitnessMin)
-
-        toolbox = base.Toolbox()
-
-        # initialization for x variables
-        for i in range(self.num_dim):
-            toolbox.register(f"attr_x_{i}", random.uniform, bounds[i, 0], bounds[i, 1])
-
-        # initialization for fidelity variable (int)
-        toolbox.register("attr_fid", random.randint, 0, num_levels-1)
-
-        # combine x variables + fidelity
-        toolbox.register(
-            "individual",
-            tools.initCycle,
-            creator.Individual,
-            [toolbox.__getattribute__(f"attr_x_{i}") for i in range(num_dim)] + [toolbox.attr_fid],
-            n=1,
-        )
-
-        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-
-        # evaluation
-        def evaluate(individual):
-            x = np.clip(np.array(individual[:-1]), bounds[:, 0], bounds[:, 1])
-
-            fid = int(np.clip(round(individual[-1]), 0, num_levels-1))
-
-            return (-epi_func(x, fid),)
-
-        toolbox.register("evaluate", evaluate)
-
-        # operators
-        toolbox.register("mate", tools.cxBlend, alpha=0.5)
-
-        # continuous mutation for x, integer mutation for fid
-        def mutate(individual, indpb=0.2):
-            for i in range(num_dim):
-                if random.random() < indpb:
-                    individual[i] = random.uniform(bounds[i, 0], bounds[i, 1])
-
-            # mutate fidelity with small probability
-            if random.random() < indpb:
-                individual[-1] = random.randint(0, num_levels - 1)
-
-            # clip variables within the boundaries
-            for i in range(num_dim):
-                individual[i] = np.clip(individual[i], bounds[i, 0], bounds[i, 1])
-
-            # clip the fidelity with the problem's levels
-            individual[-1] = np.clip(individual[-1], 0, num_levels-1)
-
-            return (individual,)
-
-        toolbox.register("mutate", mutate)
-        toolbox.register("select", tools.selTournament, tournsize=3)
-
-        # create population
-        pop = toolbox.population(n=pop_size)
-
-        # run evolution
-        algorithms.eaSimple(pop, toolbox, cxpb=0.6, mutpb=0.3, ngen=ngen,
-                            stats=None, halloffame=None, verbose=False)
-
-        # get best individual
-        best_ind = tools.selBest(pop, 1)[0]
-        best_x = np.array(best_ind[:-1])
-        best_fid = int(round(best_ind[-1]))
-        best_f = evaluate(best_ind)[0]
-
-        return best_x, best_fid
