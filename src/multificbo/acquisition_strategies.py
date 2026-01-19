@@ -4,6 +4,7 @@ import scipy.optimize as so
 from warnings import warn
 import random
 from time import perf_counter
+from functools import partial
 
 from abc import ABC, abstractmethod
 
@@ -1366,8 +1367,8 @@ class VFEI(AcquisitionStrategy):
         super().__init__()
 
         self.optimizer = optimizer
-        self.acq_func = acq_func
-        self.n_start = 10
+        # self.acq_func = acq_func
+        self.n_start = 25
 
         self.f_min = np.inf
 
@@ -1382,8 +1383,153 @@ class VFEI(AcquisitionStrategy):
 
     def execute_infill_strategy(self, optimizer) -> list:
 
+        self.optimizer = optimizer
+        self.num_levels = self.optimizer.num_levels
+
+        self.acq_data = {}
+
+        self.fmin = self.get_fmin(self.optimizer)
+
+        self.acq_data["fmin"] = self.fmin
+        self.acq_data["fmin_descaled"] = self.fmin * optimizer.yt[-1].std(axis=0) + optimizer.yt[-1].mean()
+
+        # sample the domain using a higher number of points for better starting locations
+        sampler = stats.qmc.LatinHypercube(d=self.optimizer.num_dim)
+        acq_x0 = sampler.random(10*self.n_start)
+        acq_x0 = stats.qmc.scale(acq_x0, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
+
+        acq_f = self.ei_vf(acq_x0, 0) * self.probability_of_feasibility(acq_x0, 0)
+        self.acq_data["max_init_acq_f"] = acq_f.max()
+        sorted_indices = np.argsort(acq_f.ravel())[-self.n_start:]
+
+        acq_x0 = acq_x0[sorted_indices, :]
+        acq_x0 = acq_x0[-self.n_start:, :]
+
+        acq_f = []
+        acq_x = []
+        acq_lvl = []
+
+        for lvl in range(self.num_levels):
+
+            def scipy_ei_vf_wrapper(x: np.ndarray) -> float:
+                x = x.reshape(1, -1)
+                ei_vf = self.ei_vf(x, lvl)
+                pof = self.probability_of_feasibility(x, lvl)
+                return -(ei_vf*pof).item()
+
+            for i in range(acq_x0.shape[0]):
+
+                res = so.minimize(scipy_ei_vf_wrapper,
+                                  x0=acq_x0[i, :],
+                                  method="L-BFGS-B",
+                                  bounds=self.optimizer.domain_scaled,
+                                  tol=1e-8,)
+
+                # TODO: check bounds
+
+                acq_f.append(-res.fun)
+                acq_x.append(res.x)
+                acq_lvl.append(lvl)
+
+        idx = np.argmax(acq_f)
+        x_infill = acq_x[idx]
+        level_infill = acq_lvl[idx]
+
+        self.acq_data["acq_f"] = acq_f
+        self.acq_data["acq_x"] = acq_x
+        self.acq_data["acq_lvl"] = acq_lvl
+
+        infill = []
+
+        for lvl in range(self.num_levels):
+            if lvl == level_infill:
+                infill.append(x_infill)
+            else:
+                infill.append(None)
+
+        optimizer.iter_data["acquisition"] = self.acq_data
+
+        return infill
 
 
+    def ei_vf(self, x: np.ndarray, level: int):
 
-        pass
+        mfck = self.optimizer.obj_surrogate.mfck
 
+        mu, s2 = mfck.predict_all_levels(x)
+        rho_values = mfck.optimal_theta[2 + 2 * mfck.nx:: mfck.nx + 2]
+        eta = mfck.eta(level, self.num_levels, rho_values)
+
+        mu = mu[-1].reshape(-1, 1)                  # always use the highest level mean prediction
+        s2 = eta**2 * s2[level].reshape(-1, 1)      # use the scaled level variance prediction
+
+        ei = expected_improvement(mu, s2, self.fmin)
+
+        return ei
+
+
+    def probability_of_feasibility(self, x: np.ndarray, level: int):
+
+        pof = np.ones((x.shape[0], 1))
+
+        # do not compute PoF if the problem is unconstrained
+        if self.optimizer.num_cstr == 0:
+            return pof
+
+        for c_id, c_surrogate in enumerate(self.optimizer.cstr_surrogates):
+            mfck = c_surrogate.mfck
+
+            mu, s2 = mfck.predict_all_levels(x)
+            rho_values = mfck.optimal_theta[2 + 2 * mfck.nx:: mfck.nx + 2]
+            eta = mfck.eta(level, self.num_levels, rho_values)
+
+            mu = mu[-1].reshape(-1, 1)
+            s2 = eta**2 * s2[level].reshape(-1, 1)
+
+            pof *= stats.norm.cdf(-mu/np.sqrt(s2))
+
+        return pof
+
+
+    # TODO: generalize method (make static)
+    def compute_rscv(self, cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+
+        scv = np.full_like(cstr_array, 0.0)     # Square Constraint Violation
+
+        for c_id, c_config in enumerate(cstr_config):
+
+            if c_config.type in ["less", "greater"]:
+                valid_mask = cstr_array[:, c_id] <= g_tol
+                scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+
+            elif c_config.type == "equal":
+                valid_mask = np.abs(cstr_array[:, c_id]) <= h_tol
+                scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+
+            else:
+                raise Exception(f"{c_config.type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'.")
+
+        rscv = np.sqrt(scv.sum(axis=1))
+
+        return rscv
+
+    # TODO: generelize method (make static)
+    def get_fmin(self, optimizer, rscv_tol: float = 0.0) -> float:
+
+        # no constraint
+        if optimizer.num_cstr == 0:
+            idx = optimizer.yt_scaled[-1].argmin()
+
+        # with constraints
+        if optimizer.num_cstr >= 1:
+            ct_rscv = self.compute_rscv(optimizer.ct_scaled[-1], optimizer.cstr_config)
+            feas_mask = np.where(ct_rscv <= rscv_tol, True, False)
+
+            if np.any(feas_mask):
+                idx = np.argmin(np.where(feas_mask, optimizer.yt_scaled[-1][:, 0], np.inf))
+            else:
+                idx = np.argmin(ct_rscv)
+
+        fmin = optimizer.yt_scaled[-1][idx, 0]
+
+        return fmin

@@ -846,8 +846,9 @@ class Optimizer():
             # transform the objective into a minimization problem
             self.yt_scaled.append(wrap_array(self.yt[lvl], factor=self.yt_factor))
 
-            # transform the constraints to define the feasible domain as: g <= 0 and h == 0
-            self.ct_scaled.append(wrap_array(self.ct[lvl], factor=self.ct_factor, step=self.ct_step))
+            if self.num_cstr >= 1:
+                # transform the constraints to define the feasible domain as: g <= 0 and h == 0
+                self.ct_scaled.append(wrap_array(self.ct[lvl], factor=self.ct_factor, step=self.ct_step))
 
             if self.scaling:
                 # scale xt between 0 and 1
