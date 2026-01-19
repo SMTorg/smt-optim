@@ -1363,20 +1363,22 @@ class VFPI(AcquisitionStrategy):
 
 class VFEI(AcquisitionStrategy):
 
-    def __init__(self, optimizer=None):
+    def __init__(self, optimizer=None, **kwargs):
         super().__init__()
 
         self.optimizer = optimizer
         # self.acq_func = acq_func
-        self.n_start = 25
+        self.n_start = kwargs.get("n_start", None)
 
         self.f_min = np.inf
 
         if self.optimizer is not None:
             self.mfck = self.optimizer.obj_surrogate.mfck
-            self.n_start *= self.optimizer.num_dim
         else:
             self.mfck = None
+
+        if self.optimizer is not None and self.n_start is None:
+            self.n_start = 10*self.optimizer.num_dim
 
     def compatibility_check(self, optimizer):
         raise Exception("Compatibility check not implemented.")
