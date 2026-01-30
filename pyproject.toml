@@ -3,7 +3,7 @@ requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "MultiFiCBO"
+name = "boma"
 version = "0.0.1"
 authors = [
   { name="Oihan Cordelier", email="oihan.cordelier@polymtl.ca" },
@@ -32,5 +32,5 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/oihanc/MultiFiCBO"
-Issues = "https://github.com/oihanc/MultiFiCBO/issues"
+Homepage = "https://github.com/oihanc/boma"
+Issues = "https://github.com/oihanc/boma/issues"

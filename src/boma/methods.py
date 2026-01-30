@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Any, Callable, List, Optional, Union
 
-from multificbo.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
-from multificbo.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
-from multificbo.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFEI, VFPI
+from boma.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
+from boma.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
+from boma.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFEI, VFPI
 
 
 def sego(objective: Callable, domain: np.ndarray, constraints: list = [],

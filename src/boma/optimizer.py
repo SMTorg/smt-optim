@@ -12,8 +12,8 @@ from typing import Callable
 
 import pickle
 
-from multificbo.surrogate_models import Surrogate
-from multificbo.acquisition_strategies import AcquisitionStrategy
+from boma.surrogate_models import Surrogate
+from boma.acquisition_strategies import AcquisitionStrategy
 
 
 def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
