@@ -869,8 +869,9 @@ class Optimizer():
                 self.f_min_scaled = (self.f_min - yt_mean) / yt_std
 
                 # scaled constraints to unit std
-                for c_id in range(self.ct[lvl].shape[1]):
-                    self.ct_scaled[lvl][:, c_id] /= self.ct[lvl][:, c_id].std()
+                if self.num_cstr >= 1:
+                    for c_id in range(self.ct[lvl].shape[1]):
+                        self.ct_scaled[lvl][:, c_id] /= self.ct[lvl][:, c_id].std()
             else:
                 self.domain_scaled = self.domain.copy()
 
