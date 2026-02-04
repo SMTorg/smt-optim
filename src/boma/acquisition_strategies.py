@@ -29,7 +29,7 @@ class AcquisitionStrategy(ABC):
     def execute_infill_strategy(self, optimizer):
         raise Exception("Acquisition Strategy not implemented.")
 
-class MFSEGO_EQ(AcquisitionStrategy):
+class MFSEGO(AcquisitionStrategy):
     def __init__(self, optimizer=None, **kwargs):
         super().__init__()
 
