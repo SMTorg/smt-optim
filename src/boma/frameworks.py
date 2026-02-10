@@ -3,156 +3,8 @@ from typing import Any, Callable, List, Optional, Union
 
 from boma.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
 from boma.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
-from boma.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFEI, VFPI
+from boma.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFSEGO, MFEI, VFPI
 
-
-def sego(objective: Callable, domain: np.ndarray, constraints: list = [],
-         max_iter: int = 100,
-         max_budget: float = np.inf,
-         xt_init: list = None,
-         log: str = "log",
-         verbose: bool = False) -> dict:
-
-    # set objective
-    obj_config = ObjectiveConfig(
-        objective=      objective,
-        domain=         domain,
-        type=           "minimize",
-        surrogate=      SmtKRG,
-        costs=          [1],
-    )
-
-    # set constraints
-    cstr_config = []
-    for c_func in constraints:
-        # if type(c_func) is not Callable:
-        #     print(type(c_func))
-        #     raise Exception("Not all constraints are callable.")
-
-        cstr_config.append(
-            ConstraintConfig(
-                constraint=     c_func,
-                type=           "less",
-                tol=            1e-4,
-                surrogate=      SmtKRG,
-            )
-        )
-
-    # set optimizer options
-    optim_config = OptimizerConfig(
-        constraints=    cstr_config,
-        max_iter=       max_iter,
-        max_budget=     max_budget,
-        xt_init=        xt_init,
-        log_filename=   log,
-        verbose=        verbose,
-    )
-
-    # set acquisition strategy
-    strategy = MonoFiAcqStrat
-
-    # initialize optimizer and start optimization
-    optimizer = Optimizer(obj_config, optim_config, strategy)
-    opt_data = optimizer.optimize()
-
-    return opt_data
-
-
-def mfsego(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
-           max_iter: int = 100,
-           max_budget: float = np.inf,
-           xt_init: list = None,
-           log: str = "log",
-           verbose: bool = False) -> dict:
-
-    # set objective
-    obj_config = ObjectiveConfig(
-        objective=      objective,
-        domain=         domain,
-        type=           "minimize",
-        surrogate=      SmtMFK,
-        costs=          costs,
-    )
-
-    # set constraints
-    cstr_config = []
-    for c_funcs in constraints:
-        cstr_config.append(
-            ConstraintConfig(
-                constraint=     c_funcs,
-                type=           "less",
-                tol=            1e-4,
-                surrogate=      SmtMFK,
-            )
-        )
-
-    # set optimizer options
-    optim_config = OptimizerConfig(
-        constraints=    cstr_config,
-        max_iter=       max_iter,
-        max_budget=     max_budget,
-        xt_init=        xt_init,
-        log_filename=   log,
-        verbose=        verbose,
-    )
-
-    # set acquisition strategy
-    strategy = MultiFiAcqStrat
-
-    # initialize optimizer and start optimization
-    optimizer = Optimizer(obj_config, optim_config, strategy)
-    opt_data = optimizer.optimize()
-
-    return opt_data
-
-
-def vfpi(objective: List[Callable], domain: np.ndarray, costs: list, constraints: list = [],
-         max_iter: int = 100,
-         max_budget: float = np.inf,
-         xt_init: list = None,
-         log: str = "log",
-         verbose: bool = False) -> dict:
-
-    # set objective
-    obj_config = ObjectiveConfig(
-        objective=      objective,
-        domain=         domain,
-        type=           "minimize",
-        surrogate=      SmtMFCK,
-        costs=          costs,
-    )
-
-    # set constraints
-    cstr_config = []
-    for c_funcs in constraints:
-        cstr_config.append(
-            ConstraintConfig(
-                constraint=     c_funcs,
-                type=           "less",
-                tol=            1e-4,
-                surrogate=      SmtMFCK,
-            )
-        )
-
-    # set optimizer options
-    optim_config = OptimizerConfig(
-        constraints=    cstr_config,
-        max_iter=       max_iter,
-        max_budget=     max_budget,
-        xt_init=        xt_init,
-        log_filename=   log,
-        verbose=        verbose,
-    )
-
-    # set acquisition strategy
-    strategy = VFPI
-
-    # initialize optimizer and start optimization
-    optimizer = Optimizer(obj_config, optim_config, strategy)
-    optimizer.acq_strategy.sub_optimizer = "COBYLA"   # TODO: fix genetic algorithm
-    opt_data = optimizer.optimize()
-
-    return opt_data
 
 def run_optimizer(
         objective,
@@ -161,17 +13,10 @@ def run_optimizer(
         strategy,
         costs,
         constraints: list = [],
-        max_iter: int = np.inf,
-        max_budget: float = np.inf,
-        xt_init: list = None,
-        log: str = "log",
-        verbose: bool = False,
+        max_iter: int = None,
         optimizer_kwargs: dict = None,
         strategy_kwargs: dict = None
-) -> dict:
-
-    if max_iter == np.inf and max_budget == np.inf:
-        raise Exception("At least one stopping criterion must be defined.")
+) -> tuple[dict, Optimizer]:
 
     obj_config = ObjectiveConfig(
         objective=objective,
@@ -194,19 +39,18 @@ def run_optimizer(
     optim_config = OptimizerConfig(
         constraints=cstr_config,
         max_iter=max_iter,
-        max_budget=max_budget,
-        xt_init=xt_init,
-        log_filename=log,
-        verbose=verbose,
+        verbose=True,
     )
-
-    optimizer = Optimizer(obj_config, optim_config, strategy)
 
     if optimizer_kwargs:
         for key, value in optimizer_kwargs.items():
-            setattr(optimizer, key, value)
+            setattr(optim_config, key, value)
 
-    return optimizer.optimize()
+    optimizer = Optimizer(obj_config, optim_config, strategy, strategy_kwargs)
+
+    opt_data = optimizer.optimize()
+
+    return opt_data, optimizer
 
 
 def minimize(
@@ -215,18 +59,14 @@ def minimize(
         costs,
         method: str,
         max_iter: int = np.inf,
-        max_budget: float = np.inf,
         constraints: list = [],
-        xt_init: list = None,
-        log: str = "log",
-        verbose: bool = False,
         optimizer_kwargs: dict = None,
         strategy_kwargs: dict = None
 ):
 
     methods = {
-        "sego": dict(surrogate=SmtKRG, strategy=MonoFiAcqStrat, costs=[1]),
-        "mfsego": dict(surrogate=SmtMFK, strategy=MultiFiAcqStrat),
+        "sego": dict(surrogate=SmtKRG, strategy=MFSEGO, costs=[1]),
+        "mfsego": dict(surrogate=SmtMFK, strategy=MFSEGO),
         "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
         "mfei": dict(surrogate=SmtMFCK, strategy=MFEI),
     }
@@ -244,10 +84,6 @@ def minimize(
         costs=costs,
         constraints=constraints,
         max_iter=max_iter,
-        max_budget=max_budget,
-        xt_init=xt_init,
-        log=log,
-        verbose=verbose,
         optimizer_kwargs=optimizer_kwargs,
         strategy_kwargs=strategy_kwargs,
     )
