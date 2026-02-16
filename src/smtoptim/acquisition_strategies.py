@@ -9,10 +9,10 @@ from functools import partial
 from abc import ABC, abstractmethod
 
 # from boma.optimizer import Optimizer
-from boma.surrogate_models import Surrogate, SmtMFK
-from boma.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
+from smtoptim.surrogate_models import Surrogate, SmtMFK
+from smtoptim.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
 
-from boma.suboptimizers.orthomads import orthomads
+from smtoptim.suboptimizers.orthomads import orthomads
 
 
 # TODO: acquisition strategy class template

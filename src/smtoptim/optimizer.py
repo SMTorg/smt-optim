@@ -12,8 +12,8 @@ from typing import Callable
 
 import pickle
 
-from boma.surrogate_models import Surrogate
-from boma.acquisition_strategies import AcquisitionStrategy
+from smtoptim.surrogate_models import Surrogate
+from smtoptim.acquisition_strategies import AcquisitionStrategy
 
 
 def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:

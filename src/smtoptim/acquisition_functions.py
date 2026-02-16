@@ -3,7 +3,6 @@ import scipy.stats as stats
 from scipy.special import erfcx
 import copy
 
-from boma.surrogate_models import Surrogate
 
 def expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     """

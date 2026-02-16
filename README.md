@@ -1,10 +1,10 @@
-# Bayesian Optimization and Multi-fidelity Approaches
+# SMT Optimization
 
 A multi-fidelity constrained Bayesian optimization toolkit
 
 ## Key Features
 
-The BOMA package offers a collection of surrogate-based optimization frameworks. The following frameworks are available:
+The SMT Optimization package offers a collection of surrogate-based optimization frameworks. The following frameworks are available:
 
 
 | Framework | Inequality Constraints | Equality Constraints | Multi-fidelity | As seen in                                                                               |
@@ -20,7 +20,7 @@ The BOMA package offers a collection of surrogate-based optimization frameworks.
 
 ### Prerequisites
 
-BOMA requires the following Python package to be installed:
+`smt-optim` requires the following Python package to be installed:
 1. Numpy
 ``pip install numpy``
 2. SciPy
@@ -33,19 +33,19 @@ BOMA requires the following Python package to be installed:
 
 1. Clone the repo
 ```
-git clone https://github.com/oihanc/boma.git
+git clone https://github.com/SMTOrg/smt-optim.git
 ```
-2. Install BOMA to your Python environment. In the root directory, type: 
+2. Install `smt-optim` to your Python environment. In the root directory, type: 
 ```
 pip install -e .
 ```
 
 ### Usage
-See usage examples in the `boma/examples/` directory.
+See usage examples in the `smt-optim/examples/` directory.
 
 
-## Please cite us when using BOMA
+## Please cite us when using SMT Optimization
 
-If you are using BOMA in your work, please cite the following paper.
+If you are using SMT Optimization in your work, please cite the following paper.
 
 [Oihan Cordelier, Youssef Diouane, Nathalie Bartoli and Eric Laurendeau. "Multi-Fidelity Constrained Bayesian Optimization with Application to Aircraft Wing Design," AIAA 2025-3474. AIAA AVIATION FORUM AND ASCEND 2025. July 2025.](https://doi.org/10.2514/6.2025-3474)
