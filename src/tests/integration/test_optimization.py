@@ -5,7 +5,7 @@ import numpy as np
 from smtoptim.core import Problem
 from smtoptim.core import ObjectiveConfig, ConstraintConfig, OptimizerConfig, Optimizer
 
-from smtoptim.surrogate_models.smt import SmtKRG2
+from smtoptim.surrogate_models.smt import SmtSimpleKRG
 
 from smtoptim.acquisition_strategies import MFSEGO
 
