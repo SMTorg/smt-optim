@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 import copy
 import warnings
 
@@ -15,29 +14,10 @@ from smt.design_space import (
     OrdinalVariable,
 )
 
-# from smt.surrogate_models import MixHrcKernelType, MixIntKernelType
+from smtoptim.surrogate_models import Surrogate
+
 
 EPSILON = np.finfo(float).eps
-
-class Surrogate(ABC):
-    """
-    Abstract class for surrogate models.
-    """
-
-    def __init__(self, optimizer=None, name=None):
-        pass
-
-    @abstractmethod
-    def train(self, xt: list, yt: list):
-        raise Exception("train() method not implemented.")
-
-    @abstractmethod
-    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
-        raise Exception("predict_value() method not implemented.")
-
-    @abstractmethod
-    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
-        raise Exception("predict_variance() method not implemented.")
 
 
 def check_theta_bounds(theta: np.ndarray, theta_bounds: np.ndarray) -> np.ndarray:

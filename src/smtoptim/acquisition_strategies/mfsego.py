@@ -6,7 +6,7 @@ from scipy import optimize as so, stats as stats
 
 from smtoptim.acquisition_functions import log_ei
 from smtoptim.acquisition_strategies import AcquisitionStrategy
-from smtoptim.surrogate_models import SmtMFK
+from smtoptim.surrogate_models.smt import SmtMFK
 
 from smtoptim.core.state import OptimizationState
 

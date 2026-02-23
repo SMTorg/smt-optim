@@ -64,7 +64,7 @@ class TestOptimization(unittest.TestCase):
         obj_config = ObjectiveConfig(
             objective=[func_1d],
             design_space=bounds,
-            surrogate=SmtKRG2,
+            surrogate=SmtSimpleKRG,
         )
 
         problem = Problem(
@@ -98,7 +98,7 @@ class TestOptimization(unittest.TestCase):
         obj_config = ObjectiveConfig(
             objective=[rosenbrock],
             design_space=bounds,
-            surrogate=SmtKRG2,
+            surrogate=SmtSimpleKRG,
         )
 
         problem = Problem(
@@ -138,14 +138,14 @@ class TestOptimization(unittest.TestCase):
         obj_config = ObjectiveConfig(
             objective=[rosenbrock],
             design_space=bounds,
-            surrogate=SmtKRG2,
+            surrogate=SmtSimpleKRG,
         )
 
         cstr_config = ConstraintConfig(
             constraint=[disk],
             type="less",
             value=0.0,
-            surrogate=SmtKRG2,
+            surrogate=SmtSimpleKRG,
         )
 
         problem = Problem(

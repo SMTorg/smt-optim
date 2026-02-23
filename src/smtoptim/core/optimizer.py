@@ -173,16 +173,13 @@ class Optimizer():
     def optimize(self):
 
         # generate initial design
-        generate_initial_design(self.state, Evaluator, seed=self.config.seed)
+        generate_initial_design(self.state, self.evaluator, self.config)
 
-        # loop
+        # loop - check stop criteria
         while check_stop_criteria(self.state, self.config):
 
             # iteration
             self.iteration(self.state)
-
-            # check stop criteria
-
 
         return self.state
 
