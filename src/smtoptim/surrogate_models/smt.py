@@ -1,7 +1,7 @@
-import numpy as np
 import copy
+import warnings
 
-from abc import ABC, abstractmethod
+import numpy as np
 
 from smt.surrogate_models import KRG
 from smt.applications import MFK, MFCK
@@ -14,29 +14,10 @@ from smt.design_space import (
     OrdinalVariable,
 )
 
-# from smt.surrogate_models import MixHrcKernelType, MixIntKernelType
+from smtoptim.surrogate_models import Surrogate
+
 
 EPSILON = np.finfo(float).eps
-
-class Surrogate(ABC):
-    """
-    Abstract class for surrogate models.
-    """
-
-    def __init__(self, optimizer=None, name=None):
-        pass
-
-    @abstractmethod
-    def train(self, xt: list, yt: list):
-        raise Exception("train() method not implemented.")
-
-    @abstractmethod
-    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
-        raise Exception("predict_value() method not implemented.")
-
-    @abstractmethod
-    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
-        raise Exception("predict_variance() method not implemented.")
 
 
 def check_theta_bounds(theta: np.ndarray, theta_bounds: np.ndarray) -> np.ndarray:
@@ -99,7 +80,8 @@ class SmtKRG(Surrogate):
         # TODO: should use optimizer.domain
 
         else:
-            raise Exception("Unsupported domain type.")
+            pass
+            # raise Exception("Unsupported domain type.")
 
     def _init_smt(self, optimizer):
 
@@ -110,7 +92,7 @@ class SmtKRG(Surrogate):
         self.previous_theta = np.ones(self.num_dim)
 
         # KRG for continuous domain
-        if type(self.optimizer.domain) is np.ndarray:
+        if type(self.optimizer.design_space) is np.ndarray:
             self.krg = KRG(print_global=False,
                            n_start=self.n_start,
                            hyper_opt="Cobyla",
@@ -129,11 +111,12 @@ class SmtKRG(Surrogate):
 
             self.theta_bounds = self.krg.options["theta_bounds"]
         else:
-            raise Exception("Unsupported domain type.")
+            pass
+            # raise Exception("Unsupported domain type.")
 
         self.krg_initialized = True
 
-    def train(self, xt: list, yt: list):
+    def train(self, xt: list, yt: list, **kwargs):
         """
         Train the GP on the training data.
 
@@ -142,17 +125,17 @@ class SmtKRG(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        if not self.krg_initialized:
-            raise Exception("KRG must be initialized before training.")
+        # if not self.krg_initialized:
+        #     raise Exception("KRG must be initialized before training.")
 
         # print(f"xt= \n{xt}")
         try:
-            if type(self.optimizer.domain) is np.ndarray:
+            if type(self.optimizer.design_space) is np.ndarray:
                 self.previous_theta = check_theta_bounds(self.previous_theta, self.theta_bounds)
                 self.krg.options["theta0"] = self.previous_theta
                 self.krg.options["n_start"] = self.n_start
         except:
-            warn("Error changing KRG parameters.")
+            warnings.warn("Error changing KRG parameters.")
 
 
         self.xt = xt[-1].copy()
@@ -173,6 +156,45 @@ class SmtKRG(Surrogate):
     def predict_variances(self, x_pred):
         s2_pred = self.krg.predict_variances(x_pred)
         return s2_pred
+
+class SmtAutoModel(Surrogate):
+
+    def __init__(self):
+        super().__init__()
+        self.model = None
+        pass
+
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
+        """
+        Train the GP on the training data.
+
+        Args:
+            xt (list[np.ndarray]): training data variables
+            yt (list[np.ndarray]): training data values
+        """
+
+        num_dim = xt[-1].shape[1]
+        num_fidelity = len(xt)
+
+        if num_fidelity == 1:
+            self.model = KRG(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=42)
+        else:
+            self.model = MFK(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=42)
+
+            for lvl in range(num_fidelity-1):
+                self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
+
+        self.model.set_training_values(xt[-1], yt[-1])
+        self.model.train()
+
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
+        y_pred = self.model.predict_values(x_pred)
+        return y_pred
+
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
+        s2_pred = self.model.predict_variances(x_pred)
+        return s2_pred
+
 
 class SmtMFK(Surrogate):
 
@@ -195,7 +217,7 @@ class SmtMFK(Surrogate):
     def _init_smt(self, optimizer):
 
         self.num_dim = optimizer.num_dim
-        self.num_levels = optimizer.num_levels
+        self.num_levels = optimizer.num_fidelity
         self.costs = optimizer.costs
 
         self.n_start = 3*optimizer.num_dim
@@ -211,7 +233,7 @@ class SmtMFK(Surrogate):
         self.mfk_initialized = True
 
 
-    def train(self, xt: list[np.ndarray], yt: list[np.ndarray]) -> None:
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
 
         if not self.mfk_initialized:
             raise Exception("MFK must be initialized before training.")
@@ -223,7 +245,7 @@ class SmtMFK(Surrogate):
         except:
             warn("Error changing MFK parameters.")
 
-        # TODO: data should be cleaned in the Optimizer class
+        # TODO: data should be cleaned in the Driver class
         self.xt = copy.deepcopy(xt)
         self.yt = copy.deepcopy(yt)
         self.xt, self.yt = clean_training_data(self.xt, self.yt)
@@ -304,7 +326,7 @@ class SmtMFCK(Surrogate):
     def _init_smt(self, optimizer):
 
         self.num_dim = optimizer.num_dim
-        self.num_levels = optimizer.num_levels
+        self.num_levels = optimizer.num_fidelity
         self.costs = optimizer.costs
 
         self.n_start = 3*optimizer.num_dim
@@ -318,7 +340,7 @@ class SmtMFCK(Surrogate):
 
         self.mfck_initialized = True
 
-    def train(self, xt: list, yt: list):
+    def train(self, xt: list, yt: list, **kwargs):
 
         if not self.mfck_initialized:
             raise Exception("MFK must be initialized before training.")

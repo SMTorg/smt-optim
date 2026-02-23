@@ -4,7 +4,16 @@ from scipy.special import erfcx
 import copy
 
 
-def expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+def expected_improvement(mu: float, s2: float, f_min: float) -> float:
+
+    if s2 > 0:
+        s = np.sqrt(s2)
+        z = (f_min - mu)/s
+        return (f_min - mu) * stats.norm.cdf(z) + s * stats.norm.pdf(z)
+    else:
+        return 0
+
+def vec_expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     """
     Expected Improvement acquisition function.
 
