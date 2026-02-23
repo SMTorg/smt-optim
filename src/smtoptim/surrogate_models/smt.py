@@ -1,7 +1,8 @@
-import numpy as np
-import copy
-
 from abc import ABC, abstractmethod
+import copy
+import warnings
+
+import numpy as np
 
 from smt.surrogate_models import KRG
 from smt.applications import MFK, MFCK
@@ -99,7 +100,8 @@ class SmtKRG(Surrogate):
         # TODO: should use optimizer.domain
 
         else:
-            raise Exception("Unsupported domain type.")
+            pass
+            # raise Exception("Unsupported domain type.")
 
     def _init_smt(self, optimizer):
 
@@ -110,7 +112,7 @@ class SmtKRG(Surrogate):
         self.previous_theta = np.ones(self.num_dim)
 
         # KRG for continuous domain
-        if type(self.optimizer.domain) is np.ndarray:
+        if type(self.optimizer.design_space) is np.ndarray:
             self.krg = KRG(print_global=False,
                            n_start=self.n_start,
                            hyper_opt="Cobyla",
@@ -129,7 +131,8 @@ class SmtKRG(Surrogate):
 
             self.theta_bounds = self.krg.options["theta_bounds"]
         else:
-            raise Exception("Unsupported domain type.")
+            pass
+            # raise Exception("Unsupported domain type.")
 
         self.krg_initialized = True
 
@@ -142,23 +145,121 @@ class SmtKRG(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        if not self.krg_initialized:
-            raise Exception("KRG must be initialized before training.")
+        # if not self.krg_initialized:
+        #     raise Exception("KRG must be initialized before training.")
 
         # print(f"xt= \n{xt}")
         try:
-            if type(self.optimizer.domain) is np.ndarray:
+            if type(self.optimizer.design_space) is np.ndarray:
                 self.previous_theta = check_theta_bounds(self.previous_theta, self.theta_bounds)
                 self.krg.options["theta0"] = self.previous_theta
                 self.krg.options["n_start"] = self.n_start
         except:
-            warn("Error changing KRG parameters.")
+            warnings.warn("Error changing KRG parameters.")
 
 
         self.xt = xt[-1].copy()
         self.yt = yt[-1].copy()
         self.xt, self.yt = filter_nan_values(self.xt, self.yt)
 
+        self.krg.set_training_values(self.xt, self.yt)
+        self.krg.train()
+
+        # store the optimize theta vector for the next iteration
+        self.previous_theta = self.krg.optimal_theta
+        if self.name: self.optimizer.iter_data[f"{self.name}_opt_theta"] = self.previous_theta
+
+    def predict_values(self, x_pred):
+        y_pred = self.krg.predict_values(x_pred)
+        return y_pred
+
+    def predict_variances(self, x_pred):
+        s2_pred = self.krg.predict_variances(x_pred)
+        return s2_pred
+
+class SmtKRG2(Surrogate):
+
+    def __init__(self, optimizer=None, name=None):
+        super().__init__()
+
+        # TODO: implement a way to control the random_state
+
+        self.optimizer = optimizer
+        self.name = name
+
+        self.num_dim = 0
+        self.krg = None
+        self.krg_initialized = False
+
+        if optimizer is not None:
+            self._init_smt(optimizer)
+
+        # TODO: should use optimizer.domain
+
+        else:
+            pass
+            # raise Exception("Unsupported domain type.")
+
+    def _init_smt(self, optimizer):
+
+        self.num_dim = optimizer.num_dim
+        self.costs = optimizer.costs
+
+        self.n_start = 3 * optimizer.num_dim
+        self.previous_theta = np.ones(self.num_dim)
+
+        # KRG for continuous domain
+        if type(self.optimizer.design_space) is np.ndarray:
+            self.krg = KRG(print_global=False,
+                           n_start=self.n_start,
+                           hyper_opt="Cobyla",
+                           random_state=42)
+
+            # KRG for mixed integer domain
+            # elif type(optimizer.domain) is DesignSpace:
+            #     self.dim = optimizer.domain.n_dv
+            #     self.krg = KRG(design_space=domain,
+            #                     categorical_kernel=MixIntKernelType.CONT_RELAX,
+            #                     hyper_opt="Cobyla",
+            #                     corr="abs_exp",
+            #                     n_start=3*self.dim,
+            #                     print_global=False,
+            #     )
+
+            self.theta_bounds = self.krg.options["theta_bounds"]
+        else:
+            pass
+            # raise Exception("Unsupported domain type.")
+
+        self.krg_initialized = True
+
+    def train(self, xt: list, yt: list):
+        """
+        Train the GP on the training data.
+
+        Args:
+            xt (list[np.ndarray]): training data variables
+            yt (list[np.ndarray]): training data values
+        """
+
+        # if not self.krg_initialized:
+        #     raise Exception("KRG must be initialized before training.")
+
+        # print(f"xt= \n{xt}")
+        #
+        # try:
+        #     if type(self.optimizer.domain) is np.ndarray:
+        #         self.previous_theta = check_theta_bounds(self.previous_theta, self.theta_bounds)
+        #         self.krg.options["theta0"] = self.previous_theta
+        #         self.krg.options["n_start"] = self.n_start
+        # except:
+        #     warnings.warn("Error changing KRG parameters.")
+
+        self.xt = xt[-1].copy()
+        self.yt = yt[-1].copy()
+        # self.xt, self.yt = filter_nan_values(self.xt, self.yt)
+
+        self.krg = KRG(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42)
         self.krg.set_training_values(self.xt, self.yt)
         self.krg.train()
 
@@ -195,7 +296,7 @@ class SmtMFK(Surrogate):
     def _init_smt(self, optimizer):
 
         self.num_dim = optimizer.num_dim
-        self.num_levels = optimizer.num_levels
+        self.num_levels = optimizer.num_fidelity
         self.costs = optimizer.costs
 
         self.n_start = 3*optimizer.num_dim
@@ -304,7 +405,7 @@ class SmtMFCK(Surrogate):
     def _init_smt(self, optimizer):
 
         self.num_dim = optimizer.num_dim
-        self.num_levels = optimizer.num_levels
+        self.num_levels = optimizer.num_fidelity
         self.costs = optimizer.costs
 
         self.n_start = 3*optimizer.num_dim
