@@ -69,7 +69,7 @@ class MFSEGO(AcquisitionStrategy):
 
 
 
-    def get_infill(self, acq_context: OptimizationState) -> tuple[list[np.ndarray], dict]:
+    def get_infill(self, acq_context: OptimizationState) -> list[np.ndarray]:
 
         acq_data = {}
 
@@ -201,7 +201,9 @@ class MFSEGO(AcquisitionStrategy):
         #
         # acq_context.iter_data["acquisition"] = acq_data
 
-        return next_x, acq_data
+        acq_context.iter_log["acquisition"] = acq_data
+
+        return next_x
 
 
     def build_scipy_objective(self, acq_context: OptimizationState) -> Callable:

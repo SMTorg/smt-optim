@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Callable
 import time
+import os
+import csv
 
 import numpy as np
 
@@ -28,6 +30,7 @@ class OptimizationDataset:
 
         self.fidelities: list = []
 
+
     def add(self, sample: Sample):
         self.samples.append(sample)
 
@@ -41,6 +44,7 @@ class OptimizationDataset:
         if sample.fidelity not in self.fidelities:
             self.fidelities.append(sample.fidelity)
             self.num_fidelity += 1
+
 
     def get_by_fidelity(self, lvl: int):
         return [s for s in self.samples if s.fidelity == lvl]

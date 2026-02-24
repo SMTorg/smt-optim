@@ -125,9 +125,10 @@ class OptimizerConfig:
     results_dir: str | None = "bo_results"          # name for the results directory
     verbose: bool = False                           # True/False print each iteration informations
     callback_func: list[Callable] | Callable | None = None      # additional method to call at the end of each iteration
-    scaling: bool = False                           # standardize the training data
+    scaling: bool = True                            # standardize the training data
     dynamic_costs: str | None = None                # use sampling time to update the costs
     seed: None = None
+    loggers: list | None = None
 
 
 class Optimizer():
@@ -138,12 +139,22 @@ class Optimizer():
         self.config = config
 
         self.state = OptimizationState(problem)
+        self.state.dataset.log_data = True
 
         self.strategy_kwargs = strategy_kwargs
         self.strategy_kwargs["seed"] = config.seed
         self.strategy = strategy(self.state, **self.strategy_kwargs)
 
         self.evaluator = Evaluator(problem)
+
+        # setup loggers
+        if self.config.loggers is not None:
+            self.loggers = []
+            for logger in self.config.loggers:
+                self.loggers.append(logger(self.config))
+        else:
+            self.loggers = None
+
 
     def initialize(self):
         pass
@@ -159,7 +170,7 @@ class Optimizer():
         state.build_models()
 
         # get infill
-        infill, acq_data = self.strategy.get_infill(state)
+        infill = self.strategy.get_infill(state)
         for i in range(len(infill)):
             infill[i] *= (self.problem.obj_configs[0].design_space[:, 1] - self.problem.obj_configs[0].design_space[:, 0])
             infill[i] += self.problem.obj_configs[0].design_space[:, 0]
@@ -167,13 +178,17 @@ class Optimizer():
         # evaluate infill
         self.evaluator.sample(infill, state)
 
+        # log iteration data
+        self.call_loggers(state)
+
         return state
 
 
     def optimize(self):
 
         # generate initial design
-        generate_initial_design(self.state, self.evaluator, self.config)
+        if len(self.state.dataset.samples) == 0:
+            generate_initial_design(self.state, self.evaluator, self.config)
 
         # loop - check stop criteria
         while check_stop_criteria(self.state, self.config):
@@ -186,6 +201,15 @@ class Optimizer():
 
     def finalize(self):
         pass
+
+
+    def call_loggers(self, state):
+        if self.loggers is not None:
+            for logger in self.loggers:
+                try:
+                    logger.on_iter_end(state)
+                except Exception as e:
+                    print(f"Error while logging: {e}")
 
 
 

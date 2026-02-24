@@ -1,4 +1,5 @@
 import copy
+import time
 
 import numpy as np
 
@@ -38,6 +39,8 @@ class OptimizationState:
 
         self.dataset = OptimizationDataset()
         self.scaled_dataset = None
+
+        self.iter_log = dict()
 
 
     def scale_dataset(self):
@@ -110,6 +113,8 @@ class OptimizationState:
 
         qoi_models = self.obj_models + self.cstr_models
 
+        t0 = time.perf_counter()
+
         for qoi_idx in range(self.problem.num_obj+self.problem.num_cstr):
 
             idx_train = []
@@ -118,6 +123,13 @@ class OptimizationState:
                 idx_train.append(qoi_train[lvl][:, qoi_idx].reshape(-1, 1))
 
             qoi_models[qoi_idx].train(x_train, idx_train)
+
+        t1 = time.perf_counter()
+
+        self.iter_log["gp_training_time"] = t1 - t0
+
+    def reset_log(self):
+        self.iter_log.clear()
 
 
 def generate_state(problem) -> OptimizationState:
