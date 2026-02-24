@@ -7,9 +7,9 @@ class AcquisitionStrategy(ABC):
         pass
 
     @abstractmethod
-    def validate_config(self, acq_context) -> None:
+    def validate_config(self, state) -> None:
         raise Exception("Configuration validation not implemented.")
 
     @abstractmethod
-    def get_infill(self, acq_context) -> tuple[list[np.ndarray], dict]:
+    def get_infill(self, state) -> list[np.ndarray]:
         raise Exception("Acquisition Strategy not implemented.")

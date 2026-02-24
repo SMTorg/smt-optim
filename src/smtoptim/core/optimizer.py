@@ -164,7 +164,7 @@ class Optimizer():
         state.iter += 1
 
         # scale data
-        state.scale_dataset()
+        state.scale_dataset(self.config.scaling)
 
         # build models
         state.build_models()

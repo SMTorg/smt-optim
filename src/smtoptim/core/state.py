@@ -43,29 +43,49 @@ class OptimizationState:
         self.iter_log = dict()
 
 
-    def scale_dataset(self):
+    def scale_dataset(self, unit_std: bool = False):
 
         num_qoi = self.problem.num_obj + self.problem.num_cstr
-        qoi_factor = np.empty(num_qoi)
-        qoi_step = np.empty(num_qoi)
+        qoi_factor = [np.empty(num_qoi)] * self.problem.num_fidelity
+        qoi_step = [np.empty(num_qoi)] * self.problem.num_fidelity
 
-        for obj_idx in range(self.problem.num_obj):
-            if self.problem.obj_configs[obj_idx].type == "minimize":
-                qoi_factor[obj_idx] = 1
-            elif self.problem.obj_config[obj_idx].type == "maximize":
-                qoi_factor[obj_idx] = -1
+        for lvl in range(self.problem.num_fidelity):
 
-            qoi_step[obj_idx] = 0
+            for obj_idx in range(self.problem.num_obj):
 
-        for cstr_idx in range(self.problem.num_cstr):
-            c_config = self.problem.cstr_configs[cstr_idx]
+                data = self.dataset.export_data(obj_idx, lvl)
 
-            if c_config.type in ["less", "equal"]:
-                qoi_factor[self.problem.num_obj+cstr_idx] = 1
-            elif c_config.type in ["greater"]:
-                qoi_factor[self.problem.num_obj+cstr_idx] = -1
+                if unit_std:
+                    factor = np.std(data)
+                    step = np.mean(data)
+                else:
+                    factor = 1
+                    step = 0
 
-            qoi_step[self.problem.num_obj+cstr_idx] = c_config.value
+                if self.problem.obj_configs[obj_idx].type == "minimize":
+                    qoi_factor[lvl][obj_idx] = factor
+                elif self.problem.obj_config[obj_idx].type == "maximize":
+                    qoi_factor[lvl][obj_idx] = -factor
+
+                qoi_step[lvl][obj_idx] = step
+
+            for cstr_idx in range(self.problem.num_cstr):
+                c_config = self.problem.cstr_configs[cstr_idx]
+
+                data = self.dataset.export_data(self.problem.num_obj+cstr_idx, lvl)
+
+                if unit_std:
+                    factor = np.std(data)
+                else:
+                    factor = 1
+
+                if c_config.type in ["less", "equal"]:
+                    qoi_factor[lvl][self.problem.num_obj+cstr_idx] = factor
+                elif c_config.type in ["greater"]:
+                    qoi_factor[lvl][self.problem.num_obj+cstr_idx] = -factor
+
+                qoi_step[lvl][self.problem.num_obj+cstr_idx] = c_config.value
+
 
         self.qoi_factor = qoi_factor
         self.qoi_step = qoi_step
@@ -76,40 +96,47 @@ class OptimizationState:
 
             scaled_sample = copy.deepcopy(sample)
 
+            lvl = scaled_sample.fidelity
+
             # should only normalize real variables
             scaled_sample.x -= self.problem.obj_configs[0].design_space[:, 0]
             scaled_sample.x /= (self.problem.obj_configs[0].design_space[:, 1] - self.problem.obj_configs[0].design_space[:, 0])
-            scaled_sample.obj[:] *= self.qoi_factor[:self.problem.num_obj]
-            scaled_sample.cstr[:] *= self.qoi_factor[self.problem.num_obj:self.problem.num_obj+self.problem.num_cstr]
+
+            scaled_sample.obj[:] -= self.qoi_step[lvl][:self.problem.num_obj]
+            scaled_sample.obj[:] /= self.qoi_factor[lvl][:self.problem.num_obj]
+
+            scaled_sample.cstr[:] -= self.qoi_step[lvl][self.problem.num_obj:self.problem.num_obj+self.problem.num_cstr]
+            scaled_sample.cstr[:] /= self.qoi_factor[lvl][self.problem.num_obj:self.problem.num_obj+self.problem.num_cstr]
 
             self.scaled_dataset.add(scaled_sample)
 
 
+    def group_by_fidelity(self) -> tuple[list[np.ndarray], list[np.ndarray]]:
+
+        x = []
+        qoi = []
+
+        for lvl in range(self.problem.num_fidelity):
+
+            samples = self.scaled_dataset.get_by_fidelity(lvl)
+
+            x_lvl = np.empty((len(samples), self.problem.num_dim))
+            qoi_lvl = np.empty((len(samples), self.problem.num_obj + self.problem.num_cstr))
+
+            for idx, sample in enumerate(samples):
+                x_lvl[idx, :] = sample.x
+                qoi_lvl[idx, :self.problem.num_obj] = sample.obj
+                qoi_lvl[idx, self.problem.num_obj:] = sample.cstr
+
+            x.append(x_lvl)
+            qoi.append(qoi_lvl)
+
+        return x, qoi
+
+
     def build_models(self):
 
-        def group_by_fidelity() -> tuple[list[np.ndarray], list[np.ndarray]]:
-
-            x = []
-            qoi = []
-
-            for lvl in range(self.problem.num_fidelity):
-
-                samples = self.scaled_dataset.get_by_fidelity(lvl)
-
-                x_lvl = np.empty((len(samples), self.problem.num_dim))
-                qoi_lvl = np.empty((len(samples), self.problem.num_obj + self.problem.num_cstr))
-
-                for idx, sample in enumerate(samples):
-                    x_lvl[idx, :] = sample.x
-                    qoi_lvl[idx, :self.problem.num_obj] = sample.obj
-                    qoi_lvl[idx, self.problem.num_obj:] = sample.cstr
-
-                x.append(x_lvl)
-                qoi.append(qoi_lvl)
-
-            return x, qoi
-
-        x_train, qoi_train = group_by_fidelity()
+        x_train, qoi_train = self.group_by_fidelity()
 
         qoi_models = self.obj_models + self.cstr_models
 
