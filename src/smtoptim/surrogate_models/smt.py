@@ -157,13 +157,14 @@ class SmtKRG(Surrogate):
         s2_pred = self.krg.predict_variances(x_pred)
         return s2_pred
 
-class SmtSimpleKRG(Surrogate):
+class SmtAutoModel(Surrogate):
 
     def __init__(self):
         super().__init__()
+        self.model = None
         pass
 
-    def train(self, xt: list, yt: list):
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray]) -> None:
         """
         Train the GP on the training data.
 
@@ -172,19 +173,26 @@ class SmtSimpleKRG(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        self.xt = xt[-1].copy()
-        self.yt = yt[-1].copy()
+        num_dim = xt[-1].shape[1]
+        num_fidelity = len(xt)
 
-        self.krg = KRG(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42)
-        self.krg.set_training_values(self.xt, self.yt)
-        self.krg.train()
+        if num_fidelity == 1:
+            self.model = KRG(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=42)
+        else:
+            self.model = MFK(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=42)
 
-    def predict_values(self, x_pred):
-        y_pred = self.krg.predict_values(x_pred)
+            for lvl in range(num_fidelity-1):
+                self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
+
+        self.model.set_training_values(xt[-1], yt[-1])
+        self.model.train()
+
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
+        y_pred = self.model.predict_values(x_pred)
         return y_pred
 
-    def predict_variances(self, x_pred):
-        s2_pred = self.krg.predict_variances(x_pred)
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
+        s2_pred = self.model.predict_variances(x_pred)
         return s2_pred
 
 

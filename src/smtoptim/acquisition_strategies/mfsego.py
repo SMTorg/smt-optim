@@ -71,12 +71,13 @@ class MFSEGO(AcquisitionStrategy):
 
     def get_infill(self, acq_context: OptimizationState) -> list[np.ndarray]:
 
-        acq_data = {}
+        acq_data = dict()
 
         y = acq_context.dataset.export_data([0], acq_context.problem.num_fidelity-1)
 
         if acq_context.problem.num_cstr > 0:
-            c = acq_context.dataset.export_data([1], acq_context.problem.num_fidelity-1)
+            indices = [idx for idx in range(acq_context.problem.num_obj, acq_context.problem.num_obj+acq_context.problem.num_cstr)]
+            c = acq_context.dataset.export_data(indices, acq_context.problem.num_fidelity-1)
             self.fmin = get_fmin(y, c, acq_context.cstr_types)
         else:
             self.fmin = get_fmin(y)
@@ -87,7 +88,7 @@ class MFSEGO(AcquisitionStrategy):
         # generate starting points for the multistart optimization
         gen_t0 = perf_counter()
         # multi_x0 = self.generate_multistart_points(optimizer)
-        sampler = stats.qmc.LatinHypercube(d=acq_context.problem.num_dim)
+        sampler = stats.qmc.LatinHypercube(d=acq_context.problem.num_dim, rng=acq_context.iter)
         multi_x0 = sampler.random(self.n_start)
         gen_t1 = perf_counter()
         acq_data["generate_init_points_time"] = gen_t1 - gen_t0
@@ -104,106 +105,25 @@ class MFSEGO(AcquisitionStrategy):
                                   constraints=scipy_cstr,
                                   seed=self.seed)
 
-        x_min = res.x
-
-        # acq_data["multi_idx"] = idx
-        # acq_data["multi_x"] = multi_x
-        # acq_data["multi_f"] = multi_f
-        # acq_data["multi_c"] = multi_c
-        # acq_data["acq_success"] = success_rate
-
-        # if optimizer.num_cstr > 0:
-        #     acq_data["rscv"] = rscv
-
-        # if self.optimize_best:
-        #
-        #     if optimizer.num_cstr > 0:
-        #         optimized_cstr = np.empty(optimizer.num_cstr)
-        #
-        #     res = so.minimize(scipy_acq_func,
-        #                       x0=x_min,
-        #                       bounds=optimizer.domain_scaled,
-        #                       constraints=scipy_cstr,
-        #                       method="SLSQP",
-        #                       tol=1e-15,
-        #                       options={"maxiter": 50 * optimizer.num_dim})
-        #
-        #
-        #     optimized_x = np.clip(res.x, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
-        #     acq_data["optimized_x"] = optimized_x
-        #
-        #     optimized_l2 = np.linalg.norm(optimized_x - x_min)
-        #     acq_data["optimized_l2"] = optimized_l2
-        #
-        #     optimized_acq = scipy_acq_func(optimized_x)
-        #     acq_data["optimized_acq"] = optimized_acq
-        #
-        #     if optimizer.num_cstr > 0:
-        #         for c_id in range(len(scipy_cstr)):
-        #             optimized_cstr[c_id] = -scipy_cstr[c_id]["fun"](optimized_x)
-        #             acq_data["optimized_cstr"] = optimized_cstr
-        #
-        #     # update x_min
-        #     x_min = optimized_x
+        next_x = res.x
 
         # select highest fidelity level to sample
         fid_crit_t0 = perf_counter()
-        if acq_context.problem.num_fidelity > 1 and self.select_fidelity:
+        level = self.get_fidelity(next_x, acq_context)
 
-            all_surrogates = acq_context.obj_models
-            for c_surrogate in acq_context.cstr_models:
-                all_surrogates.append(c_surrogate)
-
-            if self.cr_override is not None:
-                costs = self.cr_override
-            else:
-                costs = acq_context.problem.obj_configs[0].costs
-
-            levels, s2_red_norm = self.select_fidelity_level(x_min.reshape(1, -1),
-                                                             costs,
-                                                             all_surrogates,
-                                                             self.fidelity_crit)
-            level = levels.item()
-
-        else:
-            level = acq_context.problem.num_fidelity - 1
-
-        acq_data["infill_level"] = level
-
-        if acq_context.problem.num_fidelity > 1 and self.select_fidelity:
-            acq_data["normalized_s2_reduction"] = s2_red_norm
-
-        next_x = []
+        infills = []
         for lvl in range(acq_context.problem.num_fidelity):
             if lvl <= level:
-                next_x.append(x_min.copy().reshape(1, -1))
+                infills.append(next_x.reshape(1, -1))
             else:
-                next_x.append(None)
+                infills.append(None)
+
         fid_crit_t1 = perf_counter()
         acq_data["fid_crit_time"] = fid_crit_t1 - fid_crit_t0
 
-        # log expected values
-        expected_values = np.empty(acq_context.problem.num_cstr+1)
-        expected_values[0] = acq_context.obj_models[0].predict_values(x_min.reshape(1, -1)).item()
-
-        # if acq_context.scaling:
-        #     yt_scaled, yt_mean, yt_std = acq_context._standardize_data(acq_context.yt[-1])
-        #     expected_values[0] *= yt_std
-        #     expected_values[0] +=  yt_mean
-        #
-        # for c_id, c_surrogate in enumerate(acq_context.cstr_models):
-        #     expected_values[c_id+1] = c_surrogate.predict_values(x_min.reshape(1, -1)).item()
-        #     if acq_context.scaling:
-        #         yt_scaled, yt_mean, yt_std = acq_context._standardize_data(acq_context.ct[-1][:, c_id])
-        #         expected_values[c_id+1] *= yt_std
-        #
-        # acq_data["expected_values"] = expected_values
-        #
-        # acq_context.iter_data["acquisition"] = acq_data
-
         acq_context.iter_log["acquisition"] = acq_data
 
-        return next_x
+        return infills
 
 
     def build_scipy_objective(self, acq_context: OptimizationState) -> Callable:
@@ -215,8 +135,6 @@ class MFSEGO(AcquisitionStrategy):
             return -self.acq_func(mu, s2, self.fmin).item()
 
         return scipy_acq_func
-
-
 
     def build_scipy_constraints(self, acq_context: OptimizationState) -> list[dict]:
 
@@ -266,8 +184,93 @@ class MFSEGO(AcquisitionStrategy):
         return scipy_cstr
 
 
-    def select_fidelity(self):
-        pass
+    def get_fidelity(self, next_x: np.ndarray, state: OptimizationState) -> int:
+
+        if state.problem.num_fidelity > 1 and self.select_fidelity:
+
+            all_surrogates = state.obj_models
+            for c_surrogate in state.cstr_models:
+                all_surrogates.append(c_surrogate)
+
+            if self.cr_override is not None:
+                costs = self.cr_override
+            else:
+                costs = state.problem.obj_configs[0].costs
+
+            levels, s2_red_norm = self.select_fidelity_level(next_x.reshape(1, -1),
+                                                             costs,
+                                                             all_surrogates,
+                                                             self.fidelity_crit)
+            level = levels.item()
+
+        else:
+            level = state.problem.num_fidelity - 1
+
+        return level
+
+        self.acq_log["infill_level"] = level
+
+        if state.problem.num_fidelity > 1 and self.select_fidelity:
+            self.acq_log["normalized_s2_reduction"] = s2_red_norm
+
+    # acq_data["multi_idx"] = idx
+    # acq_data["multi_x"] = multi_x
+    # acq_data["multi_f"] = multi_f
+    # acq_data["multi_c"] = multi_c
+    # acq_data["acq_success"] = success_rate
+
+    # if optimizer.num_cstr > 0:
+    #     acq_data["rscv"] = rscv
+
+    # if self.optimize_best:
+    #
+    #     if optimizer.num_cstr > 0:
+    #         optimized_cstr = np.empty(optimizer.num_cstr)
+    #
+    #     res = so.minimize(scipy_acq_func,
+    #                       x0=x_min,
+    #                       bounds=optimizer.domain_scaled,
+    #                       constraints=scipy_cstr,
+    #                       method="SLSQP",
+    #                       tol=1e-15,
+    #                       options={"maxiter": 50 * optimizer.num_dim})
+    #
+    #
+    #     optimized_x = np.clip(res.x, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
+    #     acq_data["optimized_x"] = optimized_x
+    #
+    #     optimized_l2 = np.linalg.norm(optimized_x - x_min)
+    #     acq_data["optimized_l2"] = optimized_l2
+    #
+    #     optimized_acq = scipy_acq_func(optimized_x)
+    #     acq_data["optimized_acq"] = optimized_acq
+    #
+    #     if optimizer.num_cstr > 0:
+    #         for c_id in range(len(scipy_cstr)):
+    #             optimized_cstr[c_id] = -scipy_cstr[c_id]["fun"](optimized_x)
+    #             acq_data["optimized_cstr"] = optimized_cstr
+    #
+    #     # update x_min
+    #     x_min = optimized_x
+
+    # log expected values
+    # expected_values = np.empty(acq_context.problem.num_cstr+1)
+    # expected_values[0] = acq_context.obj_models[0].predict_values(next_x.reshape(1, -1)).item()
+
+    # if acq_context.scaling:
+    #     yt_scaled, yt_mean, yt_std = acq_context._standardize_data(acq_context.yt[-1])
+    #     expected_values[0] *= yt_std
+    #     expected_values[0] +=  yt_mean
+    #
+    # for c_id, c_surrogate in enumerate(acq_context.cstr_models):
+    #     expected_values[c_id+1] = c_surrogate.predict_values(x_min.reshape(1, -1)).item()
+    #     if acq_context.scaling:
+    #         yt_scaled, yt_mean, yt_std = acq_context._standardize_data(acq_context.ct[-1][:, c_id])
+    #         expected_values[c_id+1] *= yt_std
+    #
+    # acq_data["expected_values"] = expected_values
+    #
+    # acq_context.iter_data["acquisition"] = acq_data
 
 
     # def generate_multistart_points(self, optimizer) -> np.ndarray:
@@ -328,7 +331,7 @@ class MFSEGO(AcquisitionStrategy):
     def compute_sigma2_red(self, x_pred: np.ndarray, surrogate: SmtMFK) -> np.ndarray:
 
         # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
-        s2, rho2 = surrogate.mfk.predict_variances_all_levels(x_pred)
+        s2, rho2 = surrogate.model.predict_variances_all_levels(x_pred)
         num_levels = s2.shape[1]
 
         tot_rho2 = np.ones((x_pred.shape[0], num_levels))
