@@ -116,7 +116,7 @@ class SmtKRG(Surrogate):
 
         self.krg_initialized = True
 
-    def train(self, xt: list, yt: list):
+    def train(self, xt: list, yt: list, **kwargs):
         """
         Train the GP on the training data.
 
@@ -164,7 +164,7 @@ class SmtAutoModel(Surrogate):
         self.model = None
         pass
 
-    def train(self, xt: list[np.ndarray], yt: list[np.ndarray]) -> None:
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
         """
         Train the GP on the training data.
 
@@ -233,7 +233,7 @@ class SmtMFK(Surrogate):
         self.mfk_initialized = True
 
 
-    def train(self, xt: list[np.ndarray], yt: list[np.ndarray]) -> None:
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
 
         if not self.mfk_initialized:
             raise Exception("MFK must be initialized before training.")
@@ -245,7 +245,7 @@ class SmtMFK(Surrogate):
         except:
             warn("Error changing MFK parameters.")
 
-        # TODO: data should be cleaned in the Optimizer class
+        # TODO: data should be cleaned in the Driver class
         self.xt = copy.deepcopy(xt)
         self.yt = copy.deepcopy(yt)
         self.xt, self.yt = clean_training_data(self.xt, self.yt)
@@ -340,7 +340,7 @@ class SmtMFCK(Surrogate):
 
         self.mfck_initialized = True
 
-    def train(self, xt: list, yt: list):
+    def train(self, xt: list, yt: list, **kwargs):
 
         if not self.mfck_initialized:
             raise Exception("MFK must be initialized before training.")

@@ -8,7 +8,7 @@ from smtoptim.acquisition_functions import log_ei
 from smtoptim.acquisition_strategies import AcquisitionStrategy
 from smtoptim.surrogate_models.smt import SmtMFK
 
-from smtoptim.core.state import OptimizationState
+from smtoptim.core.state import State
 
 from smtoptim.utils.get_fmin import get_fmin
 
@@ -16,7 +16,7 @@ from smtoptim.subsolvers import multistart_minimize
 
 
 class MFSEGO(AcquisitionStrategy):
-    def __init__(self, state: OptimizationState, **kwargs):
+    def __init__(self, state: State, **kwargs):
         super().__init__()
 
         self.acq_context = state
@@ -40,7 +40,7 @@ class MFSEGO(AcquisitionStrategy):
         if state and self.n_start is None:
             self.n_start = 10 * state.problem.num_dim
 
-    def validate_config(self, acq_context: OptimizationState) -> None:
+    def validate_config(self, acq_context: State) -> None:
 
         if acq_context.problem.num_obj > 1:
             raise Exception("Multi-objective not implemented.")
@@ -69,7 +69,7 @@ class MFSEGO(AcquisitionStrategy):
 
 
 
-    def get_infill(self, acq_context: OptimizationState) -> list[np.ndarray]:
+    def get_infill(self, acq_context: State) -> list[np.ndarray]:
 
         acq_data = dict()
 
@@ -109,12 +109,12 @@ class MFSEGO(AcquisitionStrategy):
 
         # select highest fidelity level to sample
         fid_crit_t0 = perf_counter()
-        level = self.get_fidelity(next_x, acq_context)
+        level = self.get_fidelity(next_x.reshape(1, -1), acq_context)[0]
 
         infills = []
         for lvl in range(acq_context.problem.num_fidelity):
             if lvl <= level:
-                infills.append(next_x.reshape(1, -1))
+                infills.append(next_x.copy().reshape(1, -1))
             else:
                 infills.append(None)
 
@@ -126,7 +126,7 @@ class MFSEGO(AcquisitionStrategy):
         return infills
 
 
-    def build_scipy_objective(self, acq_context: OptimizationState) -> Callable:
+    def build_scipy_objective(self, acq_context: State) -> Callable:
 
         def scipy_acq_func(x):
             x = x.reshape(1, -1)
@@ -136,7 +136,7 @@ class MFSEGO(AcquisitionStrategy):
 
         return scipy_acq_func
 
-    def build_scipy_constraints(self, acq_context: OptimizationState) -> list[dict]:
+    def build_scipy_constraints(self, acq_context: State) -> list[dict]:
 
         scipy_cstr = []
 
@@ -184,7 +184,10 @@ class MFSEGO(AcquisitionStrategy):
         return scipy_cstr
 
 
-    def get_fidelity(self, next_x: np.ndarray, state: OptimizationState) -> int:
+    def get_fidelity(self, next_x: np.ndarray, state: State) -> int:
+
+        num_points = next_x.shape[0]
+        num_dim = next_x.shape[1]
 
         if state.problem.num_fidelity > 1 and self.select_fidelity:
 
@@ -195,18 +198,17 @@ class MFSEGO(AcquisitionStrategy):
             if self.cr_override is not None:
                 costs = self.cr_override
             else:
-                costs = state.problem.obj_configs[0].costs
+                costs = state.problem.costs
 
-            levels, s2_red_norm = self.select_fidelity_level(next_x.reshape(1, -1),
+            levels, s2_red_norm = self.select_fidelity_level(next_x,
                                                              costs,
                                                              all_surrogates,
                                                              self.fidelity_crit)
-            level = levels.item()
 
         else:
-            level = state.problem.num_fidelity - 1
+            levels = [(state.problem.num_fidelity - 1) for _ in range(num_points)]
 
-        return level
+        return levels
 
         self.acq_log["infill_level"] = level
 

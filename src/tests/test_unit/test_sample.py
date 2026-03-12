@@ -3,6 +3,8 @@ import numpy as np
 
 from smtoptim.core import Sample, OptimizationDataset
 
+from smtoptim.core.sample import sample_func
+
 class TestSample(unittest.TestCase):
 
     def test_sample_initialization(self):
@@ -163,6 +165,35 @@ class TestOptimizationDataset(unittest.TestCase):
 
         self.assertEqual(result.shape, (0,))
         self.assertEqual(result.size, 0)
+
+
+class TestEvaluator(unittest.TestCase):
+
+
+    def test_float_output(self):
+
+        def float_output(x):
+            return 0.0
+
+        value, time = sample_func(np.array([0.0]), float_output)
+
+        self.assertEqual(value, 0.0)
+
+
+    def test_array_output(self):
+
+        def array_1d_output(x):
+            return np.array([0.0])
+
+        value, time = sample_func(np.array([0.0]), array_1d_output)
+        self.assertEqual(value, 0.0)
+
+        def array_2d_output(x):
+            return np.array([[0.0]])
+
+        value, time = sample_func(np.array([0.0]), array_2d_output)
+        self.assertEqual(value, 0.0)
+
 
 
 if __name__ == "__main__":

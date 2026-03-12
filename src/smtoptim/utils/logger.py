@@ -13,7 +13,7 @@ class ConsoleLogger:
 
     def on_iter_end(self, state) -> None:
 
-        print(f"iter = {state.iter}  |  budget = {state.budget}  |  gp_time = {state.iter_log["gp_training_time"]:.1f}")
+        print(f"iter={state.iter}/{self.config.max_iter}  |  budget={state.budget}/{self.config.max_budget}  |  fid={state.iter_log["fidelity"]}/{state.problem.num_fidelity}  |  gp_time={state.iter_log["gp_training_time"]:.1f}  |  acq_time={state.iter_log["acq_opt_time"]:.1f}")
 
 
 class DoeLogger:

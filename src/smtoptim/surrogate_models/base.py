@@ -12,7 +12,7 @@ class Surrogate(ABC):
         pass
 
     @abstractmethod
-    def train(self, xt: list[np.ndarray], yt: list[np.ndarray]) -> None:
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
         raise Exception("train() method not implemented.")
 
     @abstractmethod

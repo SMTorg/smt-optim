@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Callable
 import time
-import os
-import csv
+import warnings
 
 import numpy as np
 
@@ -29,6 +28,7 @@ class OptimizationDataset:
         self.num_fidelity: int = 0
 
         self.fidelities: list = []
+        self.num_samples: dict = dict()
 
 
     def add(self, sample: Sample):
@@ -43,7 +43,10 @@ class OptimizationDataset:
 
         if sample.fidelity not in self.fidelities:
             self.fidelities.append(sample.fidelity)
+            self.num_samples[sample.fidelity] = 0
             self.num_fidelity += 1
+
+        self.num_samples[sample.fidelity] += 1
 
 
     def get_by_fidelity(self, lvl: int):
@@ -74,17 +77,63 @@ class OptimizationDataset:
         return np.array(data)
 
 
+    def export_as_dict(self) -> dict:
+
+        num_sample = len(self.samples)
+        fidelity = np.empty((num_sample, 1))
+        eval_time = np.empty((num_sample, self.num_obj+self.num_cstr))
+
+        nvar = len(self.samples[0].x)
+        xt = np.empty((num_sample, nvar))             # inputs
+        yt = np.empty((num_sample, self.num_obj))     # objectives
+        ct = np.empty((num_sample, self.num_cstr))    # constraints
+
+        for idx, sample in enumerate(self.samples):
+            fidelity[idx, 0] = sample.fidelity
+            eval_time[idx, :] = sample.eval_time
+            xt[idx, :] = sample.x
+            yt[idx, :] = sample.obj
+            ct[idx, :] = sample.cstr
+
+        data = {
+            "fidelity": fidelity,
+            "eval_time": eval_time,
+            "x": xt,
+            "obj": yt,
+            "cstr": ct,
+        }
+
+        return data
+
+
+def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
+
+    t0 = time.perf_counter()
+
+    output = func(x_new)
+
+    t1 = time.perf_counter()
+    elapsed_time = t1 - t0
+
+    if isinstance(output, float):
+        pass
+    elif isinstance(output, np.ndarray):
+        output = output.copy().ravel()
+        if len(output) == 1:
+            output = output.item()
+        else:
+            warnings.warn(f"Invalid function output: {output}")
+            output = np.nan
+
+    return output, elapsed_time
+
+
+
 class Evaluator:
     def __init__(self, problem):
         self.problem = problem
 
     def sample(self, infill: list[np.ndarray | None], state):
-
-        def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
-            t0 = time.perf_counter()
-            value = func(x_new)
-            t1 = time.perf_counter()
-            return value, t1 - t0
 
         for lvl, x_lvl in enumerate(infill):
 

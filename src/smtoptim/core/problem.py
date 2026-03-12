@@ -1,17 +1,25 @@
 
 
 class Problem:
-    def __init__(self, obj_configs, cstr_configs = []):
+    def __init__(self, obj_configs: list, design_space, cstr_configs: list = [], costs: list[float] | None = None) -> None:
 
 
         self._validate_cstr(cstr_configs)
 
-        self.num_dim = obj_configs[0].design_space.shape[0]
+        self.num_dim = design_space.shape[0]
         self.num_obj = 0
         self.num_cstr = 0
         self.num_fidelity = len(obj_configs[0].objective) if isinstance(obj_configs[0].objective, list) else 1
 
-        self.design_space = None
+        self.design_space = design_space
+
+        if costs is None:
+            if self.num_fidelity == 1:
+                costs = [1]
+            else:
+                raise Exception("Costs must be provided for multi-fidelity problems.")
+
+        self.costs = costs
 
         self.obj_configs = []
         self.obj_funcs = []
@@ -24,8 +32,6 @@ class Problem:
             self.obj_configs.append(config)
             self.obj_funcs.append(config.objective)
             self.num_obj += 1
-
-            self.design_space = config.design_space
 
         for idx, config in enumerate(cstr_configs):
             self._validate_cstr(config)

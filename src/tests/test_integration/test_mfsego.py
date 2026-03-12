@@ -2,8 +2,10 @@ import unittest
 
 import numpy as np
 
+from smt.applications import MFK
+
 from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, OptimizerConfig, Optimizer
+from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver, State
 
 from smtoptim.surrogate_models.smt import SmtAutoModel
 
@@ -60,6 +62,13 @@ class Branin1:
         return -x[0]*x[1] - 0.7*x[1] + 0.3*x[0]
 
 
+def sasena2002_hf(x):
+    return -np.sin(x) - np.exp(x / 100) + 10
+
+def sasena2002_lf(x):
+    return sasena2002_hf(x) + 0.3 + 0.03 * (x - 3) ** 2
+
+
 class TestOptimization(unittest.TestCase):
 
     def test_mfsego_2d_1c(self):
@@ -75,9 +84,7 @@ class TestOptimization(unittest.TestCase):
 
         obj_config = ObjectiveConfig(
             objective=branin.objective,
-            design_space=branin.bounds,
             surrogate=SmtAutoModel,
-            costs=[5, 1],
         )
 
         cstr_config = ConstraintConfig(
@@ -89,15 +96,17 @@ class TestOptimization(unittest.TestCase):
 
         problem = Problem(
             obj_configs=[obj_config],
+            design_space=branin.bounds,
             cstr_configs=[cstr_config],
+            costs=[5, 1],
         )
 
-        opt_config = OptimizerConfig(
+        opt_config = DriverConfig(
             max_iter=max_iter,
             seed=42,
         )
 
-        optimizer = Optimizer(
+        optimizer = Driver(
             problem=problem,
             config=opt_config,
             strategy=MFSEGO,
@@ -113,7 +122,6 @@ class TestOptimization(unittest.TestCase):
 
         fidelity_criteria = ["optimistic", "pessimistic", "average"]
 
-
         max_iter = 1
 
         branin = Branin1()
@@ -127,9 +135,8 @@ class TestOptimization(unittest.TestCase):
         for fid_crit in fidelity_criteria:
             obj_config = ObjectiveConfig(
                 objective=branin.objective,
-                design_space=branin.bounds,
                 surrogate=SmtAutoModel,
-                costs=[5, 1],
+
             )
 
             cstr_config = ConstraintConfig(
@@ -141,15 +148,17 @@ class TestOptimization(unittest.TestCase):
 
             problem = Problem(
                 obj_configs=[obj_config],
+                design_space=branin.bounds,
                 cstr_configs=[cstr_config],
+                costs=[5, 1],
             )
 
-            opt_config = OptimizerConfig(
+            opt_config = DriverConfig(
                 max_iter=max_iter,
                 seed=42,
             )
 
-            optimizer = Optimizer(
+            optimizer = Driver(
                 problem=problem,
                 config=opt_config,
                 strategy=MFSEGO,
@@ -161,6 +170,90 @@ class TestOptimization(unittest.TestCase):
             state = optimizer.optimize()
 
             self.assertEqual(state.iter, max_iter)
+
+    def test_get_fidelity(self):
+
+        x_train = [
+            np.linspace(0, 10, 6),
+            np.array([2, 4, 6])
+        ]
+
+        y_train = [
+            sasena2002_lf(x_train[0]),
+            sasena2002_hf(x_train[1])
+        ]
+
+        model = MFK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42)
+        model.set_training_values(x_train[0].reshape(-1, 1), y_train[0].reshape(-1, 1), name=0)
+        model.set_training_values(x_train[1].reshape(-1, 1), y_train[1].reshape(-1, 1))
+        model.train()
+
+        obj_config = ObjectiveConfig(
+            objective=[sasena2002_lf, sasena2002_hf],
+            type="minimize",
+            surrogate=SmtAutoModel,
+        )
+
+        problem = Problem(
+            obj_configs=[obj_config],
+            design_space=np.array([[0, 10]]),
+            costs=[0.2, 1],
+        )
+
+        state = State(problem)
+        state.obj_models[0].model = model
+
+        mfsego = MFSEGO(state)
+
+        next_x = np.array([[5]])
+        level = mfsego.get_fidelity(next_x, state)[0]
+        self.assertEqual(level, 0)
+
+        next_x = np.array([[8]])
+        level = mfsego.get_fidelity(next_x, state)[0]
+        self.assertEqual(level, 1)
+
+
+    def test_compute_sigma2_red(self):
+        x_train = [
+            np.linspace(0, 10, 6),
+            np.array([2, 4, 6])
+        ]
+
+        y_train = [
+            sasena2002_lf(x_train[0]),
+            sasena2002_hf(x_train[1])
+        ]
+
+        model = MFK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42)
+        model.set_training_values(x_train[0].reshape(-1, 1), y_train[0].reshape(-1, 1), name=0)
+        model.set_training_values(x_train[1].reshape(-1, 1), y_train[1].reshape(-1, 1))
+        model.train()
+
+        obj_config = ObjectiveConfig(
+            objective=[sasena2002_lf, sasena2002_hf],
+            type="minimize",
+            surrogate=SmtAutoModel,
+        )
+
+        problem = Problem(
+            obj_configs=[obj_config],
+            design_space=np.array([[0, 10]]),
+            costs=[0.2, 1],
+        )
+
+        state = State(problem)
+        state.obj_models[0].model = model
+
+        mfsego = MFSEGO(state)
+
+        x_valid = np.linspace(0, 10, 101)
+
+        s2_red = mfsego.compute_sigma2_red(x_valid.reshape(-1, 1), state.obj_models[0])
+        delta = s2_red[:, 0] - s2_red[:, 1]
+
+        self.assertTrue(all(d < 0 for d in delta))
+
 
 
 if __name__ == '__main__':

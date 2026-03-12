@@ -37,5 +37,9 @@ def json_safe(obj):
         return obj
 
     except Exception as e:
-        warnings.warn(f"Failed to convert: {obj}. Error message: {e}")
+        try:
+            obj_repr = repr(obj)
+        except Exception:
+            obj_repr = "<unrepresentable object>"
+        warnings.warn(f"Failed to convert: {obj_repr}. Error message: {e}")
         return None

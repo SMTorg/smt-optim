@@ -13,15 +13,16 @@ from typing import Callable
 
 import pickle
 
-from smtoptim.core.state import OptimizationState
+from smtoptim.core.state import State
 from smtoptim.surrogate_models import Surrogate
 from smtoptim.acquisition_strategies import AcquisitionStrategy
 
 from smtoptim.core import Sample, OptimizationDataset, Evaluator
-from smtoptim.core import OptimizationState
+from smtoptim.core import State
 
 from smtoptim.utils.initial_design import generate_initial_design
 from smtoptim.utils.stop_criteria import check_stop_criteria
+from smtoptim.utils.logger import ConsoleLogger
 
 from smtoptim.utils.json import json_safe
 
@@ -98,24 +99,22 @@ def compute_rscv(cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0., h
 
 @dataclass
 class ObjectiveConfig:
-    objective: Callable | list[Callable]
-    design_space: np.ndarray                              # problem bounds np.ndarray(dim, 2) lower = bounds[:, 0], upper = bounds[:, 1]
+    objective: list[Callable]
     type: str = "minimize"                          # problem's type -> "minimize" or "maximize")
     surrogate: Surrogate = None
-    costs: list[float] = None                       # cost of each fidelity level
+    surrogate_kwargs: dict | None = None
 
 
 @dataclass
 class ConstraintConfig:
-    constraint: Callable | list[Callable]
+    constraint: list[Callable]
     type: str = "less"                              # "less"-> g <= 0; "greater" -> g >= 0
     value: float = 0                                # g <= value (or g >= value if type is " greater")
-    tol: float = 1e-4                               # does not work. use OptimizerConfig.ctol instead
     surrogate: Surrogate = None
+    surrogate_kwargs: dict | None = None
 
 @dataclass
-class OptimizerConfig:
-    constraints: list[ConstraintConfig] | None = None
+class DriverConfig:
     ctol: float = 1e-4                              # tolerance for all constraints
     max_iter: int | None = None                     # max number of BO iterations
     max_budget: float = float("inf")                # max BO budget
@@ -131,14 +130,14 @@ class OptimizerConfig:
     loggers: list | None = None
 
 
-class Optimizer():
+class Driver:
 
     def __init__(self, problem, config, strategy, strategy_kwargs = dict()):
 
         self.problem = problem
         self.config = config
 
-        self.state = OptimizationState(problem)
+        self.state = State(problem)
         self.state.dataset.log_data = True
 
         self.strategy_kwargs = strategy_kwargs
@@ -148,12 +147,13 @@ class Optimizer():
         self.evaluator = Evaluator(problem)
 
         # setup loggers
-        if self.config.loggers is not None:
-            self.loggers = []
+        self.loggers = []
+        if self.config.verbose:
+            self.loggers.append(ConsoleLogger(self.config))
+
+        if isinstance(self.config.loggers, list):
             for logger in self.config.loggers:
                 self.loggers.append(logger(self.config))
-        else:
-            self.loggers = None
 
 
     def initialize(self):
@@ -170,11 +170,16 @@ class Optimizer():
         state.build_models()
 
         # get infill
+        t0 = time.perf_counter()
         infill = self.strategy.get_infill(state)
+        t1 = time.perf_counter()
+        state.iter_log["acq_opt_time"] = t1 - t0
+
         for i in range(len(infill)):
             if infill[i] is not None:
-                infill[i] *= (self.problem.obj_configs[0].design_space[:, 1] - self.problem.obj_configs[0].design_space[:, 0])
-                infill[i] += self.problem.obj_configs[0].design_space[:, 0]
+                infill[i] *= (self.problem.design_space[:, 1] - self.problem.design_space[:, 0])
+                infill[i] += self.problem.design_space[:, 0]
+                state.iter_log["fidelity"] = i+1
 
         # evaluate infill
         self.evaluator.sample(infill, state)
@@ -205,12 +210,12 @@ class Optimizer():
 
 
     def call_loggers(self, state):
-        if self.loggers is not None:
-            for logger in self.loggers:
-                try:
-                    logger.on_iter_end(state)
-                except Exception as e:
-                    print(f"Error while logging: {e}")
+        # if self.loggers is not None:
+        for logger in self.loggers:
+            try:
+                logger.on_iter_end(state)
+            except Exception as e:
+                print(f"Error while logging: {e}")
 
 
 
@@ -642,7 +647,7 @@ class Optimizer():
 #             elif c_config.type == "equal":
 #                 cstr_types.append("equal")
 #
-#         acq_context = OptimizationState(
+#         acq_context = State(
 #             num_dim=self.num_dim,
 #             num_obj=1,
 #             num_cstr=self.num_cstr,

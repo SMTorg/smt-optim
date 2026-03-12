@@ -4,7 +4,7 @@ import numpy as np
 import scipy.stats as stats
 
 from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, OptimizerConfig, Optimizer
+from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 
 from smtoptim.surrogate_models.smt import SmtAutoModel
 
@@ -18,10 +18,6 @@ def rosenbrock(x: np.ndarray) -> np.ndarray:
     n = x.shape[1]
     A = 10
 
-    def temp(x):
-        return x**2 - A*np.cos(2*np.pi*x)
-
-    temp_vec = np.vectorize(temp)
     value = (1 - x[:, 0])**2 + 100*(x[:, 1] - x[:, 0]**2)**2
 
     if ndim == 1:

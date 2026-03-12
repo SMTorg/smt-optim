@@ -1,6 +1,6 @@
 from .sample import Sample, OptimizationDataset, Evaluator
-from .state import OptimizationState
+from .state import State
 
 from .problem import Problem
-from .optimizer import ObjectiveConfig, ConstraintConfig, OptimizerConfig, Optimizer
+from .driver import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 

@@ -50,3 +50,17 @@ def get_fmin(f: np.ndarray, c: np.ndarray | None = None, c_type: list[str] | Non
     fmin = optimizer.yt_scaled[-1][idx, 0]
 
     return fmin
+
+# def get_fmin_from_dataset(state, ctol):
+#
+#     if state.problem.num_obj > 1:
+#         raise Exception("Not yet implemented for multi-objective dataset.")
+#
+#     indices = np.arange(state.problem.num_obj+state.problem.num_cstr, 1)
+#
+#     state.dataset.export_data(indices, state.dataset.fidelities[-1])
+#
+#
+#
+#     pass
+

@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, OptimizerConfig, Optimizer
+from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 
 from smtoptim.surrogate_models.smt import SmtAutoModel
 
@@ -58,7 +58,6 @@ class TestOptimization(unittest.TestCase):
 
         obj_config = ObjectiveConfig(
             objective=[rosenbrock],
-            design_space=bounds,
             surrogate=SmtAutoModel,
         )
 
@@ -72,14 +71,15 @@ class TestOptimization(unittest.TestCase):
         problem = Problem(
             obj_configs=[obj_config],
             cstr_configs=[cstr_config],
+            design_space=bounds,
         )
 
-        opt_config = OptimizerConfig(
+        opt_config = DriverConfig(
             max_iter=10,
             seed=42,
         )
 
-        optimizer = Optimizer(
+        optimizer = Driver(
             problem=problem,
             config=opt_config,
             strategy=MFSEGO,

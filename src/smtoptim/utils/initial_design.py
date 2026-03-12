@@ -1,29 +1,37 @@
 import copy
 
 import numpy as np
-import scipy.stats as stats
+from smt.sampling_methods import LHS
+from smt.applications import NestedLHS
 
-from smtoptim.core.state import OptimizationState
+from smtoptim.core.state import State
 
 
-def generate_initial_design(state: OptimizationState, evaluator, config) -> None:
+def generate_initial_design(state: State, evaluator, config) -> None:
 
 
     if config.xt_init is None:
 
-        sampler = stats.qmc.LatinHypercube(d=state.problem.num_dim, seed=config.seed)
+        if state.problem.num_fidelity == 1:
+            sampler = LHS(xlimits=state.problem.design_space,
+                          seed=config.seed)
+        else:
+            sampler = NestedLHS(xlimits=state.problem.design_space,
+                                nlevel=state.problem.num_fidelity,
+                                seed=config.seed)
 
         if config.nt_init is None:
-            nt_init = max(5, state.problem.num_dim)
+            nt_init = max(5, state.problem.num_dim+1)
         else:
             nt_init = config.nt_init
 
-        doe = sampler.random(nt_init)
-        doe = stats.qmc.scale(doe,
-                              state.problem.obj_configs[0].design_space[:, 0],
-                              state.problem.obj_configs[0].design_space[:, 1])
-        doe = [doe]
-        infill = doe * state.problem.num_fidelity
+        doe = sampler(nt_init)
+
+        if state.problem.num_fidelity == 1:
+            doe = [doe]
+            infill = doe * state.problem.num_fidelity
+        else:
+            infill = doe
 
     else:
         infill = copy.deepcopy(config.xt_init)

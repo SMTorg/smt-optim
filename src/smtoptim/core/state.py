@@ -4,11 +4,12 @@ import time
 import numpy as np
 
 from smtoptim.core import OptimizationDataset
+from smtoptim.utils.constraints import compute_rscv
 
 # from smtoptim.core import Problem
 
 
-class OptimizationState:
+class State:
 
     def __init__(self, problem):
 
@@ -99,8 +100,8 @@ class OptimizationState:
             lvl = scaled_sample.fidelity
 
             # should only normalize real variables
-            scaled_sample.x -= self.problem.obj_configs[0].design_space[:, 0]
-            scaled_sample.x /= (self.problem.obj_configs[0].design_space[:, 1] - self.problem.obj_configs[0].design_space[:, 0])
+            scaled_sample.x -= self.problem.design_space[:, 0]
+            scaled_sample.x /= (self.problem.design_space[:, 1] - self.problem.design_space[:, 0])
 
             scaled_sample.obj[:] -= self.qoi_step[lvl][:self.problem.num_obj]
             scaled_sample.obj[:] /= self.qoi_factor[lvl][:self.problem.num_obj]
@@ -136,20 +137,37 @@ class OptimizationState:
 
     def build_models(self):
 
-        x_train, qoi_train = self.group_by_fidelity()
 
-        qoi_models = self.obj_models + self.cstr_models
+        data = self.scaled_dataset.export_as_dict()
+
+        fidelity = data["fidelity"]
+        all_xt = data["x"]
+        all_yt = data["obj"]
+        all_ct = data["cstr"]
+
+        fidelity_masks = []
+        xt = []
+        yt = []
+        ct = []
+        for lvl in range(self.problem.num_fidelity):
+            fidelity_masks.append((fidelity == lvl).ravel())
+            xt.append(all_xt[fidelity_masks[lvl], :])
 
         t0 = time.perf_counter()
 
-        for qoi_idx in range(self.problem.num_obj+self.problem.num_cstr):
+        for idx in range(self.problem.num_obj):
+            yt.append(
+                [all_yt[fidelity_masks[lvl], idx].reshape(-1, 1) for lvl in range(self.problem.num_fidelity)]
+            )
+            kwargs = self.problem.obj_configs[idx].surrogate_kwargs if self.problem.obj_configs[idx].surrogate_kwargs is not None else dict()
+            self.obj_models[idx].train(xt, yt[idx], **kwargs)
 
-            idx_train = []
-
-            for lvl in range(self.problem.num_fidelity):
-                idx_train.append(qoi_train[lvl][:, qoi_idx].reshape(-1, 1))
-
-            qoi_models[qoi_idx].train(x_train, idx_train)
+        for idx in range(self.problem.num_cstr):
+            ct.append(
+                [all_ct[fidelity_masks[lvl], idx].reshape(-1, 1) for lvl in range(self.problem.num_fidelity)]
+            )
+            kwargs = self.problem.cstr_configs[idx].surrogate_kwargs if self.problem.cstr_configs[idx].surrogate_kwargs is not None else dict()
+            self.cstr_models[idx].train(xt, ct[idx], **kwargs)
 
         t1 = time.perf_counter()
 
@@ -159,7 +177,36 @@ class OptimizationState:
         self.iter_log.clear()
 
 
-def generate_state(problem) -> OptimizationState:
-    return OptimizationState(problem)
+    def get_best_sample(self, ctol=1e-4, fidelity=-1):
+
+        if fidelity == -1:
+            fidelity = self.problem.num_fidelity-1
+
+        best_obj = np.inf
+        best_sample = None
+        coeff = 1 if self.problem.obj_configs[0].type == "minimize" else -1
+
+        samples = self.dataset.get_by_fidelity(fidelity)
+
+        if self.problem.num_cstr > 0:
+            for s in samples:
+                if s.obj[0] < best_obj * coeff:
+                    best_sample = s
+        else:
+            for s in samples:
+                rscv = compute_rscv(s.cstr.reshape(1, -1), self.cstr_types)
+                if rscv <= ctol:
+                    if s.obj[0] < best_obj * coeff:
+                        best_sample = s
+
+            if best_sample is None:
+                min_rscv = np.inf
+
+                for s in samples:
+                    rscv = compute_rscv(s.cstr.reshape(1, -1), self.cstr_types)
+                    if rscv < min_rscv:
+                        best_sample = s
+
+        return best_sample
 
 

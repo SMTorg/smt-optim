@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, OptimizerConfig, Optimizer
+from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 
 from smtoptim.surrogate_models.smt import SmtAutoModel
 
@@ -58,7 +58,6 @@ class TestOptimization(unittest.TestCase):
 
         obj_config = ObjectiveConfig(
             objective=two_cstrs.objective,
-            design_space=two_cstrs.bounds,
             surrogate=SmtAutoModel,
         )
 
@@ -78,16 +77,17 @@ class TestOptimization(unittest.TestCase):
 
         problem = Problem(
             obj_configs=[obj_config],
+            design_space=two_cstrs.bounds,
             cstr_configs=[cstr0_config, cstr0_config],
         )
 
-        opt_config = OptimizerConfig(
+        opt_config = DriverConfig(
             max_iter=1,
             seed=42,
             scaling=True,
         )
 
-        optimizer = Optimizer(
+        optimizer = Driver(
             problem=problem,
             config=opt_config,
             strategy=MFSEGO,
@@ -112,20 +112,20 @@ class TestOptimization(unittest.TestCase):
         # --- first optimization ---
         obj_config = ObjectiveConfig(
             objective=[func_1d],
-            design_space=bounds,
             surrogate=SmtAutoModel,
         )
 
         problem = Problem(
             obj_configs=[obj_config],
+            design_space=bounds,
         )
 
-        opt_config = OptimizerConfig(
+        opt_config = DriverConfig(
             max_iter=1,
             seed=42,
         )
 
-        optimizer = Optimizer(problem, config=opt_config, strategy=MFSEGO)
+        optimizer = Driver(problem, config=opt_config, strategy=MFSEGO)
         state = optimizer.optimize()
 
         doe_0 = np.empty(len(state.dataset.samples))
@@ -135,20 +135,20 @@ class TestOptimization(unittest.TestCase):
         # --- second optimization ---
         obj_config = ObjectiveConfig(
             objective=[func_1d],
-            design_space=bounds,
             surrogate=SmtAutoModel,
         )
 
         problem = Problem(
             obj_configs=[obj_config],
+            design_space=bounds,
         )
 
-        opt_config = OptimizerConfig(
+        opt_config = DriverConfig(
             max_iter=1,
             seed=42,
         )
 
-        optimizer = Optimizer(problem, config=opt_config, strategy=MFSEGO)
+        optimizer = Driver(problem, config=opt_config, strategy=MFSEGO)
         state = optimizer.optimize()
 
         doe_1 = np.empty(len(state.dataset.samples))
