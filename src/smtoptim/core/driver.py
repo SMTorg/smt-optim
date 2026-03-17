@@ -26,6 +26,7 @@ from smtoptim.utils.logger import ConsoleLogger
 
 from smtoptim.utils.json import json_safe
 
+
 def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
     """
     Wrap function to return factor * (func - step).
@@ -44,12 +45,15 @@ def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
     """
 
     def wrapped(x, f=func):
-        return factor*(f(x) - step)
+        return factor * (f(x) - step)
 
     return wrapped
 
-def wrap_array(array: np.ndarray, factor: float | np.ndarray = 1., step: float | np.ndarray = 0.) -> np.ndarray:
-    return factor*(array - step)
+
+def wrap_array(
+    array: np.ndarray, factor: float | np.ndarray = 1.0, step: float | np.ndarray = 0.0
+) -> np.ndarray:
+    return factor * (array - step)
 
 
 def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
@@ -70,27 +74,33 @@ def check_bounds(x: np.ndarray, bounds: np.ndarray) -> np.ndarray:
     x_corrected = np.where(x_corrected > bounds[:, 1], bounds[:, 1], x_corrected)
 
     if np.any(x != x_corrected):
-        warnings.warn(f"Infill point was outside of the bounds. L1 correction was applied: (initial = {x}; corrected = {x_corrected}).")
+        warnings.warn(
+            f"Infill point was outside of the bounds. L1 correction was applied: (initial = {x}; corrected = {x_corrected})."
+        )
 
     return x_corrected
 
-# def compute_rscv(self, cstr_array: np.ndarray, cstr_config: list[ConstraintConfig], g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
-def compute_rscv(cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
 
-    scv = np.full_like(cstr_array, 0.0)     # Square Constraint Violation
+# def compute_rscv(self, cstr_array: np.ndarray, cstr_config: list[ConstraintConfig], g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+def compute_rscv(
+    cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0.0, h_tol: float = 0.0
+) -> np.ndarray:
+
+    scv = np.full_like(cstr_array, 0.0)  # Square Constraint Violation
 
     for c_id, c_config in enumerate(cstr_config):
-
         if c_config.type in ["less", "greater"]:
             valid_mask = cstr_array[:, c_id] <= g_tol
-            scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+            scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id] ** 2
 
         elif c_config.type == "equal":
             valid_mask = np.abs(cstr_array[:, c_id]) <= h_tol
-            scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id]**2
+            scv[~valid_mask, c_id] = cstr_array[~valid_mask, c_id] ** 2
 
         else:
-            raise Exception(f"{c_config.type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'.")
+            raise Exception(
+                f"{c_config.type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'."
+            )
 
     rscv = np.sqrt(scv.sum(axis=1))
 
@@ -99,40 +109,87 @@ def compute_rscv(cstr_array: np.ndarray, cstr_config: list, g_tol: float = 0., h
 
 @dataclass
 class ObjectiveConfig:
+    """
+    Configuration of the objective function used in the optimization problem.
+
+    This class stores an objective callable(s) together with surrogate
+    modeling information used to approximate the objective during optimization.
+
+    Attributes
+    ----------
+    objective : list[Callable]
+        List of an objective functions. Each callable must accept a decision
+        variable vector ``x`` and return a scalar objective value. The functions
+        must be ordered in increasing level of fidelity.
+    type : {"minimize", "maximize"}, default="minimize"
+        Specifies whether the objective should be minimized or maximized.
+    surrogate : Surrogate or None, default=None
+        Surrogate model used to approximate the objective function.
+    surrogate_kwargs : dict or None, default=None
+        Optional keyword arguments passed to the surrogate model.
+    """
+
     objective: list[Callable]
-    type: str = "minimize"                          # problem's type -> "minimize" or "maximize")
+    type: str = "minimize"  # problem's type -> "minimize" or "maximize")
     surrogate: Surrogate = None
     surrogate_kwargs: dict | None = None
 
 
 @dataclass
 class ConstraintConfig:
+    """
+    Configuration of a constraint function used in the optimization problem.
+
+    This class stores a constraint callable(s) together with surrogate
+    modeling information used to approximate the constraint during optimization.
+
+    Attributes
+    ----------
+    constraint : list[Callable]
+        List of constraint functions. Each callable must accept a decision
+        variable vector ``x`` and return a scalar constraint value. The functions
+        must be ordered in increasing level of fidelity.
+    type : {"less", "greater", "equal"}, default="minimize"
+        Specifies whether the feasible domain is defined when the constraint value
+        is less, greater or equal to the configuration value.
+    value: float, default=0
+        Specifies the value defining the feasible domain.
+    surrogate : Surrogate or None, default=None
+        Surrogate model used to approximate the constraint function.
+    surrogate_kwargs : dict or None, default=None
+        Optional keyword arguments passed to the surrogate model.
+    """
+
     constraint: list[Callable]
-    type: str = "less"                              # "less"-> g <= 0; "greater" -> g >= 0
-    value: float = 0                                # g <= value (or g >= value if type is " greater")
+    type: str = "less"  # "less"-> g <= 0; "greater" -> g >= 0
+    value: float = 0  # g <= value (or g >= value if type is " greater")
     surrogate: Surrogate = None
     surrogate_kwargs: dict | None = None
 
+
 @dataclass
 class DriverConfig:
-    ctol: float = 1e-4                              # tolerance for all constraints
-    max_iter: int | None = None                     # max number of BO iterations
-    max_budget: float = float("inf")                # max BO budget
-    max_time: float = float("inf")                  # max BO elapsed time
-    nt_init: int | None = None                      # number of samples in initial DOE (with LHS)
-    xt_init: np.ndarray | None = None               # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
-    results_dir: str | None = "bo_results"          # name for the results directory
-    verbose: bool = False                           # True/False print each iteration informations
-    callback_func: list[Callable] | Callable | None = None      # additional method to call at the end of each iteration
-    scaling: bool = True                            # standardize the training data
-    dynamic_costs: str | None = None                # use sampling time to update the costs
+    ctol: float = 1e-4  # tolerance for all constraints
+    max_iter: int | None = None  # max number of BO iterations
+    max_budget: float = float("inf")  # max BO budget
+    max_time: float = float("inf")  # max BO elapsed time
+    nt_init: int | None = None  # number of samples in initial DOE (with LHS)
+    xt_init: np.ndarray | None = (
+        None  # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
+    )
+    results_dir: str | None = None  # name for the results directory
+    verbose: bool = False  # True/False print each iteration informations
+    callback_func: list[Callable] | Callable | None = (
+        None  # additional method to call at the end of each iteration
+    )
+    scaling: bool = True  # standardize the training data
+    dynamic_costs: str | None = None  # use sampling time to update the costs
     seed: None = None
     loggers: list | None = None
 
 
 class Driver:
-
-    def __init__(self, problem, config, strategy, strategy_kwargs = dict()):
+    def __init__(self, problem, config, strategy, strategy_kwargs=dict()):
 
         self.problem = problem
         self.config = config
@@ -144,7 +201,10 @@ class Driver:
         self.strategy_kwargs["seed"] = config.seed
         self.strategy = strategy(self.state, **self.strategy_kwargs)
 
-        self.evaluator = Evaluator(problem)
+        if self.config.results_dir is not None:
+            config.results_dir = self.make_res_dir(self.config.results_dir)
+
+        self.evaluator = Evaluator(problem, config.results_dir)
 
         # setup loggers
         self.loggers = []
@@ -154,10 +214,6 @@ class Driver:
         if isinstance(self.config.loggers, list):
             for logger in self.config.loggers:
                 self.loggers.append(logger(self.config))
-
-
-    def initialize(self):
-        pass
 
 
     def iteration(self, state):
@@ -177,18 +233,19 @@ class Driver:
 
         for i in range(len(infill)):
             if infill[i] is not None:
-                infill[i] *= (self.problem.design_space[:, 1] - self.problem.design_space[:, 0])
+                infill[i] *= (
+                    self.problem.design_space[:, 1] - self.problem.design_space[:, 0]
+                )
                 infill[i] += self.problem.design_space[:, 0]
-                state.iter_log["fidelity"] = i+1
+                state.iter_log["fidelity"] = i + 1
 
-        # evaluate infill
-        self.evaluator.sample(infill, state)
+        # evaluate infill points
+        self.evaluator.sample_func(infill, state)
 
         # log iteration data
         self.call_loggers(state)
 
         return state
-
 
     def optimize(self):
 
@@ -198,16 +255,13 @@ class Driver:
 
         # loop - check stop criteria
         while check_stop_criteria(self.state, self.config):
-
             # iteration
             self.iteration(self.state)
 
         return self.state
 
-
     def finalize(self):
         pass
-
 
     def call_loggers(self, state):
         # if self.loggers is not None:
@@ -216,6 +270,24 @@ class Driver:
                 logger.on_iter_end(state)
             except Exception as e:
                 print(f"Error while logging: {e}")
+
+    def make_res_dir(self, res_dir: str | None) -> str | None:
+
+        og_res_dir = res_dir
+
+        if res_dir is not None:
+            # if results_dir already exists, append '_idx' to it to avoid overwriting existing data
+            idx = 1
+            while os.path.exists(res_dir):
+                res_dir = og_res_dir + f"_{idx}"
+                idx += 1
+
+            # create results_dir directory
+            os.makedirs(res_dir, exist_ok=False)
+            return res_dir
+
+        else:
+            return None
 
 
 
@@ -1009,5 +1081,5 @@ class Driver:
 #     #         else:
 #     #             self.domain_scaled = self.domain.copy()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

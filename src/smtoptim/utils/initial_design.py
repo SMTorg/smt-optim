@@ -14,6 +14,7 @@ def generate_initial_design(state: State, evaluator, config) -> None:
 
         if state.problem.num_fidelity == 1:
             sampler = LHS(xlimits=state.problem.design_space,
+                          criterion="ese",
                           seed=config.seed)
         else:
             sampler = NestedLHS(xlimits=state.problem.design_space,
@@ -36,5 +37,5 @@ def generate_initial_design(state: State, evaluator, config) -> None:
     else:
         infill = copy.deepcopy(config.xt_init)
 
-    evaluator.sample(infill, state)
+    evaluator.sample_func(infill, state)
 

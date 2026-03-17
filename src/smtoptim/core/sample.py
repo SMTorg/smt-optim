@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Callable
 import time
 import warnings
+import csv
+import os
 
 import numpy as np
 
@@ -17,6 +19,18 @@ class Sample:
     eval_time: np.ndarray | None   # (num_obj + num_cstr,)
 
     metadata: dict = field(default_factory=dict)
+
+    def __repr__(self):
+        string = f"======= sample data =======\n"
+        string += f"x =             {self.x}\n"
+        string += f"obj =           {self.obj}\n"
+        string += f"cstr =          {self.cstr}\n"
+        string += f"eval_time =     {self.eval_time}\n"
+        string+= f"------- meta data -------\n"
+        for key, value in self.metadata.items():
+            string += f"{key} =     {value}\n"
+        string += f"===========================\n"
+        return string
 
 
 class OptimizationDataset:
@@ -130,10 +144,12 @@ def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
 
 
 class Evaluator:
-    def __init__(self, problem):
+    def __init__(self, problem, res_path: str | None = None):
         self.problem = problem
+        self.res_path = res_path
 
-    def sample(self, infill: list[np.ndarray | None], state):
+
+    def sample_func(self, infill: list[np.ndarray | None], state):
 
         for lvl, x_lvl in enumerate(infill):
 
@@ -154,6 +170,7 @@ class Evaluator:
                     for cstr_idx in range(self.problem.num_cstr):
                         cstr_values[cstr_idx], times[self.problem.num_obj + cstr_idx] = sample_func(x_new,
                                                                                             self.problem.cstr_funcs[cstr_idx][lvl])
+                    state.budget += state.problem.costs[lvl]
 
                     sample = Sample(
                         x=x_new,
@@ -161,7 +178,56 @@ class Evaluator:
                         obj=obj_values,
                         cstr=cstr_values,
                         eval_time=times,
-                        metadata={"iter": state.iter}
+                        metadata={
+                            "iter": state.iter,
+                            "budget": state.budget,
+                            "fidelity": lvl,
+                        }
                     )
 
                     state.dataset.add(sample)
+
+                    if self.res_path is not None:
+                        self.log_sample(sample)
+
+    def log_sample(self, sample):
+
+        try:
+            row = dict()
+
+            row["iter"] = sample.metadata.get("iter", np.nan)
+            row["budget"] = sample.metadata.get("budget", np.nan)  # self.compute_used_budget() # self.budget
+            row["fidelity"] = sample.metadata.get("fidelity", np.nan)  # self.compute_used_budget() # self.budget
+
+            # save variables
+            for i in range(len(sample.x)):
+                row[f"x{i}"] = sample.x[i]
+
+            # save objectives
+            for i in range(len(sample.obj)):
+                row[f"f{i}"] = sample.obj[i]
+
+            # save constraints
+            for i in range(len(sample.cstr)):
+                row[f"c{i}"] = sample.cstr[i]
+
+            row["time"] = np.sum(sample.eval_time)
+
+            path = os.path.join(self.res_path, "doe.csv")
+            file_exists = os.path.isfile(path)
+
+            # possibly does not work on Windows -> to be tested
+            with open(path, 'a') as file:
+                writer = csv.DictWriter(file, fieldnames=row.keys())
+
+                if not file_exists:
+                    writer.writeheader()
+
+                writer.writerow(row)
+
+        except Exception as e:
+            print(f"Error while saving the DoE: {e}")
+
+
+
+

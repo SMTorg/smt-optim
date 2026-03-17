@@ -188,15 +188,17 @@ class State:
 
         samples = self.dataset.get_by_fidelity(fidelity)
 
-        if self.problem.num_cstr > 0:
+        if self.problem.num_cstr == 0:
             for s in samples:
                 if s.obj[0] < best_obj * coeff:
+                    best_obj = s.obj[0]
                     best_sample = s
         else:
             for s in samples:
                 rscv = compute_rscv(s.cstr.reshape(1, -1), self.cstr_types)
                 if rscv <= ctol:
                     if s.obj[0] < best_obj * coeff:
+                        best_obj = s.obj[0]
                         best_sample = s
 
             if best_sample is None:
