@@ -4,7 +4,7 @@ import numpy as np
 from smt.sampling_methods import LHS
 from smt.applications import NestedLHS
 
-from smtoptim.core.state import State
+from smt_optim.core.state import State
 
 
 def generate_initial_design(state: State, evaluator, config) -> None:

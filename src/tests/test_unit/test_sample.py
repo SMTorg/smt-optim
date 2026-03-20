@@ -1,9 +1,9 @@
 import unittest
 import numpy as np
 
-from smtoptim.core import Sample, OptimizationDataset
+from smt_optim.core import Sample, OptimizationDataset
 
-from smtoptim.core.sample import sample_func
+from smt_optim.core.sample import sample_func
 
 class TestSample(unittest.TestCase):
 

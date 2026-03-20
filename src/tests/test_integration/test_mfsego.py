@@ -4,12 +4,12 @@ import numpy as np
 
 from smt.applications import MFK
 
-from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver, State
+from smt_optim.core import Problem
+from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver, State
 
-from smtoptim.surrogate_models.smt import SmtAutoModel
+from smt_optim.surrogate_models.smt import SmtAutoModel
 
-from smtoptim.acquisition_strategies import MFSEGO
+from smt_optim.acquisition_strategies import MFSEGO
 
 
 def branin_forrester(x):

@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from smtoptim.subsolvers.multistart import multistart_minimize, MultistartResult
+from smt_optim.subsolvers.multistart import multistart_minimize, MultistartResult
 
 
 
