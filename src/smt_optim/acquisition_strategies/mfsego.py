@@ -4,15 +4,15 @@ from typing import Callable
 import numpy as np
 from scipy import optimize as so, stats as stats
 
-from smtoptim.acquisition_functions import log_ei
-from smtoptim.acquisition_strategies import AcquisitionStrategy
-from smtoptim.surrogate_models.smt import SmtMFK
+from smt_optim.acquisition_functions import log_ei
+from smt_optim.acquisition_strategies import AcquisitionStrategy
+# from smt_optim.surrogate_models.smt import SmtMFK
 
-from smtoptim.core.state import State
+from smt_optim.core.state import State
 
-from smtoptim.utils.get_fmin import get_fmin
+from smt_optim.utils.get_fmin import get_fmin
 
-from smtoptim.subsolvers import multistart_minimize
+from smt_optim.subsolvers import multistart_minimize
 
 
 class MFSEGO(AcquisitionStrategy):
@@ -330,7 +330,7 @@ class MFSEGO(AcquisitionStrategy):
     #
     #     return multi_x0
 
-    def compute_sigma2_red(self, x_pred: np.ndarray, surrogate: SmtMFK) -> np.ndarray:
+    def compute_sigma2_red(self, x_pred: np.ndarray, surrogate) -> np.ndarray:
 
         # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
         s2, rho2 = surrogate.model.predict_variances_all_levels(x_pred)
@@ -362,7 +362,7 @@ class MFSEGO(AcquisitionStrategy):
 
         return tot_costs2
 
-    def compute_norm_sigma2_red(self, x_pred: np.ndarray, norm_costs2: list[float], surrogate: SmtMFK) -> np.ndarray:
+    def compute_norm_sigma2_red(self, x_pred: np.ndarray, norm_costs2: list[float], surrogate) -> np.ndarray:
 
         num_levels = len(norm_costs2)
 
@@ -375,7 +375,7 @@ class MFSEGO(AcquisitionStrategy):
         return s2_norm
 
 
-    def compute_all_s2_red_norm(self, x_pred: np.ndarray, costs: list[float], surrogates: list[SmtMFK]) -> list[np.ndarray]:
+    def compute_all_s2_red_norm(self, x_pred: np.ndarray, costs: list[float], surrogates: list) -> list[np.ndarray]:
 
         num_pts = x_pred.shape[0]
         num_levels = len(costs)
@@ -390,7 +390,7 @@ class MFSEGO(AcquisitionStrategy):
         return s2_red_norm
 
 
-    def select_fidelity_level(self, x_pred: np.ndarray, costs: list[float], all_surrogates: list[SmtMFK], criterion: str) -> np.ndarray:
+    def select_fidelity_level(self, x_pred: np.ndarray, costs: list[float], all_surrogates: list, criterion: str) -> np.ndarray:
 
         num_pts: int = x_pred.shape[0]
         # level: np.ndarray = np.zeros(num_pts)

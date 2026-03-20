@@ -3,10 +3,10 @@ import time
 
 import numpy as np
 
-from smtoptim.core import OptimizationDataset
-from smtoptim.utils.constraints import compute_rscv
+from smt_optim.core import OptimizationDataset
+from smt_optim.utils.constraints import compute_rscv
 
-# from smtoptim.core import Problem
+# from smt_optim.core import Problem
 
 
 class State:
@@ -112,27 +112,27 @@ class State:
             self.scaled_dataset.add(scaled_sample)
 
 
-    def group_by_fidelity(self) -> tuple[list[np.ndarray], list[np.ndarray]]:
-
-        x = []
-        qoi = []
-
-        for lvl in range(self.problem.num_fidelity):
-
-            samples = self.scaled_dataset.get_by_fidelity(lvl)
-
-            x_lvl = np.empty((len(samples), self.problem.num_dim))
-            qoi_lvl = np.empty((len(samples), self.problem.num_obj + self.problem.num_cstr))
-
-            for idx, sample in enumerate(samples):
-                x_lvl[idx, :] = sample.x
-                qoi_lvl[idx, :self.problem.num_obj] = sample.obj
-                qoi_lvl[idx, self.problem.num_obj:] = sample.cstr
-
-            x.append(x_lvl)
-            qoi.append(qoi_lvl)
-
-        return x, qoi
+    # def group_by_fidelity(self) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    #
+    #     x = []
+    #     qoi = []
+    #
+    #     for lvl in range(self.problem.num_fidelity):
+    #
+    #         samples = self.scaled_dataset.get_by_fidelity(lvl)
+    #
+    #         x_lvl = np.empty((len(samples), self.problem.num_dim))
+    #         qoi_lvl = np.empty((len(samples), self.problem.num_obj + self.problem.num_cstr))
+    #
+    #         for idx, sample in enumerate(samples):
+    #             x_lvl[idx, :] = sample.x
+    #             qoi_lvl[idx, :self.problem.num_obj] = sample.obj
+    #             qoi_lvl[idx, self.problem.num_obj:] = sample.cstr
+    #
+    #         x.append(x_lvl)
+    #         qoi.append(qoi_lvl)
+    #
+    #     return x, qoi
 
 
     def build_models(self):
@@ -173,8 +173,8 @@ class State:
 
         self.iter_log["gp_training_time"] = t1 - t0
 
-    def reset_log(self):
-        self.iter_log.clear()
+    # def reset_log(self):
+    #     self.iter_log.clear()
 
 
     def get_best_sample(self, ctol=1e-4, fidelity=-1):

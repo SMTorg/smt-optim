@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from smtoptim.acquisition_functions import expected_improvement, vec_expected_improvement
+from smt_optim.acquisition_functions import expected_improvement, vec_expected_improvement
 
 
 class TestExpectedImprovement(unittest.TestCase):

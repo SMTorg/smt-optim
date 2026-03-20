@@ -4,8 +4,6 @@ class Problem:
     def __init__(self, obj_configs: list, design_space, cstr_configs: list = [], costs: list[float] | None = None) -> None:
 
 
-        self._validate_cstr(cstr_configs)
-
         self.num_dim = design_space.shape[0]
         self.num_obj = 0
         self.num_cstr = 0

@@ -4,7 +4,7 @@ import warnings
 import json
 
 # Adjust this import to your actual module
-from smtoptim.utils.json import json_safe
+from smt_optim.utils.json import json_safe
 
 
 class TestJsonSafe(unittest.TestCase):

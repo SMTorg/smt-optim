@@ -4,7 +4,7 @@ import numpy as np
 import scipy.optimize as so
 import scipy.stats as stats
 
-from smtoptim.utils.constraints import compute_rscv_sp
+from smt_optim.utils.constraints import compute_rscv_sp
 
 @dataclass
 class MultistartResult:

@@ -2,12 +2,12 @@ import unittest
 
 import numpy as np
 
-from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
+from smt_optim.core import Problem
+from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 
-from smtoptim.surrogate_models.smt import SmtAutoModel
+from smt_optim.surrogate_models.smt import SmtAutoModel
 
-from smtoptim.acquisition_strategies import MFSEGO
+from smt_optim.acquisition_strategies import MFSEGO
 
 
 def rosenbrock(x: np.ndarray) -> np.ndarray:

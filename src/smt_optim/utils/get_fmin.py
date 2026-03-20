@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from smtoptim.utils.constraints import compute_rscv
+from smt_optim.utils.constraints import compute_rscv
 
 
 def get_fmin(f: np.ndarray, c: np.ndarray | None = None, c_type: list[str] | None = None, rscv_tol: float = 0.0) -> float:

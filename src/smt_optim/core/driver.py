@@ -9,22 +9,20 @@ import copy
 
 import os
 
-from typing import Callable
+from typing import Callable, Type
 
 import pickle
 
-from smtoptim.core.state import State
-from smtoptim.surrogate_models import Surrogate
-from smtoptim.acquisition_strategies import AcquisitionStrategy
+from smt_optim.core.state import State
+from smt_optim.surrogate_models import Surrogate
+from smt_optim.acquisition_strategies import AcquisitionStrategy
 
-from smtoptim.core import Sample, OptimizationDataset, Evaluator
-from smtoptim.core import State
+from smt_optim.core import Sample, OptimizationDataset, Evaluator
+from smt_optim.core import State
 
-from smtoptim.utils.initial_design import generate_initial_design
-from smtoptim.utils.stop_criteria import check_stop_criteria
-from smtoptim.utils.logger import ConsoleLogger
-
-from smtoptim.utils.json import json_safe
+from smt_optim.utils.initial_design import generate_initial_design
+from smt_optim.utils.stop_criteria import check_stop_criteria
+from smt_optim.utils.logger import ConsoleLogger, JsonLogger
 
 
 def wrap_func(func: Callable, factor: float = 1, step: float = 0) -> Callable:
@@ -130,8 +128,8 @@ class ObjectiveConfig:
     """
 
     objective: list[Callable]
+    surrogate: type[Surrogate]
     type: str = "minimize"  # problem's type -> "minimize" or "maximize")
-    surrogate: Surrogate = None
     surrogate_kwargs: dict | None = None
 
 
@@ -177,15 +175,15 @@ class DriverConfig:
     xt_init: np.ndarray | None = (
         None  # initial training data [np.ndarray(nt, dim), np.ndarray(nt, dim)]
     )
-    results_dir: str | None = None  # name for the results directory
+    results_dir: str | None = "bo_result"  # name for the results directory
     verbose: bool = False  # True/False print each iteration informations
+    log_doe: bool = False
+    log_stats: bool = False
     callback_func: list[Callable] | Callable | None = (
         None  # additional method to call at the end of each iteration
     )
     scaling: bool = True  # standardize the training data
-    dynamic_costs: str | None = None  # use sampling time to update the costs
     seed: None = None
-    loggers: list | None = None
 
 
 class Driver:
@@ -201,8 +199,10 @@ class Driver:
         self.strategy_kwargs["seed"] = config.seed
         self.strategy = strategy(self.state, **self.strategy_kwargs)
 
-        if self.config.results_dir is not None:
-            config.results_dir = self.make_res_dir(self.config.results_dir)
+        if self.config.log_doe or self.config.log_stats:
+            self.config.results_dir = self.make_res_dir(self.config.results_dir)
+        else:
+            self.config.results_dir = None
 
         self.evaluator = Evaluator(problem, config.results_dir)
 
@@ -210,10 +210,8 @@ class Driver:
         self.loggers = []
         if self.config.verbose:
             self.loggers.append(ConsoleLogger(self.config))
-
-        if isinstance(self.config.loggers, list):
-            for logger in self.config.loggers:
-                self.loggers.append(logger(self.config))
+        if self.config.log_stats:
+            self.loggers.append(JsonLogger(self.config))
 
 
     def iteration(self, state):

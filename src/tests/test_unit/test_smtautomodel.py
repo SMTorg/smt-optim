@@ -3,10 +3,10 @@ import unittest
 import numpy as np
 import scipy.stats as stats
 
-from smtoptim.core import Problem
-from smtoptim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
+from smt_optim.core import Problem
+from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 
-from smtoptim.surrogate_models.smt import SmtAutoModel
+from smt_optim.surrogate_models.smt import SmtAutoModel
 
 def rosenbrock(x: np.ndarray) -> np.ndarray:
 

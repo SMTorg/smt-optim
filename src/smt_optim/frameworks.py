@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Any, Callable, List, Optional, Union
 
-from smtoptim.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
-from smtoptim.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
-from smtoptim.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFSEGO, MFEI, VFPI
+from smt_optim.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
+from smt_optim.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
+from smt_optim.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFSEGO, MFEI, VFPI
 
 
 def run_optimizer(
