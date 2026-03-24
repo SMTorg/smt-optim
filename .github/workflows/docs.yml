@@ -26,6 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r docs/requirements.txt
+          pip install -e .
 
       - name: Install pandoc
         run: sudo apt-get update && sudo apt-get install -y pandoc
