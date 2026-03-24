@@ -11,8 +11,6 @@ The SMT Optimization package offers a collection of surrogate-based optimization
 |-----------|------------------------|----------------------|----------------|------------------------------------------------------------------------------------------|
 | SEGO      | Yes                    | Yes                  | No             | [https://doi.org/10.1080/03052150211751](https://doi.org/10.1080/03052150211751)         |
 | MFSEGO    | Yes                    | Yes                  | Yes            | [https://doi.org/10.2514/6.2019-3236](https://doi.org/10.2514/6.2019-3236)               |
-| VF-EI     | Yes                    | No                   | Yes            | [https://doi.org/10.1007/s00158-018-1971-x](https://doi.org/10.1007/s00158-018-1971-x)   |
-| VF-PI     | Yes                    | No                   | Yes            | [https://doi.org/10.1007/s00158-020-02646-9](https://doi.org/10.1007/s00158-020-02646-9) |
 
 
 
@@ -41,7 +39,7 @@ pip install -e .
 ```
 
 ### Usage
-See usage examples in the `smt-optim/examples/` directory.
+See usage examples in the `examples/` directory.
 
 
 ## Please cite us when using SMT Optimization

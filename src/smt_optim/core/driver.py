@@ -167,6 +167,39 @@ class ConstraintConfig:
 
 @dataclass
 class DriverConfig:
+    """
+    Optimization driver configuration
+
+    Attributes
+    ----------
+    max_iter: int
+        Maximum number of iteration
+    max_budget: float, default=inf
+        Maximum budget before termination of the optimization process
+    max_time: float, default=inf
+        Maximum time before termination of the optimization process
+    nt_init: int
+        Number of samples in the initial DoE
+    xt_init: list[np.ndarray]
+        Initial DoE to use. The Numpy array must be of shape (num_sample, num_dimension).
+        By providing an initial DoE, the driver will not generate an initial DoE. Cannot be
+        used with `nt_init`
+    results_dir: str or None, default=None
+        Name of the logging directory
+    verbose: bool, default=False
+        Print optimization information.
+    log_doe: bool, default=False
+        Log the value of the function values as soon as they are sampled. The values are
+        stored in a .csv file.
+    log_stats: bool, default=False
+        Log optimization statistics at the end of each iteration. The stats are store in
+        a .jsonl file.
+    scaling: bool, default=True
+        Scale the data. The objective is standardized. The constraints are divided by
+        their standard deviation. The design variables are normalized between 0 and 1.
+    seed: default=None
+        Seed for experiment reproducibility
+    """
     ctol: float = 1e-4  # tolerance for all constraints
     max_iter: int | None = None  # max number of BO iterations
     max_budget: float = float("inf")  # max BO budget
@@ -215,6 +248,24 @@ class Driver:
 
 
     def iteration(self, state):
+        """
+        Perform an optimization iteration. An iteration consists of:
+        - scaling all the training data
+        - building the surrogate models
+        - acquiring points to sample (and their associated fidelity level)
+        - sampling the expensive-to-evaluate functions
+
+        Attributes
+        ----------
+        state: State
+            Optimization state on which to perform an iteration.
+
+        Returns
+        -------
+        State
+            Return optimization state on which an iteration was performed.
+
+        """
         state.iter += 1
 
         # scale data
@@ -246,6 +297,18 @@ class Driver:
         return state
 
     def optimize(self):
+        """
+        Perform the optimization process which consists of:
+        - generating a DoE if the initial dataset is empty
+        - while no termination criteria is met, perform iterations
+
+
+        Returns
+        -------
+        State
+            optimization state on which the optimization process was performed.
+
+        """
 
         # generate initial design
         if len(self.state.dataset.samples) == 0:
