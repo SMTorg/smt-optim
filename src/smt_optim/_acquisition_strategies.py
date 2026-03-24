@@ -5,11 +5,11 @@ from warnings import warn
 
 from abc import ABC, abstractmethod
 
-# from boma.optimizer import Optimizer
-from smtoptim.surrogate_models import Surrogate, SmtMFK
-from smtoptim.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
+# from boma.optimizer import Driver
+from smt_optim.surrogate_models import Surrogate, SmtMFK
+from smt_optim.acquisition_functions import expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
 
-from smtoptim.suboptimizers.orthomads import orthomads
+from smt_optim.suboptimizers.orthomads import orthomads
 
 
 # TODO: acquisition strategy class template

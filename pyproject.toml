@@ -23,7 +23,7 @@ dependencies = [
     "smt",
 ]
 
-license = "LicenseRef-My-Custom-License"
+license = "Apache-2.0"
 license-files = ["LICEN[CS]E*"]
 
 [project.optional-dependencies]
@@ -32,5 +32,5 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/oihanc/boma"
-Issues = "https://github.com/oihanc/boma/issues"
+Homepage = "https://github.com/SMTorg/smt-optim"
+Issues = "https://github.com/SMTorg/smt-optim/issues"
