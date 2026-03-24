@@ -10,17 +10,54 @@ from smt_optim.utils.constraints import compute_rscv
 
 
 class State:
+    """
+    State of the optimization process at a given moment.
+
+    The optimization state holds information about the optimization process at a given moment.
+
+    Parameters
+    ----------
+    problem: Problem
+        The problem to be optimized.
+
+    Attributes
+    ----------
+    problem: Problem
+        The problem to be optimized.
+    iter: int
+        Current iteration number.
+    budget: float
+        Current used budget.
+    bo_start: float
+        Start time of the optimization problem
+    bo_time: float
+        Elapsed time of the optimization driver.
+    obj_models: list[Surrogate]
+        List containing the surrogate modeling the objective(s) function(s).
+    cstr_models: list[Surrogate]
+        List containing the surrogate modeling the constraint(s) function(s).
+    cstr_types: list[str]
+        List containing the constraint types.
+    dataset: OptimizationDataset
+        The dataset containing all samples from the expensive-to-evaluate functions.
+    scaled_dataset: OptimizationDataset
+        The scaled dataset.
+    iter_log: dict
+        Dictionary containing logging data.
+
+    Methods
+    -------
+    scale_dataset(unit_std: bool)
+        Scale data in the dataset. The scaled dataset is accessible using the `scaled_dataset`attribute.
+    build_models()
+        Builds the surrogate models based on the scale dataset.
+    get_best_sample()
+        Returns the best sample in the dataset.
+    """
 
     def __init__(self, problem):
 
         self.problem = problem
-
-        # self.num_dim: int = problem.num_dim
-        # self.num_obj: int = problem.num_obj
-        # self.num_cstr: int = problem.num_cstr
-        # self.num_fidelity: int = problem.num_fidelity
-
-        # self.design_space = problem.design_space
 
         self.iter = 0
         self.budget = 0
@@ -45,7 +82,18 @@ class State:
 
 
     def scale_dataset(self, unit_std: bool = False):
+        """
+        Scales the dataset.
 
+        Parameters
+        ----------
+        unit_std : bool, optional
+            If True, normalize by standard deviation.
+
+        Returns
+        -------
+        None
+        """
         num_qoi = self.problem.num_obj + self.problem.num_cstr
         qoi_factor = [np.empty(num_qoi)] * self.problem.num_fidelity
         qoi_step = [np.empty(num_qoi)] * self.problem.num_fidelity
@@ -112,31 +160,14 @@ class State:
             self.scaled_dataset.add(scaled_sample)
 
 
-    # def group_by_fidelity(self) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    #
-    #     x = []
-    #     qoi = []
-    #
-    #     for lvl in range(self.problem.num_fidelity):
-    #
-    #         samples = self.scaled_dataset.get_by_fidelity(lvl)
-    #
-    #         x_lvl = np.empty((len(samples), self.problem.num_dim))
-    #         qoi_lvl = np.empty((len(samples), self.problem.num_obj + self.problem.num_cstr))
-    #
-    #         for idx, sample in enumerate(samples):
-    #             x_lvl[idx, :] = sample.x
-    #             qoi_lvl[idx, :self.problem.num_obj] = sample.obj
-    #             qoi_lvl[idx, self.problem.num_obj:] = sample.cstr
-    #
-    #         x.append(x_lvl)
-    #         qoi.append(qoi_lvl)
-    #
-    #     return x, qoi
-
-
     def build_models(self):
+        """
+        Builds the surrogate models.
 
+        Returns
+        -------
+        None
+        """
 
         data = self.scaled_dataset.export_as_dict()
 
@@ -178,7 +209,21 @@ class State:
 
 
     def get_best_sample(self, ctol=1e-4, fidelity=-1):
+        """
+        Returns the best sample based on the objective function value.
 
+        Parameters
+        ----------
+        ctol : float, optional
+            Tolerance for constraint violation. Default is 1e-4.
+        fidelity : int, optional
+            Fidelity level to consider. If -1, uses the highest fidelity. Default is -1.
+
+        Returns
+        -------
+        sample : Sample
+            The best sample based on the objective function value.
+        """
         if fidelity == -1:
             fidelity = self.problem.num_fidelity-1
 
@@ -210,5 +255,4 @@ class State:
                         best_sample = s
 
         return best_sample
-
 
