@@ -32,7 +32,7 @@ jobs:
 
       - name: Generate API docs
         run: |
-          sphinx-apidoc -o docs/source/api src/your_package
+          sphinx-apidoc -o docs/source/api src/smt_optim
 
       - name: Build Sphinx docs
         run: |
