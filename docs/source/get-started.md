@@ -1,10 +1,9 @@
-===============
-Getting started
-===============
 
-Installation
-============
-**Prerequisites**
+# Get started
+
+
+## Installation
+### Prerequisites
 
 The `smt-optim` package requires the following package to be installed in your Python environment:
 
@@ -12,7 +11,7 @@ The `smt-optim` package requires the following package to be installed in your P
 - SciPy
 - SMT
 
-**Installation**
+### Installation
 
 1. Clone the `smt-optim` repo.
 
@@ -24,12 +23,10 @@ The `smt-optim` package requires the following package to be installed in your P
 
 ``pip install -e .``
 
-Usage
-=====
-**Quickstart**
+## Usage
+### Quickstart
 *TODO: add quickstart example here*
 
 
-**Examples**
-
+# Examples
 See usage examples in the `tutorial` directory.
