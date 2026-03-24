@@ -1,0 +1,4 @@
+sphinx
+nbsphinx
+sphinx-collections
+pydata-sphinx-theme
