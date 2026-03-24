@@ -2,3 +2,4 @@ sphinx
 nbsphinx
 sphinx-collections
 pydata-sphinx-theme
+myst-parser

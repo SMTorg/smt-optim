@@ -8,4 +8,9 @@ from .driver import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 __all__ = ["ObjectiveConfig",
            "ConstraintConfig",
            "DriverConfig",
-           "Driver", ]
+           "Driver",
+           "Problem",
+           "Sample",
+           "OptimizationDataset",
+           "Evaluator",
+           "State",]

@@ -255,7 +255,7 @@ class Driver:
         - acquiring points to sample (and their associated fidelity level)
         - sampling the expensive-to-evaluate functions
 
-        Attributes
+        Parameters
         ----------
         state: State
             Optimization state on which to perform an iteration.
