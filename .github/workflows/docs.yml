@@ -27,6 +27,9 @@ jobs:
         run: |
           pip install -r docs/requirements.txt
 
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
       - name: Build Sphinx docs
         run: |
           sphinx-build -b html source _build/html
