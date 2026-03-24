@@ -30,6 +30,10 @@ jobs:
       - name: Install pandoc
         run: sudo apt-get update && sudo apt-get install -y pandoc
 
+      - name: Generate API docs
+        run: |
+          sphinx-apidoc -o docs/source/api src/your_package
+
       - name: Build Sphinx docs
         run: |
           sphinx-build -b html source _build/html
