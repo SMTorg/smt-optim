@@ -1,6 +1,32 @@
 
 
 class Problem:
+    """
+    Problem configuration
+
+    Attributes
+    ----------
+        num_dim : int
+            Number of dimensions.
+        num_obj : int
+            Number of objectives.
+        num_cstr : int
+            Number of constraints.
+        num_fidelity : int
+            Number of fidelities.
+        design_space : np.ndarray
+            Problem design space.
+        costs : list
+            Fidelity level costs.
+        obj_configs : list
+            Objective configurations.
+        obj_funcs : list
+            Objective functions.
+        cstr_configs : list
+            Constraint configurations.
+        cstr_funcs : list
+            Constraint functions.
+    """
     def __init__(self, obj_configs: list, design_space, cstr_configs: list = [], costs: list[float] | None = None) -> None:
 
 

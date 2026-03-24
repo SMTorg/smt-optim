@@ -10,6 +10,22 @@ import numpy as np
 
 @dataclass
 class Sample:
+    """
+    Store sample data.
+
+    Attributes
+    ----------
+    x : np.ndarray
+        Variable
+    obj : np.ndarray
+        Objective value(s). Array dimension: (num_obj,)
+    cstr : np.ndarray
+        Contraint value(s). Array dimension: (num_cstr,)
+    eval_time : np.ndarray
+        Evaluation times of each QoI. Array dimension: (num_obj+num_cstr,)
+    metadata : dict
+        Dictionary with sample metadata such as iter, budget and fidelity.
+    """
     x: np.ndarray                  # (num_dim,)
     fidelity: int
 
@@ -34,6 +50,23 @@ class Sample:
 
 
 class OptimizationDataset:
+    """
+    Store samples.
+
+    Attributes
+    ----------
+    samples : list[Sample]
+    num_obj: int
+        Number of objectives
+    num_cstr: int
+        Number of constraints
+    num_fidelity: int
+        Number of fidelity levels
+    fidelities: list
+        Fidelity levels sorted in increasing order.
+    num_samples: dict
+        Number of samples for each fidelity levels.
+    """
     def __init__(self):
         self.samples: list[Sample] = []
 
@@ -92,6 +125,14 @@ class OptimizationDataset:
 
 
     def export_as_dict(self) -> dict:
+        """
+        Exports the samples data as a dictionary. Each `attribute` corresponds to a key in the dictionary.
+
+        Returns
+        -------
+        dict
+            Dictionary containing all sample data.
+        """
 
         num_sample = len(self.samples)
         fidelity = np.empty((num_sample, 1))
@@ -121,7 +162,25 @@ class OptimizationDataset:
 
 
 def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
+    """
+    Evaluates the function `func` value evaluated at `x_new`. Returns the function value and the elapsed time.
+    If the function output is of type `np.ndarray`, converts it to a float.
 
+    Parameters
+    ----------
+    x_new: np.ndarry
+        Point to sample.
+    func
+        Function to sample.
+
+    Returns
+    -------
+    float
+        Function value at `x_new`.
+    float
+        Elapsed time for sampling the function.
+
+    """
     t0 = time.perf_counter()
 
     output = func(x_new)
@@ -144,13 +203,37 @@ def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
 
 
 class Evaluator:
+    """
+    Evaluate the expensive-to-evaluate functions.
+
+    Attributes
+    ----------
+    problem: Problem
+        Optimization problem.
+    res_path: str
+        Logging directory path.
+
+    """
     def __init__(self, problem, res_path: str | None = None):
         self.problem = problem
         self.res_path = res_path
 
 
-    def sample_func(self, infill: list[np.ndarray | None], state):
+    def sample_func(self, infill: list[np.ndarray | None], state) -> None:
+        """
+        Sample the problem functions at requested query points.
 
+        Parameters
+        ----------
+        infill: list[np.ndarray | None]
+            Query points. Each np.ndarray in the list corresponds to a fidelity level. The np.ndarray must have the
+            shape (num_points, num_dim).
+        state: State
+            Optimization state.
+        Returns
+        -------
+        None
+        """
         for lvl, x_lvl in enumerate(infill):
 
             if x_lvl is None:
@@ -190,8 +273,19 @@ class Evaluator:
                     if self.res_path is not None:
                         self.log_sample(sample)
 
-    def log_sample(self, sample):
+    def log_sample(self, sample) -> None:
+        """
+        Log the sample data.
 
+        Parameters
+        ----------
+        sample: Sample
+            The sample to log.
+
+        Returns
+        -------
+        None
+        """
         try:
             row = dict()
 
@@ -227,7 +321,4 @@ class Evaluator:
 
         except Exception as e:
             print(f"Error while saving the DoE: {e}")
-
-
-
 
