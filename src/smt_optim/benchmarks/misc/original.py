@@ -1,5 +1,5 @@
 import numpy as np
-from .base import BenchmarkProblem
+from smt_optim.benchmarks.base import BenchmarkProblem
 
 
 def branin_forrester(x):

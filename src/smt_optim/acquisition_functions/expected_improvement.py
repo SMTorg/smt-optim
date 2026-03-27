@@ -5,6 +5,23 @@ import copy
 
 
 def expected_improvement(mu: float, s2: float, f_min: float) -> float:
+    """
+    Expected Improvement acquisition function.
+
+    Parameters
+    ----------
+    mu: float
+        Mean prediction.
+    s2: float
+        Variance prediction.
+    f_min: float
+        Best minimum objective value in training data.
+
+    Returns
+    -------
+    float
+        Expected Improvement value.
+    """
 
     if s2 > 0:
         s = np.sqrt(s2)
@@ -15,19 +32,21 @@ def expected_improvement(mu: float, s2: float, f_min: float) -> float:
 
 def vec_expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     """
-    Expected Improvement acquisition function.
+    Vectorized Expected Improvement acquisition function.
 
-    :param mu: Mean prediction.
-    :type mu: np.ndarray
+    Parameters
+    ----------
+    mu: np.ndarray
+        Mean prediction of shape (num_points, 1).
+    s2: np.ndarray
+        Variance prediction of shape (num_points, 1).
+    f_min: float
+        Best minimum objective value in training data.
 
-    :param s2: Variance prediction.
-    :type s2: np.ndarray
-
-    :param f_min: Best minimum objective value in training data.
-    :type f_min: np.ndarray
-
-    :return: The EI acquisition function value.
-    :rtype: np.ndarray
+    Returns
+    -------
+    np.ndarray
+        Expected Improvement values of shape (num_points, 1).
     """
 
     mask_s = s2 > 0
@@ -46,22 +65,24 @@ def vec_expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np
 # ------- LOG EXPECTED IMPROVEMENT -------
 def log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     """
-    Log Expected Improvement acquisition function. More numerically stable that the EI acquisition function especially
-    when the GP's variance is small. From: https://arxiv.org/abs/2310.20708.
+    Vectorized Log Expected Improvement acquisition function.
 
-    :param mu: Mean prediction.
-    :type mu: np.ndarray
+    LogEI is more numerically stable that the EI acquisition function especially when the GP's variance is small.
+    From: https://arxiv.org/abs/2310.20708.
 
-    :param s2: Variance prediction.
-    :type s2: np.ndarray
+    Parameters
+    ----------
+    mu: np.ndarray
+        Mean prediction of shape (num_points, 1).
+    s2: np.ndarray
+        Variance prediction of shape (num_points, 1).
+    f_min: float
+        Best minimum objective value in training data.
 
-    :param f_min: Best minimum objective value in training data.
-    :type f_min: np.ndarray
-
-    :return: The log EI acquisition function value.
-    :rtype: np.ndarray
+    Returns
+    -------
+    np.ndarray
     """
-
     s = np.sqrt(s2)
 
     c1 = np.log(2*np.pi)/2
@@ -93,6 +114,7 @@ def log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     log_ei[not_mask_s] = -np.inf
 
     return log_ei
+
 
 def log1mexp(z: np.ndarray) -> np.ndarray:
 

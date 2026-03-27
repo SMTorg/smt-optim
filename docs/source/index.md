@@ -1,10 +1,5 @@
 # smt-optim
 
-```{danger}
-`smt-optim` is currently in early development. The codebase is subject to change, and
-stability and performance cannot yet be guaranteed.
-```
-
 ## Introduction
 `smt-optim` is an open-source python package for Bayesian Optimization. It is well suited for solving
 expensive-to-evaluate blackbox problem with little exploitable properties such as derivatives. It can handle
