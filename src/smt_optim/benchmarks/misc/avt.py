@@ -1,5 +1,5 @@
 import numpy as np
-from .base import BenchmarkProblem
+from smt_optim.benchmarks.base import BenchmarkProblem
 
 
 # rhs for first-order system of ODEs in spring-mass system
