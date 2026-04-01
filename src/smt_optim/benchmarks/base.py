@@ -27,7 +27,7 @@ class BenchmarkProblem(ABC):
     def set_dim(self, dim):
         if "n_variable" in self.tags:
             self.num_dim = dim
-            self.bounds = self.bounds[-1, :].reshape(1, self.num_dim)
+            self.bounds = self.bounds[-1, :].reshape(1, 2)
             self.bounds = self.bounds.repeat(dim, axis=0)
         else:
             raise Exception("Not a variable dimension problem.")
