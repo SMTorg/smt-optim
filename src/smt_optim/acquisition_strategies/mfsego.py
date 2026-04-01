@@ -73,7 +73,8 @@ class MFSEGO(AcquisitionStrategy):
 
         acq_data = dict()
 
-        y = acq_context.dataset.export_data([0], acq_context.problem.num_fidelity-1)
+        # TODO: correct .dataset -> .scaled_dataset
+        y = acq_context.scaled_dataset.export_data([0], acq_context.problem.num_fidelity-1)
 
         if acq_context.problem.num_cstr > 0:
             indices = [idx for idx in range(acq_context.problem.num_obj, acq_context.problem.num_obj+acq_context.problem.num_cstr)]
