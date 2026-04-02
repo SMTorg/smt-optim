@@ -1,4 +1,4 @@
-from .expected_improvement import expected_improvement, vec_expected_improvement, log_ei, probability_of_improvement
+from .expected_improvement import expected_improvement, vec_expected_improvement, log_ei, probability_of_improvement, fidelity_correlation
 
 
 __all__ = [
@@ -6,4 +6,5 @@ __all__ = [
     "vec_expected_improvement",
     "log_ei",
     "probability_of_improvement",
+    "fidelity_correlation",
 ]

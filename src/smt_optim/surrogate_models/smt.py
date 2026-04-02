@@ -370,7 +370,7 @@ class SmtMFCK(Surrogate):
             raise Exception("Fidelity covariances not implemented for MFCK with noise.")
 
         if lvlj is None:
-            lvlj = self.lvl - 1
+            lvlj = self.model.lvl - 1
 
         self.model.K = self.model.compute_blockwise_K(self.model.X_norma_all, self.model.X_norma_all, self.model.optimal_theta)
         L = np.linalg.cholesky(
