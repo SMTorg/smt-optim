@@ -38,8 +38,6 @@ class TestSmtAutoModel(unittest.TestCase):
         model = SmtAutoModel()
         model.train([xt], [yt.reshape(-1, 1)])
 
-        # check hyper_opt
-
 
 if __name__ == "__main__":
     unittest.main()
