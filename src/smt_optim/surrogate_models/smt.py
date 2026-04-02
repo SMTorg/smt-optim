@@ -3,6 +3,8 @@ import warnings
 
 import numpy as np
 
+from scipy.linalg import solve_triangular
+
 from smt.surrogate_models import KRG
 from smt.applications import MFK, MFCK
 
@@ -162,6 +164,7 @@ class SmtAutoModel(Surrogate):
     def __init__(self):
         super().__init__()
         self.model = None
+        self.train_counter = 0
         pass
 
     def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
@@ -177,15 +180,16 @@ class SmtAutoModel(Surrogate):
         num_fidelity = len(xt)
 
         if num_fidelity == 1:
-            self.model = KRG(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=42)
+            self.model = KRG(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=self.train_counter)
         else:
-            self.model = MFK(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=42)
+            self.model = MFK(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=self.train_counter)
 
             for lvl in range(num_fidelity-1):
                 self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
 
         self.model.set_training_values(xt[-1], yt[-1])
         self.model.train()
+        self.train_counter += 1
 
     def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
         y_pred = self.model.predict_values(x_pred)
@@ -306,63 +310,102 @@ class SmtAutoModel(Surrogate):
 #
 #         return s2_red, tot_rho2
 
-# class SmtMFCK(Surrogate):
-#
-#     def __init__(self, optimizer=None, name=None):
-#
-#         self.optimizer = optimizer
-#
-#         self.name = name
-#
-#         self.num_dim = 0
-#         self.num_levels = 0
-#         self.costs = []
-#         self.mfck = None
-#         self.mfck_initialized = False
-#
-#         if optimizer is not None:
-#             self._init_smt(optimizer)
-#
-#     def _init_smt(self, optimizer):
-#
-#         self.num_dim = optimizer.num_dim
-#         self.num_levels = optimizer.num_fidelity
-#         self.costs = optimizer.costs
-#
-#         self.n_start = 3*optimizer.num_dim
-#
-#         self.mfck = MFCK(print_global=False,
-#                          n_start=self.n_start,
-#                          hyper_opt="Cobyla",
-#                          random_state=None)
-#
-#         self.mfck.options["lambda"] = 0.0
-#
-#         self.mfck_initialized = True
-#
-#     def train(self, xt: list, yt: list, **kwargs):
-#
-#         if not self.mfck_initialized:
-#             raise Exception("MFK must be initialized before training.")
-#
-#         self.xt = xt
-#         self.yt = yt
-#
-#         for k in range(self.num_levels-1):
-#             self.mfck.set_training_values(self.xt[k], self.yt[k], name=k)
-#
-#         self.mfck.set_training_values(self.xt[-1], self.yt[-1])
-#
-#         self.mfck.train()
-#
-#         # self.previous_theta = np.array(self.mfk.optimal_theta).reshape(self.num_levels, self.dim)
-#
-#         # if self.name: self.optimizer.iter_data[f"{self.name}_opt_theta"] = self.previous_theta
-#
-#     def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
-#         y_pred = self.mfck.predict_values(x_pred)
-#         return y_pred
-#
-#     def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
-#         s2_pred = self.mfck.predict_variances(x_pred)
-#         return s2_pred
+class SmtMFCK(Surrogate):
+
+    def __init__(self):
+        super().__init__()
+        self.model = None
+        self.train_counter = 0
+
+    def train(self, xt: list, yt: list, **kwargs):
+
+        num_dim = xt[-1].shape[1]
+        num_fidelity = len(xt)
+
+        self.model = MFCK(print_global=False, n_start=3 * num_dim, hyper_opt="Cobyla", seed=42+self.train_counter)
+
+        for k in range(num_fidelity-1):
+            self.model.set_training_values(xt[k], yt[k], name=k)
+
+        self.model.set_training_values(xt[-1], yt[-1])
+
+        self.model.train()
+        self.train_counter += 1
+
+        # self.previous_theta = np.array(self.mfk.optimal_theta).reshape(self.num_levels, self.dim)
+
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
+        y_pred = self.model.predict_values(x_pred)
+        return y_pred
+
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
+        s2_pred = self.model.predict_variances(x_pred)
+        return s2_pred.reshape(-1, 1)   # makes variance shape consistent with value prediction
+
+    def predict_level_covariances(self, x: np.ndarray, lvli: int, lvlj: int = None):
+        """
+        Compute the covariance between two fidelity levels at location x.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Array with the inputs for make the prediction.
+        lvli : int
+            First fidelity level.
+        lvlj : int
+            Second fidelity level. If not specified, will be set to the highest fidelity level.
+        Returns
+        -------
+        covariances: np.array
+            Returns the posterior covariance.
+        """
+
+        x = (x - self.model.X_offset) / self.model.X_scale
+
+        if self.model.lvl == 1:
+            raise Exception("Fidelity covariances prediction is only for MFCK with multiple fidelity levels.")
+
+        if self.model.options["eval_noise"]:
+            # TODO
+            raise Exception("Fidelity covariances not implemented for MFCK with noise.")
+
+        if lvlj is None:
+            lvlj = self.model.lvl - 1
+
+        self.model.K = self.model.compute_blockwise_K(self.model.X_norma_all, self.model.X_norma_all, self.model.optimal_theta)
+        L = np.linalg.cholesky(
+            self.model.K + self.model.options["nugget"] * np.eye(self.model.K.shape[0])
+        )
+
+        l_max = max(lvli, lvlj)
+        l_min = min(lvli, lvlj)
+        k_xx = self.model.compute_cross_K(x, x, l_max, l_min, self.model.optimal_theta)
+
+        k_xX_i = []
+        k_xX_j = []
+
+        for lvl in range(self.model.lvl):
+
+            li_max = max(lvli, lvl)
+            li_min = min(lvli, lvl)
+
+            k_xX_i.append(
+                self.model.compute_cross_K(
+                    self.model.X_norma_all[lvl], x, li_max, li_min, self.model.optimal_theta
+                ))
+
+            lj_max = max(lvlj, lvl)
+            lj_min = min(lvlj, lvl)
+
+            k_xX_j.append(
+                self.model.compute_cross_K(
+                    self.model.X_norma_all[lvl], x, lj_max, lj_min, self.model.optimal_theta
+                ))
+
+        beta_i = solve_triangular(L, np.vstack(k_xX_i), lower=True)
+        beta_j = solve_triangular(L, np.vstack(k_xX_j), lower=True)
+
+        covariances = k_xx - np.dot(beta_j.T, beta_i)
+        covariances = np.diag(covariances) # * self.model.y_std**2
+
+        return covariances.reshape(-1, 1)
