@@ -17,7 +17,7 @@ class ConsoleLogger:
     def __init__(self, config):
         self.config = config
 
-        self.headers = ["iter", "budget", "fmin", "fidelity", "gp_time", "acq_time"]
+        self.headers = ["iter", "budget", "fmin", "rscv", "fidelity", "gp_time", "acq_time"]
         width = 14
         self.widths = [max(len(h), width) for h in self.headers]
 
@@ -28,6 +28,7 @@ class ConsoleLogger:
             "iter": ".0f",
             "budget": ".3f",
             "fmin": ".5e",
+            "rscv": ".3e",
             "fidelity": ".0f",
             "gp_time": ".3f",
             "acq_time": ".3f",
@@ -48,6 +49,7 @@ class ConsoleLogger:
             "iter": state.iter,
             "budget": state.budget,
             "fmin": sample.obj[0],
+            "rscv": sample.metadata["rscv"],
             "fidelity": state.iter_log["fidelity"],
             "gp_time": state.iter_log["gp_training_time"],
             "acq_time": state.iter_log["acq_opt_time"],

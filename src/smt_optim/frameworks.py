@@ -1,74 +1,29 @@
 import numpy as np
 from typing import Any, Callable, List, Optional, Union
 
-from smt_optim.optimizer import Optimizer, ObjectiveConfig, ConstraintConfig, OptimizerConfig
-from smt_optim.surrogate_models import Surrogate, SmtKRG, SmtMFK, SmtMFCK
-from smt_optim.acquisition_strategies import MonoFiAcqStrat, MultiFiAcqStrat, MFSEGO, MFEI, VFPI
-
-
-def run_optimizer(
-        objective,
-        domain,
-        surrogate,
-        strategy,
-        costs,
-        constraints: list = [],
-        max_iter: int = None,
-        optimizer_kwargs: dict = None,
-        strategy_kwargs: dict = None
-) -> tuple[dict, Optimizer]:
-
-    obj_config = ObjectiveConfig(
-        objective=objective,
-        domain=domain,
-        type="minimize",
-        surrogate=surrogate,
-        costs=costs,
-    )
-
-    cstr_config = [
-        ConstraintConfig(
-            constraint=c_funcs,
-            type="less",
-            tol=1e-4,
-            surrogate=surrogate,
-        )
-        for c_funcs in constraints
-    ]
-
-    optim_config = OptimizerConfig(
-        constraints=cstr_config,
-        max_iter=max_iter,
-        verbose=True,
-    )
-
-    if optimizer_kwargs:
-        for key, value in optimizer_kwargs.items():
-            setattr(optim_config, key, value)
-
-    optimizer = Optimizer(obj_config, optim_config, strategy, strategy_kwargs)
-
-    opt_data = optimizer.optimize()
-
-    return opt_data, optimizer
+from smt_optim.core import Driver, ObjectiveConfig, ConstraintConfig, DriverConfig, Problem, State
+from smt_optim.surrogate_models import SmtAutoModel,  SmtMFCK
+from smt_optim.acquisition_strategies import MFSEGO, VFPI
 
 
 def minimize(
-        objective,
-        domain,
-        costs,
+        objective: list[Callable],
+        design_space: np.ndarray,
         method: str,
-        max_iter: int = np.inf,
+        costs: list = [1],
+        max_iter: int = 100,
+        max_budget: int = np.inf,
         constraints: list = [],
-        optimizer_kwargs: dict = None,
-        strategy_kwargs: dict = None
-):
+        # driver_kwargs: dict = {},
+        strategy_kwargs: dict = {},
+        verbose: bool = True,
+) -> State:
 
     methods = {
-        "sego": dict(surrogate=SmtKRG, strategy=MFSEGO, costs=[1]),
-        "mfsego": dict(surrogate=SmtMFK, strategy=MFSEGO),
+        "ego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
+        "sego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
+        "mfsego": dict(surrogate=SmtAutoModel, strategy=MFSEGO),
         "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
-        "mfei": dict(surrogate=SmtMFCK, strategy=MFEI),
     }
 
     config = methods[method]
@@ -76,14 +31,47 @@ def minimize(
     strategy = config["strategy"]
     costs = costs or config["costs", [1]]
 
-    return run_optimizer(
-        objective=objective,
-        domain=domain,
+
+    # ------- setup objective configuration -------
+    obj_config = ObjectiveConfig(
+        objective,
+        type="minimize",
         surrogate=surrogate,
-        strategy=strategy,
-        costs=costs,
-        constraints=constraints,
-        max_iter=max_iter,
-        optimizer_kwargs=optimizer_kwargs,
-        strategy_kwargs=strategy_kwargs,
     )
+
+    # ------- setup constraint configurations -------
+    cstr_configs = []
+    for c_dict in constraints:
+        cstr_configs.append(
+            ConstraintConfig(
+                c_dict["fun"],
+                equal = c_dict["equal"] if c_dict.get("equal", None) is not None else None,
+                lower = c_dict["lower"] if c_dict.get("lower", None) is not None else None,
+                upper = c_dict["upper"] if c_dict.get("upper", None) is not None else None,
+                surrogate=surrogate,
+            )
+        )
+
+    # ------- problem configuration -------
+    problem = Problem(
+        obj_configs=[obj_config],
+        design_space=design_space,
+        costs=costs,  # Set the cost of sampling each level
+        cstr_configs=cstr_configs,
+    )
+
+    # ------- driver configuration -------
+    driver_config = DriverConfig(
+        max_iter=max_iter,
+        max_budget=max_budget,
+        nt_init=max(3, design_space.shape[0]),
+        verbose=verbose,
+        scaling=True,
+    )
+
+    # TODO: apply user defined driver_kwargs
+
+    # ------- start driver -------
+    driver = Driver(problem, driver_config, strategy, strategy_kwargs=strategy_kwargs)
+    state = driver.optimize()
+    return state

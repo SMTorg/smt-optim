@@ -27,29 +27,55 @@ import numpy as np
 
 
 # @overload
-def compute_rscv(c: np.ndarray, c_type: list[str] | None, g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+# def compute_rscv(c: np.ndarray, c_type: list[str] | None, g_tol: float = 0., h_tol: float = 0.) -> np.ndarray:
+#
+#     if c.shape[1] != len(c_type):
+#         raise Exception("Number of constraint types must correspond to number of constraints.")
+#
+#     scv = np.full_like(c, 0.0)     # Square Constraint Violation
+#
+#     for c_id in range(c.shape[1]):
+#
+#         if c_type[c_id] == "less":
+#             scv[:, c_id] = np.maximum(0, c[:, c_id])**2
+#         elif c_type[c_id] == "greater":
+#             scv[:, c_id] = np.minimum(0, c[:, c_id])**2
+#         elif c_type[c_id] == "equal":
+#             scv[:, c_id] = c[:, c_id]**2
+#         else:
+#             raise Exception(f"{c_type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'.")
+#
+#     rscv = np.sqrt(scv.sum(axis=1))
+#
+#     return rscv
 
-    if c.shape[1] != len(c_type):
-        raise Exception("Number of constraint types must correspond to number of constraints.")
 
-    scv = np.full_like(c, 0.0)     # Square Constraint Violation
 
-    for c_id in range(c.shape[1]):
+def compute_rscv(cstr_values: np.ndarray, cstr_configs: list) -> np.ndarray:
 
-        if c_type[c_id] == "less":
-            scv[:, c_id] = np.maximum(0, c[:, c_id])**2
-        elif c_type[c_id] == "greater":
-            scv[:, c_id] = np.minimum(0, c[:, c_id])**2
-        elif c_type[c_id] == "equal":
-            scv[:, c_id] = c[:, c_id]**2
+    # cstr_values of shape (num_data, num_cstr)
+    num_data = cstr_values.shape[0]
+
+    rscv = np.zeros(num_data)
+
+    for c_id, c_config in enumerate(cstr_configs):
+
+        if c_config.equal is not None:
+            unfeasible = cstr_values[:, c_id] != c_config.equal
+            rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.equal)**2
+
         else:
-            raise Exception(f"{c_type} is not a valid constraint type. It must be 'less', 'greater' or 'equal'.")
+            if c_config.lower is not None:
+                unfeasible = cstr_values[:, c_id] < c_config.lower
+                rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.lower)** 2
 
-    rscv = np.sqrt(scv.sum(axis=1))
+            if c_config.upper is not None:
+                unfeasible = cstr_values[:, c_id] > c_config.upper
+                rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.upper) ** 2
 
-    return rscv
+    return np.sqrt(rscv)
 
-
+# TODO: move to multistart.py
 def compute_rscv_sp(x: np.ndarray, cstr_list: list[dict]) -> float:
     """
     SciPy wrapper to compute the Root Squared Constraint Violation (RSCV).

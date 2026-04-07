@@ -147,11 +147,6 @@ class ConstraintConfig:
         List of constraint functions. Each callable must accept a decision
         variable vector ``x`` and return a scalar constraint value. The functions
         must be ordered in increasing level of fidelity.
-    type : {"less", "greater", "equal"}, default="minimize"
-        Specifies whether the feasible domain is defined when the constraint value
-        is less, greater or equal to the configuration value.
-    value: float, default=0
-        Specifies the value defining the feasible domain.
     surrogate : Surrogate or None, default=None
         Surrogate model used to approximate the constraint function.
     surrogate_kwargs : dict or None, default=None
@@ -159,8 +154,9 @@ class ConstraintConfig:
     """
 
     constraint: list[Callable]
-    type: str = "less"  # "less"-> g <= 0; "greater" -> g >= 0
-    value: float = 0  # g <= value (or g >= value if type is " greater")
+    lower: float = None
+    upper: float = None
+    equal: float = None
     surrogate: Surrogate = None
     surrogate_kwargs: dict | None = None
 
@@ -220,7 +216,7 @@ class DriverConfig:
 
 
 class Driver:
-    def __init__(self, problem, config, strategy, strategy_kwargs=dict()):
+    def __init__(self, problem, config, strategy, strategy_kwargs={}):
 
         self.problem = problem
         self.config = config
@@ -230,6 +226,7 @@ class Driver:
 
         self.strategy_kwargs = strategy_kwargs
         self.strategy_kwargs["seed"] = config.seed
+        # = {"seed": config.seed if config.seed is not None else None}
         self.strategy = strategy(self.state, **self.strategy_kwargs)
 
         if self.config.log_doe or self.config.log_stats:
@@ -310,9 +307,7 @@ class Driver:
 
         """
 
-        # generate initial design
-        if len(self.state.dataset.samples) == 0:
-            generate_initial_design(self.state, self.evaluator, self.config)
+        self.start_optim()
 
         # loop - check stop criteria
         while check_stop_criteria(self.state, self.config):
@@ -321,8 +316,11 @@ class Driver:
 
         return self.state
 
-    def finalize(self):
-        pass
+    def start_optim(self):
+        # generate initial design
+        if len(self.state.dataset.samples) == 0:
+            generate_initial_design(self.state, self.evaluator, self.config)
+
 
     def call_loggers(self, state):
         # if self.loggers is not None:

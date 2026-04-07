@@ -8,6 +8,8 @@ import os
 import numpy as np
 
 
+from smt_optim.utils.constraints import compute_rscv
+
 @dataclass
 class Sample:
     """
@@ -133,6 +135,7 @@ class OptimizationDataset:
         dict
             Dictionary containing all sample data.
         """
+        # TODO: add metadata to exported dict
 
         num_sample = len(self.samples)
         fidelity = np.empty((num_sample, 1))
@@ -142,6 +145,7 @@ class OptimizationDataset:
         xt = np.empty((num_sample, nvar))             # inputs
         yt = np.empty((num_sample, self.num_obj))     # objectives
         ct = np.empty((num_sample, self.num_cstr))    # constraints
+        rscv = np.empty(num_sample)    # constraints
 
         for idx, sample in enumerate(self.samples):
             fidelity[idx, 0] = sample.fidelity
@@ -149,6 +153,7 @@ class OptimizationDataset:
             xt[idx, :] = sample.x
             yt[idx, :] = sample.obj
             ct[idx, :] = sample.cstr
+            rscv[idx] = sample.metadata["rscv"]
 
         data = {
             "fidelity": fidelity,
@@ -156,6 +161,7 @@ class OptimizationDataset:
             "x": xt,
             "obj": yt,
             "cstr": ct,
+            "rscv": rscv,
         }
 
         return data
@@ -265,6 +271,7 @@ class Evaluator:
                             "iter": state.iter,
                             "budget": state.budget,
                             "fidelity": lvl,
+                            "rscv": compute_rscv(cstr_values.reshape(1, -1), state.problem.cstr_configs).item()
                         }
                     )
 
