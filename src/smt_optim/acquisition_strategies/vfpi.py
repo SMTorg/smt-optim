@@ -161,13 +161,16 @@ class VFPI(AcquisitionStrategy):
         x = x.reshape(1, -1)
 
         mu, s2 = state.obj_models[0].model.predict_all_levels(x)
-        cov = state.obj_models[0].predict_level_covariances(x, lvl)
 
         # probability of improvement
         pi = probability_of_improvement(mu[-1].reshape(-1, 1), s2[-1].reshape(-1, 1), self.f_min)
 
         # fidelity correlation penalty
-        corr = fidelity_correlation(cov, s2[lvl].reshape(-1, 1), s2[-1].reshape(-1, 1))
+        if state.problem.num_fidelity > 1:
+            cov = state.obj_models[0].predict_level_covariances(x, lvl)
+            corr = fidelity_correlation(cov, s2[lvl].reshape(-1, 1), s2[-1].reshape(-1, 1))
+        else:
+            corr = 1.0
 
         # cost ratio penalty
         cost_ratio = state.problem.costs[-1]/state.problem.costs[lvl]
@@ -181,11 +184,21 @@ class VFPI(AcquisitionStrategy):
         pof = 1.0
 
         for c_id in range(state.problem.num_cstr):
+            c_config = state.problem.cstr_configs[c_id]
             # g_pred = self.optimizer.cstr_surrogates[c_id].predict_values(x)
             # s2_pred = self.optimizer.cstr_surrogates[c_id].predict_variances(x)
 
             # TODO: add predict_all_levels() to mfck wrapper
             g_pred, s2_pred = state.cstr_models[c_id].model.predict_all_levels(x)
+
+            if c_config.equal is not None:
+                pof *= stats.norm.cdf((state.cstr_equal[c_id] - g_pred[lvl]) / np.sqrt(s2_pred[lvl].reshape(1, 1)))
+                pof *= stats.norm.cdf((g_pred[lvl] - state.cstr_equal[c_id]) / np.sqrt(s2_pred[lvl].reshape(1, 1)))
+            else:
+                if c_config.lower is not None:
+                    pof *= stats.norm.cdf((g_pred[lvl] - state.cstr_lower[c_id]) / np.sqrt(s2_pred[lvl].reshape(1, 1)))
+                if c_config.upper is not None:
+                    pof *= stats.norm.cdf((state.cstr_upper[c_id] - g_pred[lvl]) / np.sqrt(s2_pred[lvl].reshape(1, 1)))
 
             pof *= stats.norm.cdf(-g_pred[lvl] / np.sqrt(s2_pred[lvl].reshape(1, 1)))
 

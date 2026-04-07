@@ -12,4 +12,6 @@ _collections/tutorial/sego
 _collections/tutorial/mfsego
 _collections/tutorial/benchmarkproblems
 _collections/tutorial/logging
+_collections/tutorial/api
+_collections/tutorial/vfpi
 ```

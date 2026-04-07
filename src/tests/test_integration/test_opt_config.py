@@ -63,15 +63,13 @@ class TestOptimization(unittest.TestCase):
 
         cstr0_config = ConstraintConfig(
             constraint=two_cstrs.constraints[0],
-            type="less",
-            value=0.0,
+            upper=0.0,
             surrogate=SmtAutoModel,
         )
 
         cstr1_config = ConstraintConfig(
             constraint=two_cstrs.constraints[1],
-            type="less",
-            value=0.0,
+            upper=0.0,
             surrogate=SmtAutoModel,
         )
 

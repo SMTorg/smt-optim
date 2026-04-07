@@ -89,8 +89,7 @@ class TestOptimization(unittest.TestCase):
 
         cstr_config = ConstraintConfig(
             constraint=branin.constraints[0],
-            type="less",
-            value=0.0,
+            upper=0.0,
             surrogate=SmtAutoModel,
         )
 
@@ -141,8 +140,7 @@ class TestOptimization(unittest.TestCase):
 
             cstr_config = ConstraintConfig(
                 constraint=branin.constraints[0],
-                type="less",
-                value=0.0,
+                upper=0.0,
                 surrogate=SmtAutoModel,
             )
 

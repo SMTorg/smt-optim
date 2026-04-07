@@ -7,6 +7,9 @@ from unittest.mock import patch
 class DummySample:
     def __init__(self, obj):
         self.obj = obj
+        self.metadata = {
+            "rscv": 1.0e-5,
+        }
 
 
 class DummyState:
@@ -89,6 +92,7 @@ class TestConsoleLogger(unittest.TestCase):
         self.assertIn("0", row)              # iter
         self.assertIn("1.000", row)          # budget (.3f)
         self.assertIn("1.23450e+00", row)    # fmin (.5e)
+        self.assertIn("1.000e-05", row)    # fmin (.5e)
         self.assertIn("2", row)              # fidelity
 
     def test_iteration_counter_increments(self):
