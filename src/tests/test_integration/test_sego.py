@@ -63,8 +63,7 @@ class TestOptimization(unittest.TestCase):
 
         cstr_config = ConstraintConfig(
             constraint=[disk],
-            type="less",
-            value=0.0,
+            upper=0.0,
             surrogate=SmtAutoModel,
         )
 

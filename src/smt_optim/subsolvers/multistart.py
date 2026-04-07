@@ -86,11 +86,16 @@ def multistart_minimize(func, bounds, **kwargs):
     else:
         feas_mask = multi_rscv <= tol*2
 
-    idx = np.argmin(multi_f[feas_mask])
-    fmin = multi_f[feas_mask][idx]
-    xmin = multi_x[feas_mask][idx]
+    if len(multi_f[feas_mask]) != 0:
+        idx = np.argmin(multi_f[feas_mask])
+        fmin = multi_f[feas_mask][idx]
+        xmin = multi_x[feas_mask][idx]
+    else:
+        idx = np.argmin(multi_rscv)
+        fmin = multi_f[idx]
+        xmin = multi_x[idx]
 
-    # add final optimization round
+    # TODO: add final optimization round
 
     res = MultistartResult(
         x = xmin,
