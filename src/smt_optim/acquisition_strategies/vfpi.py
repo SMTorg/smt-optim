@@ -235,9 +235,6 @@ class VFPI(AcquisitionStrategy):
         - Inputs are internally normalized using the model's scaling and offset.
         - The kernel hyperparameters (``sigma2`` and ``theta``) are extracted
           from ``optimal_theta`` based on the fidelity level.
-        - The penalty is computed as the product of
-          :math:`1 - k(x, x_i) / \\sigma^2` over all training points
-          :math:`x_i` at the specified level.
         - This formulation encourages exploration by penalizing regions that are
           strongly correlated with existing samples.
         """

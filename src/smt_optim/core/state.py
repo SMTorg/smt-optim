@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 from smt_optim.core import OptimizationDataset
+from smt_optim.core.sample import Sample
 from smt_optim.utils.constraints import compute_rscv
 
 # from smt_optim.core import Problem
@@ -36,8 +37,6 @@ class State:
         List containing the surrogate modeling the objective(s) function(s).
     cstr_models: list[Surrogate]
         List containing the surrogate modeling the constraint(s) function(s).
-    cstr_types: list[str]
-        List containing the constraint types.
     dataset: OptimizationDataset
         The dataset containing all samples from the expensive-to-evaluate functions.
     scaled_dataset: OptimizationDataset
@@ -69,10 +68,8 @@ class State:
             self.obj_models.append(obj_config.surrogate())
 
         self.cstr_models: list = []
-        self.cstr_types: list[str] = []
         for cstr_config in self.problem.cstr_configs:
             self.cstr_models.append(cstr_config.surrogate())
-            self.cstr_types.append(cstr_config.type)
 
 
         self.dataset = OptimizationDataset()
@@ -98,6 +95,11 @@ class State:
         qoi_factor = [np.empty(num_qoi)] * self.problem.num_fidelity
         qoi_step = [np.empty(num_qoi)] * self.problem.num_fidelity
 
+        # initializes scaled constraint bounds
+        self.cstr_equal = np.full(self.problem.num_cstr, np.nan)
+        self.cstr_lower = np.full(self.problem.num_cstr, np.nan)
+        self.cstr_upper = np.full(self.problem.num_cstr, np.nan)
+
         for lvl in range(self.problem.num_fidelity):
 
             for obj_idx in range(self.problem.num_obj):
@@ -119,21 +121,36 @@ class State:
                 qoi_step[lvl][obj_idx] = step
 
             for cstr_idx in range(self.problem.num_cstr):
+
+                qoi_idx = self.problem.num_obj+cstr_idx
+
                 c_config = self.problem.cstr_configs[cstr_idx]
 
                 data = self.dataset.export_data(self.problem.num_obj+cstr_idx, lvl)
 
                 if unit_std:
                     factor = np.std(data)
+                    step = np.mean(data)
                 else:
                     factor = 1
+                    step = 0
 
-                if c_config.type in ["less", "equal"]:
-                    qoi_factor[lvl][self.problem.num_obj+cstr_idx] = factor
-                elif c_config.type in ["greater"]:
-                    qoi_factor[lvl][self.problem.num_obj+cstr_idx] = -factor
+                qoi_factor[lvl][qoi_idx] = factor
+                qoi_step[lvl][qoi_idx] = step
 
-                qoi_step[lvl][self.problem.num_obj+cstr_idx] = c_config.value
+        # scale the constraint bounds
+        for c_idx in range(self.problem.num_cstr):
+
+            c_config = self.problem.cstr_configs[c_idx]
+            qoi_idx = self.problem.num_obj + c_idx
+
+            if c_config.equal is not None:
+                self.cstr_equal[c_idx] = (c_config.equal - qoi_step[-1][qoi_idx]) / qoi_factor[-1][qoi_idx]
+            else:
+                if c_config.lower is not None:
+                    self.cstr_lower[c_idx] = (c_config.lower - qoi_step[-1][qoi_idx]) / qoi_factor[-1][qoi_idx]
+                if c_config.upper is not None:
+                    self.cstr_upper[c_idx] = (c_config.upper - qoi_step[-1][qoi_idx]) / qoi_factor[-1][qoi_idx]
 
 
         self.qoi_factor = qoi_factor
@@ -208,7 +225,7 @@ class State:
     #     self.iter_log.clear()
 
 
-    def get_best_sample(self, ctol=1e-4, fidelity=-1):
+    def get_best_sample(self, ctol: float = 1e-4, fidelity: int = -1, scaled: bool = False) -> Sample:
         """
         Returns the best sample based on the objective function value.
 
@@ -227,32 +244,39 @@ class State:
         if fidelity == -1:
             fidelity = self.problem.num_fidelity-1
 
-        best_obj = np.inf
-        best_sample = None
         coeff = 1 if self.problem.obj_configs[0].type == "minimize" else -1
 
-        samples = self.dataset.get_by_fidelity(fidelity)
-
-        if self.problem.num_cstr == 0:
-            for s in samples:
-                if s.obj[0] < best_obj * coeff:
-                    best_obj = s.obj[0]
-                    best_sample = s
+        if scaled:
+            dataset = self.scaled_dataset
         else:
-            for s in samples:
-                rscv = compute_rscv(s.cstr.reshape(1, -1), self.cstr_types)
-                if rscv <= ctol:
-                    if s.obj[0] < best_obj * coeff:
-                        best_obj = s.obj[0]
-                        best_sample = s
+            dataset = self.dataset
 
-            if best_sample is None:
-                min_rscv = np.inf
+        data = dataset.export_as_dict()
+        fidelity_mask = (data["fidelity"] == fidelity).ravel()
+        yt = data["obj"][:, 0]
+        rscv = data["rscv"]
+        feasible = rscv <= ctol
+        if np.any(feasible):
+            # mono-objective only
+            filtered_yt = np.where(np.logical_and(fidelity_mask, feasible), yt * coeff, np.inf)
+            idx = np.argmin(filtered_yt)
+        else:
+            filtered_rscv = np.where(fidelity_mask, rscv, np.inf)
+            idx = np.argmin(filtered_rscv)
 
-                for s in samples:
-                    rscv = compute_rscv(s.cstr.reshape(1, -1), self.cstr_types)
-                    if rscv < min_rscv:
-                        best_sample = s
+        best_sample = self.dataset.samples[idx]
 
         return best_sample
+
+
+
+
+
+
+
+
+
+
+
+
 
