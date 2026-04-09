@@ -1,4 +1,14 @@
 
+import numpy as np
+import smt.design_space as ds
+
+# from smt.design_space import (
+#     DesignSpace,
+#     FloatVariable,
+#     IntegerVariable,
+#     OrdinalVariable,
+#     CategoricalVariable,
+# )
 
 class Problem:
     """
@@ -27,10 +37,19 @@ class Problem:
         cstr_funcs : list
             Constraint functions.
     """
-    def __init__(self, obj_configs: list, design_space, cstr_configs: list = [], costs: list[float] | None = None) -> None:
+    def __init__(self, obj_configs: list, design_space: np.ndarray | ds.DesignSpace, cstr_configs: list = [], costs: list[float] | None = None) -> None:
 
+        # convert np.ndarray into ds.DesignSpace, and assumes all variable are continuous
+        if isinstance(design_space, np.ndarray):
+            float_vars = []
+            for idx in range(design_space.shape[0]):
+                float_vars.append(
+                    ds.FloatVariable(design_space[idx, 0], design_space[idx, 1])
+                )
+            design_space = ds.DesignSpace(float_vars)
 
-        self.num_dim = design_space.shape[0]
+        self.num_dim = design_space.n_dv
+
         self.num_obj = 0
         self.num_cstr = 0
         self.num_fidelity = len(obj_configs[0].objective) if isinstance(obj_configs[0].objective, list) else 1

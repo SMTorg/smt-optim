@@ -4,11 +4,14 @@ from typing import Callable
 import numpy as np
 from scipy import optimize as so, stats as stats
 
+import smt.design_space as ds
+
 from smt_optim.acquisition_functions import log_ei
 from smt_optim.acquisition_strategies import AcquisitionStrategy
 # from smt_optim.surrogate_models.smt import SmtMFK
 
 from smt_optim.core.state import State
+from smt_optim.subsolvers.multistart import mixvar_multistart_minimize
 
 from smt_optim.utils.get_fmin import get_fmin
 
@@ -20,17 +23,19 @@ class MFSEGO(AcquisitionStrategy):
         super().__init__()
 
         self.acq_context = state
-        self.acq_func = kwargs.pop("acq_func", log_ei)                  # expected_improvement, log_ei
-        self.fmin_crit = kwargs.pop("fmin_crit", "min_rscv")            # min_rscv, fmin, mean_rscv
+        self.acq_func = kwargs.pop("acq_func", log_ei)                          # expected_improvement, log_ei
+        self.fmin_crit = kwargs.pop("fmin_crit", "min_rscv")                    # broken -> to be removed (min_rscv, fmin, mean_rscv)
         # self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
-        self.n_start = kwargs.pop("n_start", None)
-        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")    # obj-only, average, optimistic, pessimistic
-        self.select_fidelity = kwargs.pop("select_fidelity", True)
-        self.min_rscv_first = kwargs.pop("min_rscv_first", False)
-        self.filter_rscv = kwargs.pop("filter_rscv", False)
-        self.optimize_best = kwargs.pop("optimize_best", False)
-        self.relax_constraints = kwargs.pop("relax_constraints", False)
-        self.cr_override = kwargs.pop("cr_override", None)                  # override optimizer Cost Ratio
+        self.n_start = kwargs.pop("n_start", None)                              # optimizer multistart
+        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")            # obj-only, average, optimistic, pessimistic
+        self.select_fidelity = kwargs.pop("select_fidelity", True)              # if set to False, will always sample (LF+HF)
+        self.min_rscv_first = kwargs.pop("min_rscv_first", False)               # broken -> to be fixed!
+        self.filter_rscv = kwargs.pop("filter_rscv", False)                     # broken -> to be fixed!
+        self.optimize_best = kwargs.pop("optimize_best", False)                 # broken -> to be fixed!
+        self.relax_constraints = kwargs.pop("relax_constraints", False)         # broken -> to be fixed!
+        self.cr_override = kwargs.pop("cr_override", None)                      # override optimizer Cost Ratio
+        self.sp_method = kwargs.pop("sp_method", "Cobyla")                      # SciPy optimizer method
+        self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))        # SciPy optimizer tolerance
 
         self.seed = kwargs.pop("seed", None)
 
@@ -71,6 +76,10 @@ class MFSEGO(AcquisitionStrategy):
 
     def get_infill(self, acq_context: State) -> list[np.ndarray]:
 
+
+        if isinstance(self.seed, int) or isinstance(self.seed, float):
+            self.seed += 1
+
         acq_data = dict()
 
         # TODO: correct .dataset -> .scaled_dataset
@@ -88,13 +97,7 @@ class MFSEGO(AcquisitionStrategy):
         acq_data["fmin"] = self.fmin
         # acq_data["fmin_descaled"] = self.fmin * optimizer.yt[-1].std(axis=0) + optimizer.yt[-1].mean()
 
-        # generate starting points for the multistart optimization
-        gen_t0 = perf_counter()
-        # multi_x0 = self.generate_multistart_points(optimizer)
-        sampler = stats.qmc.LatinHypercube(d=acq_context.problem.num_dim, rng=acq_context.iter)
-        multi_x0 = sampler.random(self.n_start)
-        gen_t1 = perf_counter()
-        acq_data["generate_init_points_time"] = gen_t1 - gen_t0
+
 
         # scipy objective wrapper
         scipy_obj = self.build_scipy_objective(acq_context)
@@ -102,11 +105,36 @@ class MFSEGO(AcquisitionStrategy):
         # scipy constraint wrapper (for scipy, the feasible domain is g >= 0)
         scipy_cstr = self.build_scipy_constraints(acq_context)
 
-        res = multistart_minimize(scipy_obj,
-                                  bounds=np.array([[0, 1]] * acq_context.problem.num_dim),
-                                  multi_x0=multi_x0,
-                                  constraints=scipy_cstr,
-                                  seed=self.seed)
+        mix_var = False
+        for dv in acq_context.problem.design_space.design_variables:
+            if not isinstance(dv, ds.FloatVariable):
+                mix_var = True
+                break
+
+        if not mix_var:
+            # generate starting points for the multistart optimization
+            gen_t0 = perf_counter()
+            # multi_x0 = self.generate_multistart_points(optimizer)
+            sampler = stats.qmc.LatinHypercube(d=acq_context.problem.num_dim, rng=acq_context.iter)
+            multi_x0 = sampler.random(self.n_start)
+            gen_t1 = perf_counter()
+            acq_data["generate_init_points_time"] = gen_t1 - gen_t0
+
+            res = multistart_minimize(scipy_obj,
+                                      bounds=np.array([[0, 1]] * acq_context.problem.num_dim),
+                                      multi_x0=multi_x0,
+                                      constraints=scipy_cstr,
+                                      seed=self.seed,
+                                      tol=self.sp_tol,
+                                      method=self.sp_method,)
+        else:
+            res = mixvar_multistart_minimize(scipy_obj,
+                                             design_space=acq_context.problem.design_space,
+                                             constraints=scipy_cstr,
+                                             n_start=self.n_start,
+                                             method=self.sp_method,
+                                             tol=self.sp_tol,
+                                             seed=self.seed)
 
         next_x = res.x
 

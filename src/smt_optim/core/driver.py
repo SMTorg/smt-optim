@@ -157,7 +157,7 @@ class ConstraintConfig:
     lower: float = None
     upper: float = None
     equal: float = None
-    surrogate: Surrogate = None
+    surrogate: type[Surrogate] = None
     surrogate_kwargs: dict | None = None
 
 
@@ -279,10 +279,8 @@ class Driver:
 
         for i in range(len(infill)):
             if infill[i] is not None:
-                infill[i] *= (
-                    self.problem.design_space[:, 1] - self.problem.design_space[:, 0]
-                )
-                infill[i] += self.problem.design_space[:, 0]
+                infill[i] *= state.x_factor
+                infill[i] += state.x_step
                 state.iter_log["fidelity"] = i + 1
 
         # evaluate infill points

@@ -27,6 +27,3 @@ The `smt-optim` package requires the following package to be installed in your P
 ### Quickstart
 *TODO: add quickstart example here*
 
-
-# Examples
-See usage examples in the `tutorial` directory.
