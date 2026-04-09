@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Any, Callable, List, Optional, Union
 
+import smt.design_space as ds
+
 from smt_optim.core import Driver, ObjectiveConfig, ConstraintConfig, DriverConfig, Problem, State
 from smt_optim.surrogate_models import SmtAutoModel,  SmtMFCK
 from smt_optim.acquisition_strategies import MFSEGO, VFPI
@@ -8,7 +10,7 @@ from smt_optim.acquisition_strategies import MFSEGO, VFPI
 
 def minimize(
         objective: list[Callable],
-        design_space: np.ndarray,
+        design_space: ds.DesignSpace | np.ndarray,
         method: str,
         costs: list = [1],
         max_iter: int = 100,
@@ -63,7 +65,6 @@ def minimize(
     default_kwargs = {
         "max_iter": max_iter,
         "max_budget": max_budget,
-        "nt_init": max(3, design_space.shape[0]),
         "verbose": verbose,
         "scaling": True,
     }

@@ -3,6 +3,8 @@ import time
 
 import numpy as np
 
+import smt.design_space as ds
+
 from smt_optim.core import OptimizationDataset
 from smt_optim.core.sample import Sample
 from smt_optim.utils.constraints import compute_rscv
@@ -65,12 +67,15 @@ class State:
 
         self.obj_models: list = []
         for obj_config in self.problem.obj_configs:
-            self.obj_models.append(obj_config.surrogate())
+            kwargs = obj_config.surrogate_kwargs if obj_config.surrogate_kwargs is not None else {}
+            kwargs["design_space"] = problem.design_space
+            self.obj_models.append(obj_config.surrogate(**kwargs))
 
         self.cstr_models: list = []
         for cstr_config in self.problem.cstr_configs:
-            self.cstr_models.append(cstr_config.surrogate())
-
+            kwargs = cstr_config.surrogate_kwargs if cstr_config.surrogate_kwargs is not None else {}
+            kwargs["design_space"] = problem.design_space
+            self.cstr_models.append(cstr_config.surrogate(**kwargs))
 
         self.dataset = OptimizationDataset()
         self.scaled_dataset = None
@@ -158,6 +163,21 @@ class State:
 
         self.scaled_dataset = OptimizationDataset()
 
+        # scaling step and factor for the design variables
+        self.x_step = np.zeros(self.problem.num_dim)
+        self.x_factor = np.ones(self.problem.num_dim)
+
+        # mixed-variables
+        if isinstance(self.problem.design_space, ds.DesignSpace):
+            # apply unit scaling only to continuous design variables
+            for idx, dvar in enumerate(self.problem.design_space.design_variables):
+                if isinstance(dvar, ds.FloatVariable):
+                    self.x_step[idx] = dvar.lower
+                    self.x_factor[idx] = dvar.upper - dvar.lower
+        else:
+            self.x_step[:] = self.problem.design_space[:, 0]
+            self.x_factor[:] = self.problem.design_space[:, 1] - self.problem.design_space[:, 0]
+
         for sample in self.dataset.samples:
 
             scaled_sample = copy.deepcopy(sample)
@@ -165,8 +185,8 @@ class State:
             lvl = scaled_sample.fidelity
 
             # should only normalize real variables
-            scaled_sample.x -= self.problem.design_space[:, 0]
-            scaled_sample.x /= (self.problem.design_space[:, 1] - self.problem.design_space[:, 0])
+            scaled_sample.x -= self.x_step
+            scaled_sample.x /= self.x_factor
 
             scaled_sample.obj[:] -= self.qoi_step[lvl][:self.problem.num_obj]
             scaled_sample.obj[:] /= self.qoi_factor[lvl][:self.problem.num_obj]
@@ -267,6 +287,14 @@ class State:
         best_sample = self.dataset.samples[idx]
 
         return best_sample
+
+    def descale_inputs(self, inputs):
+
+        for lvl in range(len(inputs)):
+            if inputs[lvl] is not None:
+                inputs[lvl] *= self.x_factor
+                inputs[lvl] += self.x_step
+
 
 
 
