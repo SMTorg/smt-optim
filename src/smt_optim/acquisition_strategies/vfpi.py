@@ -24,7 +24,7 @@ class VFPI(AcquisitionStrategy):
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
 
         if state and self.n_start is None:
-            self.n_start = 10 * state.problem.num_dim
+            self.n_start = 20 # * state.problem.num_dim
 
     def validate_config(self, acq_context: State) -> None:
         pass
