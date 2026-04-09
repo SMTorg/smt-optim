@@ -180,9 +180,9 @@ class SmtAutoModel(Surrogate):
         num_fidelity = len(xt)
 
         if num_fidelity == 1:
-            self.model = KRG(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=self.train_counter)
+            self.model = KRG(print_global=False, n_start=3, hyper_opt="Cobyla", seed=self.train_counter)
         else:
-            self.model = MFK(print_global=False, n_start=3*num_dim, hyper_opt="Cobyla", seed=self.train_counter)
+            self.model = MFK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=self.train_counter)
 
             for lvl in range(num_fidelity-1):
                 self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
@@ -322,7 +322,7 @@ class SmtMFCK(Surrogate):
         num_dim = xt[-1].shape[1]
         num_fidelity = len(xt)
 
-        self.model = MFCK(print_global=False, n_start=3 * num_dim, hyper_opt="Cobyla", seed=42+self.train_counter)
+        self.model = MFCK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42+self.train_counter)
 
         for k in range(num_fidelity-1):
             self.model.set_training_values(xt[k], yt[k], name=k)
