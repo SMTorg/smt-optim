@@ -14,7 +14,7 @@ def minimize(
         max_iter: int = 100,
         max_budget: int = np.inf,
         constraints: list = [],
-        # driver_kwargs: dict = {},
+        driver_kwargs: dict = {},
         strategy_kwargs: dict = {},
         verbose: bool = True,
 ) -> State:
@@ -30,7 +30,6 @@ def minimize(
     surrogate = config["surrogate"]
     strategy = config["strategy"]
     costs = costs or config["costs", [1]]
-
 
     # ------- setup objective configuration -------
     obj_config = ObjectiveConfig(
@@ -61,15 +60,20 @@ def minimize(
     )
 
     # ------- driver configuration -------
-    driver_config = DriverConfig(
-        max_iter=max_iter,
-        max_budget=max_budget,
-        nt_init=max(3, design_space.shape[0]),
-        verbose=verbose,
-        scaling=True,
-    )
+    default_kwargs = {
+        "max_iter": max_iter,
+        "max_budget": max_budget,
+        "nt_init": max(3, design_space.shape[0]),
+        "verbose": verbose,
+        "scaling": True,
+    }
 
-    # TODO: apply user defined driver_kwargs
+    # overrides defaults if key collide
+    driver_kwargs = {**default_kwargs, **driver_kwargs}
+
+    driver_config = DriverConfig(
+        **driver_kwargs,
+    )
 
     # ------- start driver -------
     driver = Driver(problem, driver_config, strategy, strategy_kwargs=strategy_kwargs)
