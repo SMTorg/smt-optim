@@ -120,7 +120,7 @@ class State:
 
                 if self.problem.obj_configs[obj_idx].type == "minimize":
                     qoi_factor[lvl][obj_idx] = factor
-                elif self.problem.obj_config[obj_idx].type == "maximize":
+                elif self.problem.obj_configs[obj_idx].type == "maximize":
                     qoi_factor[lvl][obj_idx] = -factor
 
                 qoi_step[lvl][obj_idx] = step
