@@ -23,7 +23,6 @@ benchmarking.
 
 Introduction <index>
 get-started.md
-concepts.md
 examples.md
 miscellaneous.md
 API reference <api/smt_optim>

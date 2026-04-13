@@ -14,4 +14,5 @@ _collections/tutorial/benchmarkproblems
 _collections/tutorial/logging
 _collections/tutorial/api
 _collections/tutorial/vfpi
+_collections/tutorial/mixed_variables
 ```

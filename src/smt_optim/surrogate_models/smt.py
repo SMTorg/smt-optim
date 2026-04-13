@@ -8,6 +8,8 @@ from scipy.linalg import solve_triangular
 from smt.surrogate_models import KRG
 from smt.applications import MFK, MFCK
 
+from smt.surrogate_models import MixIntKernelType
+
 from smt.design_space import (
     DesignSpace,
     CategoricalVariable,
@@ -159,13 +161,20 @@ EPSILON = np.finfo(float).eps
 #         s2_pred = self.krg.predict_variances(x_pred)
 #         return s2_pred
 
+def _filter_none_kwargs(d):
+    return {k: v for k, v in d.items() if v is not None}
+
+
 class SmtAutoModel(Surrogate):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
         self.model = None
         self.train_counter = 0
-        pass
+
+        self.ds = kwargs.pop("design_space", None)
+        self.mix_kernel = kwargs.pop("mix_kernel", MixIntKernelType.CONT_RELAX)
+
 
     def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
         """
@@ -179,10 +188,21 @@ class SmtAutoModel(Surrogate):
         num_dim = xt[-1].shape[1]
         num_fidelity = len(xt)
 
+        n_start = kwargs.pop("n_start", 3)
+
+        model_kwargs = _filter_none_kwargs({
+            "print_global": False,
+            "n_start": n_start,
+            "design_space": self.ds,
+            "categorical_kernel": self.mix_kernel,
+            "hyper_opt": "Cobyla",
+            "seed": self.train_counter,
+        })
+
         if num_fidelity == 1:
-            self.model = KRG(print_global=False, n_start=3, hyper_opt="Cobyla", seed=self.train_counter)
+            self.model = KRG(**model_kwargs)
         else:
-            self.model = MFK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=self.train_counter)
+            self.model = MFK(print_global=False, n_start=n_start, hyper_opt="Cobyla", seed=self.train_counter)
 
             for lvl in range(num_fidelity-1):
                 self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
@@ -312,7 +332,7 @@ class SmtAutoModel(Surrogate):
 
 class SmtMFCK(Surrogate):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
         self.model = None
         self.train_counter = 0
