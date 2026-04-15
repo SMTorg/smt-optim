@@ -178,7 +178,7 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
     multi_rscv = rscv[sorted_idx][:n_small]
     multi_sp_res = []
 
-    if n_cont > 0:
+    if n_cont > 0 and method is not None:
 
         def wrapper(x_cont, x_ref, fun=func):
             x = x_ref

@@ -61,9 +61,67 @@ def vec_expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np
 
     return ei
 
+
+
+c1 = np.log(2*np.pi)/2
+c2 = np.log(np.pi/2)/2
+epsilon = np.finfo(np.float64).eps
+sqrt2 = np.sqrt(2)
+
+
+def log_ei(mu: float, s2: float, f_min: float) -> float:
+    """
+    Log Expected Improvement acquisition function.
+
+    LogEI is more numerically stable that the EI acquisition function especially when the GP's variance is small.
+    From: https://arxiv.org/abs/2310.20708.
+
+    Parameters
+    ----------
+    mu: float
+        Mean prediction
+    s2: float
+        Variance prediction
+    f_min: float
+        Best minimum objective value in training data.
+
+    Returns
+    -------
+    float
+    """
+
+    if s2 <= 0:
+        return -np.inf
+
+    s = np.sqrt(s2)
+    z = (f_min - mu)/s
+
+    if z > -1:
+        log_h = np.log(stats.norm.pdf(z) + z * stats.norm.cdf(z))
+
+    elif (-1/np.sqrt(epsilon) < z) & (z <= -1):
+        log_h = -z ** 2 / 2 - c1 + log1mexp(np.log(erfcx(-z / sqrt2) * np.abs(z)) + c2)
+
+    elif z <= -1/np.sqrt(epsilon):
+        log_h = -z**2/2 - c1 - 2*np.log(np.abs(z))
+
+    else:
+        raise Exception("Error computing LogEI")
+
+    val = log_h + np.log(s)
+
+    return val
+
+def log1mexp(z: float) -> float:
+    if z > -np.log(2):
+        return np.log(-(np.expm1(z)))
+    else:
+        return np.log1p(-np.exp(z))
+
+
 # ------- TODO: CLEAN LOG EXPECTED IMPROVEMENT -------
 # ------- LOG EXPECTED IMPROVEMENT -------
-def log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+def vec_log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     """
     Vectorized Log Expected Improvement acquisition function.
 
@@ -104,7 +162,7 @@ def log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     log_h = np.empty_like(z)
 
     log_h[mask1] = np.log(stats.norm.pdf(z[mask1]) + z[mask1] * stats.norm.cdf(z[mask1]))
-    log_h[mask2] = -z[mask2]**2/2 - c1 + log1mexp(np.log(erfcx(-z[mask2]/np.sqrt(2))*np.abs(z[mask2])) + c2)
+    log_h[mask2] = -z[mask2]**2/2 - c1 + vec_log1mexp(np.log(erfcx(-z[mask2]/np.sqrt(2))*np.abs(z[mask2])) + c2)
     log_h[mask3] = -z[mask3]**2/2 - c1 - 2*np.log(np.abs(z[mask3]))
 
     log_ei = copy.deepcopy(log_h)
@@ -116,8 +174,8 @@ def log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     return log_ei
 
 
-def log1mexp(z: np.ndarray) -> np.ndarray:
-
+def vec_log1mexp(z: np.ndarray) -> np.ndarray:
+    # review how mask1 is computed -> see not regular implementation
     mask1 = (-2*np.log(2) < z).ravel()
     mask2 = ~mask1
 

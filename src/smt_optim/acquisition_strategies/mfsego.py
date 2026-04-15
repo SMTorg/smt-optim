@@ -34,7 +34,7 @@ class MFSEGO(AcquisitionStrategy):
         self.optimize_best = kwargs.pop("optimize_best", False)                 # broken -> to be fixed!
         self.relax_constraints = kwargs.pop("relax_constraints", False)         # broken -> to be fixed!
         self.cr_override = kwargs.pop("cr_override", None)                      # override optimizer Cost Ratio
-        self.sp_method = kwargs.pop("sp_method", "Cobyla")                      # SciPy optimizer method
+        self.sp_method = kwargs.pop("sp_method", "SLSQP")                       # SciPy optimizer method
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))        # SciPy optimizer tolerance
 
         self.seed = kwargs.pop("seed", None)
@@ -161,9 +161,9 @@ class MFSEGO(AcquisitionStrategy):
 
         def scipy_acq_func(x):
             x = x.reshape(1, -1)
-            mu = acq_context.obj_models[0].predict_values(x)
-            s2 = acq_context.obj_models[0].predict_variances(x)
-            return -self.acq_func(mu, s2, self.fmin).item()
+            mu = acq_context.obj_models[0].predict_values(x).item()
+            s2 = acq_context.obj_models[0].predict_variances(x).item()
+            return -float(self.acq_func(mu, s2, self.fmin))
 
         return scipy_acq_func
 
