@@ -1,3 +1,5 @@
+import os
+import sys
 import copy
 import warnings
 
@@ -5,7 +7,7 @@ import numpy as np
 
 from scipy.linalg import solve_triangular
 
-from smt.surrogate_models import KRG
+from smt.surrogate_models import KRG, GPX
 from smt.applications import MFK, MFCK
 
 from smt.surrogate_models import MixIntKernelType
@@ -202,13 +204,73 @@ class SmtAutoModel(Surrogate):
         if num_fidelity == 1:
             self.model = KRG(**model_kwargs)
         else:
-            self.model = MFK(print_global=False, n_start=n_start, hyper_opt="Cobyla", seed=self.train_counter)
+            self.model = MFK(**model_kwargs)
 
             for lvl in range(num_fidelity-1):
                 self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
 
         self.model.set_training_values(xt[-1], yt[-1])
         self.model.train()
+        self.train_counter += 1
+
+    def predict_values(self, x_pred: np.ndarray) -> np.ndarray:
+        y_pred = self.model.predict_values(x_pred)
+        return y_pred
+
+    def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
+        s2_pred = self.model.predict_variances(x_pred)
+        return s2_pred
+
+
+class HidePrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
+
+
+class SmtGPX(Surrogate):
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.model = None
+        self.train_counter = 0
+
+        # self.ds = kwargs.pop("design_space", None)
+        # self.mix_kernel = kwargs.pop("mix_kernel", MixIntKernelType.CONT_RELAX)
+
+
+    def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
+        """
+        Train the GP on the training data.
+
+        Args:
+            xt (list[np.ndarray]): training data variables
+            yt (list[np.ndarray]): training data values
+        """
+
+        num_dim = xt[-1].shape[1]
+
+        n_start = kwargs.pop("n_start", 20)
+
+        model_kwargs = _filter_none_kwargs({
+            "print_global": False,
+            "n_start": n_start,
+            "design_space": None,
+            "categorical_kernel": None,
+            "hyper_opt": None,
+            "seed": self.train_counter,
+        })
+
+        self.model = GPX(**model_kwargs)
+
+        self.model.set_training_values(xt[-1], yt[-1])
+        with HidePrints():
+            self.model.train()
+
         self.train_counter += 1
 
     def predict_values(self, x_pred: np.ndarray) -> np.ndarray:

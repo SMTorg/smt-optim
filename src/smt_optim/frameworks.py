@@ -4,14 +4,14 @@ from typing import Any, Callable, List, Optional, Union
 import smt.design_space as ds
 
 from smt_optim.core import Driver, ObjectiveConfig, ConstraintConfig, DriverConfig, Problem, State
-from smt_optim.surrogate_models import SmtAutoModel,  SmtMFCK
+from smt_optim.surrogate_models.smt import SmtAutoModel, SmtGPX, SmtMFCK
 from smt_optim.acquisition_strategies import MFSEGO, VFPI
 
 
 def minimize(
         objective: list[Callable],
         design_space: ds.DesignSpace | np.ndarray,
-        method: str,
+        method: str | None = None,
         costs: list = [1],
         max_iter: int = 100,
         max_budget: int = np.inf,
@@ -21,17 +21,40 @@ def minimize(
         verbose: bool = True,
 ) -> State:
 
-    methods = {
-        "ego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
-        "sego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
-        "mfsego": dict(surrogate=SmtAutoModel, strategy=MFSEGO),
-        "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
-    }
+    if method is None:
 
-    config = methods[method]
-    surrogate = config["surrogate"]
-    strategy = config["strategy"]
-    costs = costs or config["costs", [1]]
+        strategy = MFSEGO
+
+        if isinstance(design_space, ds.DesignSpace):
+            mix_var = True
+        else:
+            mix_var = False
+
+        if len(objective) > 1:
+            multi_fidelity = True
+        else:
+            multi_fidelity = False
+
+        if not mix_var and not multi_fidelity:
+            surrogate = SmtGPX
+        else:
+            surrogate = SmtAutoModel
+
+        if multi_fidelity and len(costs) != len(objective):
+            raise Exception("Error: len(costs) != len(objective)")
+
+    else:
+        methods = {
+            "ego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
+            "sego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
+            "mfsego": dict(surrogate=SmtAutoModel, strategy=MFSEGO),
+            "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
+        }
+
+        config = methods[method]
+        surrogate = config["surrogate"]
+        strategy = config["strategy"]
+        costs = costs or config["costs", [1]]
 
     # ------- setup objective configuration -------
     obj_config = ObjectiveConfig(
