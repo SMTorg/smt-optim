@@ -18,9 +18,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy",
-    "scipy",
-    "smt",
+    "numpy>=2.4.0",
+    "scipy>=1.17.0",
+    "smt[gpx]==2.13.0",
 ]
 
 license = "Apache-2.0"

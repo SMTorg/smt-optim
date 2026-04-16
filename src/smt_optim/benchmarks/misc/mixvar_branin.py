@@ -78,52 +78,6 @@ class MixVarBranin(BenchmarkProblem):
         return -g
 
 
-if __name__ == "__main__":
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    # Instantiate your problem
-    problem = MixVarBranin()
-
-    # Continuous domain of the Branin function
-    x1 = np.linspace(0.0, 1.0, 300)
-    x2 = np.linspace(0.0, 1.0, 300)
-
-    X1, X2 = np.meshgrid(x1, x2)
-
-    # All 4 combinations of z1, z2
-    z_combinations = [
-        (0, 0),
-        (0, 1),
-        (1, 0),
-        (1, 1),
-    ]
-
-    fig = plt.figure(figsize=(14, 10))
-
-    for i, (z1, z2) in enumerate(z_combinations, start=1):
-
-        F = np.zeros_like(X1)
-
-        for r in range(X1.shape[0]):
-            for c in range(X1.shape[1]):
-                x = np.array([X1[r, c], X2[r, c], z1, z2])
-                F[r, c] = problem.objective(x)
-
-        ax = fig.add_subplot(2, 2, i, projection="3d")
-        surf = ax.plot_surface(X1, X2, F, cmap="viridis", edgecolor="none")
-
-        ax.set_title(f"z1={z1}, z2={z2}")
-        ax.set_xlabel("x1")
-        ax.set_ylabel("x2")
-        ax.set_zlabel("f(x1, x2, z1, z2)")
-
-        fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.1)
-
-    plt.tight_layout()
-    plt.show()
-
-
 class MixVarGoldstein(BenchmarkProblem):
 
     def __init__(self):
@@ -217,6 +171,88 @@ class MixVarGoldstein(BenchmarkProblem):
         )
 
         return -value
+
+
+class MultiFidelityMixVarBranin(BenchmarkProblem):
+
+    def __init__(self):
+        super().__init__()
+
+        self.name = "MultiFidelityMixVarBranin"
+        self.num_dim = 4
+        self.num_obj = 1
+        self.num_cstr = 1
+        self.num_fidelity = 2
+
+        self.design_space = ds.DesignSpace([
+            ds.FloatVariable(0, 1),
+            ds.FloatVariable(0, 1),
+            ds.CategoricalVariable([0, 1]),
+            ds.CategoricalVariable([0, 1]),
+        ])
+
+
+        self.children = MixVarBranin()
+
+        self.objectives = [self.objective_lf, self.children.objective]
+
+        self.constraints = [
+            [self.constraint_lf, self.children.constraint]
+        ]
+
+
+    def objective_lf(self, x):
+        return self.children.objective(x)  - np.cos(0.5*x[0]) - x[1]**3
+
+    def constraint_lf(self, x):
+        return self.children.constraint(x) - 0.1 * np.sin(10*x[0] + 5*x[1])
+
+
+
+if __name__ == "__main__":
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # Instantiate your problem
+    problem = MixVarBranin()
+
+    # Continuous domain of the Branin function
+    x1 = np.linspace(0.0, 1.0, 300)
+    x2 = np.linspace(0.0, 1.0, 300)
+
+    X1, X2 = np.meshgrid(x1, x2)
+
+    # All 4 combinations of z1, z2
+    z_combinations = [
+        (0, 0),
+        (0, 1),
+        (1, 0),
+        (1, 1),
+    ]
+
+    fig = plt.figure(figsize=(14, 10))
+
+    for i, (z1, z2) in enumerate(z_combinations, start=1):
+
+        F = np.zeros_like(X1)
+
+        for r in range(X1.shape[0]):
+            for c in range(X1.shape[1]):
+                x = np.array([X1[r, c], X2[r, c], z1, z2])
+                F[r, c] = problem.objective(x)
+
+        ax = fig.add_subplot(2, 2, i, projection="3d")
+        surf = ax.plot_surface(X1, X2, F, cmap="viridis", edgecolor="none")
+
+        ax.set_title(f"z1={z1}, z2={z2}")
+        ax.set_xlabel("x1")
+        ax.set_ylabel("x2")
+        ax.set_zlabel("f(x1, x2, z1, z2)")
+
+        fig.colorbar(surf, ax=ax, shrink=0.7, pad=0.1)
+
+    plt.tight_layout()
+    plt.show()
 
 
 
