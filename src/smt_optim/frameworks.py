@@ -14,7 +14,7 @@ def minimize(
         method: str | None = None,
         costs: list = [1],
         max_iter: int = 100,
-        max_budget: int = np.inf,
+        max_budget: float = np.inf,
         constraints: list = [],
         driver_kwargs: dict = {},
         strategy_kwargs: dict = {},
