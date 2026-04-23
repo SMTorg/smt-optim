@@ -277,11 +277,19 @@ class Driver:
         t1 = time.perf_counter()
         state.iter_log["acq_opt_time"] = t1 - t0
 
+        # for i in range(len(infill)):
+        #     if infill[i] is not None:
+        #         infill[i] *= state.x_factor
+        #         infill[i] += state.x_step
+        #         state.iter_log["fidelity"] = i + 1
+
+        # safe descale, clip infill to the bounds, verify design space
         for i in range(len(infill)):
             if infill[i] is not None:
-                infill[i] *= state.x_factor
-                infill[i] += state.x_step
+                infill[i] = safe_descale(infill[i], state)
                 state.iter_log["fidelity"] = i + 1
+
+        infill_not_in_xt(infill, state)
 
         # evaluate infill points
         self.evaluator.sample_func(infill, state)
@@ -345,6 +353,73 @@ class Driver:
 
         else:
             return None
+
+
+def safe_descale(x_scaled: np.ndarray, state: State) -> np.ndarray:
+    """
+    Descale point X and verify that it satisfies the design space. If necessary, correct it.
+
+    Parameters
+    ----------
+    x_scaled: np.ndarray
+    state: State
+
+    Returns
+    -------
+    x_clip
+
+    """
+    ds = state.problem.design_space
+    ds_bounds = ds.get_num_bounds()
+
+    # descale infill point
+    # descaling only applies to cont. variables -> int. and cat. variables are not scaled
+    x_raw = x_scaled * state.x_factor + state.x_step
+
+    # rounds cat. and int. variables
+    # only clips bounds for cat. variables
+    x_corr, _ = ds.correct_get_acting(x_raw)
+
+    # clips bounds for all variables
+    x_clip = np.clip(x_corr, ds_bounds[:, 0], ds_bounds[:, 1])
+
+    if np.linalg.norm(x_clip - x_raw) > 1e-10: # TODO: add customizable tolerance
+        warnings.warn("Infill point did not respect the design space.")
+
+    return x_clip
+
+
+def infill_not_in_xt(infills: list[np.ndarray], state: State) -> None:
+    """
+    Raise exception if an infill point is already in the training data.
+
+    Parameters
+    ----------
+    infills: list[np.ndarray]
+    state: State
+
+    Returns
+    -------
+
+    """
+    dataset = state.dataset.export_as_dict()
+
+    fidelity = dataset["fidelity"].ravel()
+    xt = dataset["x"]
+
+    for lvl in range(len(infills)):
+        if infills[lvl] is not None:
+
+            fid_mask = fidelity == lvl
+            xt_lvl = xt[fid_mask, :]
+
+            for idx in range(infills[lvl].shape[0]):
+                diff = xt_lvl - infills[lvl][idx, :]
+                l2_norms = np.linalg.norm(diff, axis=1)
+                if np.min(l2_norms) < 1e-8: # TODO: add customizable tolerance
+                    raise Exception("Infill point already in training data.")
+
+    return None
 
 
 
