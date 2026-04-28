@@ -15,7 +15,7 @@ from sphinx.highlighting import lexers
 from pygments.lexers import PythonLexer
 
 project = 'smt-optim'
-copyright = '2026, O. Cordelier'
+copyright = '2026, SMT Optim contributors'
 author = 'O. Cordelier'
 release = '0.0.1'
 
@@ -34,7 +34,15 @@ extensions = [
 ]
 
 
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": False,
+    "inherited-members": True,
+    "show-inheritance": True,
+}
+
 autosummary_generate = True
+add_module_names = False
 
 napoleon_numpy_docstring = True
 
@@ -53,8 +61,8 @@ html_theme_options = {
     # header
     "logo": {
         "text": "smt-optim",
-        "image_light": "https://avatars.githubusercontent.com/u/26074483?s=200&v=4",
-        "image_dark": "https://avatars.githubusercontent.com/u/26074483?s=200&v=4",
+        "image_light": "smt_logo.png",
+        "image_dark": "smt_logo.png",
     },
 }
 
@@ -77,18 +85,16 @@ exclude_patterns = []
 html_theme = "sphinx_book_theme"
 html_static_path = ['_static']
 
-# html_logo = "https://avatars.githubusercontent.com/u/26074483?s=200&v=4"
-html_favicon = "https://avatars.githubusercontent.com/u/26074483?s=200&v=4"
-
-html_sidebars = {
-    "get-started": [],
-    "concepts": [],
-}
+html_favicon = "_static/smt_logo.png"
 
 nb_render_plugin = "default"
 
 nb_render_markdown_format = "myst"
-myst_enable_extensions = ["colon_fence"]
+myst_enable_extensions = [
+    "colon_fence",
+    "dollarmath",   # enable the use of $ and $$
+    "amsmath",      # enable some latex commands (e.g., align)
+]
 
 nb_execution_mode = "off"
 highlight_language = "python"
@@ -99,3 +105,8 @@ nb_render_text_lexer = "python"
 lexers["ipython2"] = PythonLexer()
 lexers["ipython"] = PythonLexer()
 lexers["ipython3"] = PythonLexer()
+
+myst_dmath_double_inline = True
+
+# sets mathjax v3. v4 makes vertical scrollbar appear
+mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"

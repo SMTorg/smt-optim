@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-`smt-optim` requires the following package to be installed in the Python environment:
+SMT Optim requires the following package to be installed in the Python environment:
 
 - Numpy
 - SciPy
@@ -18,7 +18,7 @@ It can be done via PIP:
 
 ``git clone https://github.com/SMTorg/smt-optim.git``
 
-2. Install `smt-optim` to your Python environment.
+2. Install SMT Optim to your Python environment.
 
 ``cd smt-optim``
 

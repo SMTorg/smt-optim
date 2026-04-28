@@ -39,6 +39,22 @@ _register_from_module(mixvar_branin)
 #     return results
 
 def list_problems(n: list[int] = None, tags: list[str] = None) -> list[BenchmarkProblem]:
+    """
+    Retrieves a list of BenchmarkProblem objects that match the specified problem features.
+
+    Parameters
+    ----------
+    n : Optional[list[int]]
+        A list containing minimum and maximum problem dimensions (inclusive).
+        If `None`, no dimension filtering is applied.
+    tags : Optional[list[str]]
+        A list of problem tags to filter by. If `None`, no tag filtering is applied.
+
+    Returns
+    -------
+    results : list[BenchmarkProblem]
+        A list of BenchmarkProblem objects that match the specified features.
+    """
 
     results = []
 
@@ -59,5 +75,17 @@ def list_problems(n: list[int] = None, tags: list[str] = None) -> list[Benchmark
     return results
 
 
-def get_problem(name):
+def get_problem(name: str) -> BenchmarkProblem:
+    """
+    Retrieves a single BenchmarkProblem object by its unique name.
+
+    Parameters
+    ----------
+    name : str
+        The name of the problem to retrieve.
+    Returns
+    -------
+    result : BenchmarkProblem or None
+        The retrieved BenchmarkProblem object, or None if no matching problem is found.
+    """
     return available.get(name)

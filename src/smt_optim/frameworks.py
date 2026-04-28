@@ -20,6 +20,46 @@ def minimize(
         strategy_kwargs: dict = {},
         verbose: bool = True,
 ) -> State:
+    """
+    Minimize the objective function with respect to the problem properties.
+
+    This function provides a unified interface to perform optimization using
+    different acquisition-based strategies (e.g., EGO, SEGO, MFSEGO, VFPI).
+    It supports mono-fidelity and multi-fidelity optimization, with optional
+    constraints and budget control.
+
+    Parameters
+    ----------
+    objective: list[Callable]
+        List of objective function callables ordered by increasing fidelity. For mono-fidelity problems,
+        the function callable must still be provided as a single-element list.
+    design_space: ds.DesignSpace | np.ndarray
+        Problem design space. If a np.ndarray is provided, the problem will be treated as fully continuous.
+    method: str {"ego", "sego", "mfsego", "vfpi"} or None, optional
+        Optimization framework to use. If None, the method is selected automatically based on the problem
+        characteristics  between {"ego", "sego", "mfsego"}.
+    costs: list[float], optional
+        Evaluation cost associated with each fidelity level, ordered from
+        lowest to highest fidelity. Required for multi-fidelity optimization.
+        Defaults to [1] for mono-fidelity problems.
+    max_iter: int, default=100
+        Maximum number of optimization iteration.
+    max_budget: float, default=np.inf
+        Maximum total evaluation budget.The optimization stops when this budget is exhausted.
+    constraints: list[dict], optional
+        List of the constraint definitions.
+    driver_kwargs: dict, optional
+        Additional keyword arguments passed to the optimization driver.
+    strategy_kwargs: dict, optional
+        Additional keyword arguments passed to the acquisition strategy.
+    verbose: bool
+        If True, prints progress information during optimization.
+
+    Returns
+    -------
+    State
+        Final optimization state.
+    """
 
     if method is None:
 

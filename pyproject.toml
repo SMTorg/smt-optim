@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
   { name="Oihan Cordelier", email="oihan.cordelier@polymtl.ca" },
 ]
-description = "A multi-fidelity constrained Bayesian optimization toolkit"
+description = "A constrained, multi-fidelity, mixed variable Bayesian optimization toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
 

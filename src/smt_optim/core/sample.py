@@ -81,6 +81,24 @@ class OptimizationDataset:
 
 
     def add(self, sample: Sample):
+        """
+        Add a new sample to the dataset.
+
+        Parameters
+        ----------
+        sample : Sample
+            The sample to be added. It should contain objective function values (`obj`)
+            and/or constraint function values (`cstr`) for each variable in the problem.
+
+        Notes
+        -----
+        If no samples have been added yet, the number of objectives and constraints are set to
+        the lengths of `sample.obj` and `sample.cstr`, respectively. Subsequent samples must
+        have the same number of objectives and constraints as the first sample.
+
+        If the fidelity level of the new sample is not already in the dataset, it is added,
+        along with a counter for the number of samples at that fidelity.
+        """
         self.samples.append(sample)
 
         if self.num_obj is None:
@@ -98,7 +116,19 @@ class OptimizationDataset:
         self.num_samples[sample.fidelity] += 1
 
 
-    def get_by_fidelity(self, lvl: int):
+    def get_by_fidelity(self, lvl: int) -> list[Sample]:
+        """
+        Fetches all the samples corresponding to the specified fidelity level.
+
+        Parameters
+        ----------
+        lvl : int
+            Fidelity level (starting at 0 for the lowest fidelity level) from which to retrieve samples.
+        Returns
+        -------
+        list[Sample]
+            A list of samples of the corresponding fidelity level.
+        """
         return [s for s in self.samples if s.fidelity == lvl]
 
 
@@ -128,12 +158,19 @@ class OptimizationDataset:
 
     def export_as_dict(self) -> dict:
         """
-        Exports the samples data as a dictionary. Each `attribute` corresponds to a key in the dictionary.
+        Exports the samples data as a dictionary, including fidelity levels, evaluation times, input values,
+        objective function values, constraint function values, and RSCV values.
 
         Returns
         -------
         dict
-            Dictionary containing all sample data.
+            A dictionary containing the following keys:
+                - "cstr": an array of shape (num_samples, num_cstr) representing the constraint function values for each sample.
+                - "eval_time": an array of shape (num_samples,) representing the total evaluation time for each sample.
+                - "fidelity": an array of shape (num_samples,) representing the fidelity level of each sample.
+                - "obj": an array of shape (num_samples, num_obj) representing the objective function values for each sample.
+                - "rscv": an array of shape (num_samples,) representing the Root Square Constraint Violation value for each sample.
+                - "x": an array of shape (num_samples, nvar) representing the input values for each sample.
         """
         # TODO: add metadata to exported dict
 
@@ -142,10 +179,10 @@ class OptimizationDataset:
         eval_time = np.empty((num_sample, self.num_obj+self.num_cstr))
 
         nvar = len(self.samples[0].x)
-        xt = np.empty((num_sample, nvar))             # inputs
-        yt = np.empty((num_sample, self.num_obj))     # objectives
-        ct = np.empty((num_sample, self.num_cstr))    # constraints
-        rscv = np.empty(num_sample)    # constraints
+        xt = np.empty((num_sample, nvar))               # inputs
+        yt = np.empty((num_sample, self.num_obj))       # objectives
+        ct = np.empty((num_sample, self.num_cstr))      # constraints
+        rscv = np.empty(num_sample)                     # constraints
 
         for idx, sample in enumerate(self.samples):
             fidelity[idx, 0] = sample.fidelity
@@ -156,12 +193,12 @@ class OptimizationDataset:
             rscv[idx] = sample.metadata["rscv"]
 
         data = {
-            "fidelity": fidelity,
-            "eval_time": eval_time,
-            "x": xt,
-            "obj": yt,
             "cstr": ct,
+            "eval_time": eval_time,
+            "fidelity": fidelity,
+            "obj": yt,
             "rscv": rscv,
+            "x": xt,
         }
 
         return data
@@ -169,23 +206,25 @@ class OptimizationDataset:
 
 def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
     """
-    Evaluates the function `func` value evaluated at `x_new`. Returns the function value and the elapsed time.
-    If the function output is of type `np.ndarray`, converts it to a float.
+    Evaluates a given function at a specified point and returns the function value and elapsed time.
 
     Parameters
     ----------
-    x_new: np.ndarry
+    x_new : np.ndarray
         Point to sample.
-    func
-        Function to sample.
+    func : Callable
+        Function to evaluate (e.g., objective function, constraint function).
 
     Returns
     -------
-    float
-        Function value at `x_new`.
-    float
-        Elapsed time for sampling the function.
+    tuple[float, float]
+        A tuple containing:
+            - The function value at `x_new`.
+            - The elapsed time for sampling the function.
 
+    Notes
+    -----
+    If the function output is not a scalar float or a 1D numpy array, it will be replaced with NaN.
     """
     t0 = time.perf_counter()
 
@@ -216,8 +255,8 @@ class Evaluator:
     ----------
     problem: Problem
         Optimization problem.
-    res_path: str
-        Logging directory path.
+    res_path: str | None
+        DOE logging directory path.
 
     """
     def __init__(self, problem, res_path: str | None = None):
@@ -227,15 +266,17 @@ class Evaluator:
 
     def sample_func(self, infill: list[np.ndarray | None], state) -> None:
         """
-        Sample the problem functions at requested query points.
+        Sample the problem functions at requested query points and add the samples to the optimization state's
+        dataset.
 
         Parameters
         ----------
         infill: list[np.ndarray | None]
-            Query points. Each np.ndarray in the list corresponds to a fidelity level. The np.ndarray must have the
-            shape (num_points, num_dim).
+            Query points: each numpy array in the list represents a fidelity level and must have shape
+            (num_points, num_dim); if a level is set to None, it will be skipped.
         state: State
-            Optimization state.
+            Optimization state object.
+
         Returns
         -------
         None
@@ -253,9 +294,11 @@ class Evaluator:
                     cstr_values = np.empty(self.problem.num_cstr)
                     times = np.empty(self.problem.num_obj + self.problem.num_cstr)
 
+                    # samples objectives
                     for obj_idx in range(self.problem.num_obj):
                         obj_values[obj_idx], times[obj_idx] = sample_func(x_new, self.problem.obj_funcs[obj_idx][lvl])
 
+                    # samples constraints
                     for cstr_idx in range(self.problem.num_cstr):
                         cstr_values[cstr_idx], times[self.problem.num_obj + cstr_idx] = sample_func(x_new,
                                                                                             self.problem.cstr_funcs[cstr_idx][lvl])
@@ -275,20 +318,24 @@ class Evaluator:
                         }
                     )
 
+                    # adds sample to dataset
                     state.dataset.add(sample)
 
+                    # logs the sample to the DOE file if DOE logging is enabled
                     if self.res_path is not None:
                         self.log_sample(sample)
 
+
     def log_sample(self, sample) -> None:
         """
-        Log the sample data.
+        Append the sample data to the DOE CSV file.
+
+        This method appends new rows to the existing file at the specified path. If the file does not exist, it will be created with a header row.
 
         Parameters
         ----------
-        sample: Sample
+        sample : Sample
             The sample to log.
-
         Returns
         -------
         None
@@ -317,7 +364,7 @@ class Evaluator:
             path = os.path.join(self.res_path, "doe.csv")
             file_exists = os.path.isfile(path)
 
-            # possibly does not work on Windows -> to be tested
+            # possibly does not work on Windows OS -> to be tested
             with open(path, 'a') as file:
                 writer = csv.DictWriter(file, fieldnames=row.keys())
 
@@ -328,4 +375,3 @@ class Evaluator:
 
         except Exception as e:
             print(f"Error while saving the DoE: {e}")
-

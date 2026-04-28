@@ -6,20 +6,32 @@ SMT Optim is an open-source Python package for Bayesian optimization developed f
 
 ## Cite us
 
-To cite `smt-optim`:
+To cite SMT Optim:
 
 ```bibtex
-@inproceedings{cordelier_2025_multifidelity,
-    author = {Cordelier, Oihan and Diouane, Youssef and Bartoli, Nathalie and Laurendeau, Eric},
-    title = {Multi-{Fidelity} {Constrained} {Bayesian} {Optimization} with {Application} to {Aircraft} {Wing} {Design}},
-    booktitle = {{AIAA} {AVIATION} {FORUM} {AND} {ASCEND} 2025},
-    year = {2025},
-    address = {Las Vegas, Nevada},
-    month = jul,
-    publisher = {American Institute of Aeronautics and Astronautics},
-    doi = {10.2514/6.2025-3474},
+@techreport{cordelier_etal_2026,
+    author      = {Cordelier, Oihan and Diouane, Youssef and Bartoli, Nathalie and Laurendeau, Eric},
+    title       = {Multi-fidelity approaches for general constrained Bayesian optimization with application to aircraft design},
+    institution = {{GERAD}},
+    year        = 2026,
+    type        = {Cahier du GERAD},
+    number      = {G-2026-17},
+    address     = {Montr\'eal, QC, Canada},
+    doi         = {10.48550/arXiv.2603.28987}
+}
 ```
-
+```bibtex
+@inproceedings{cordelier_etal_2025,
+    author      = {Cordelier, Oihan and Diouane, Youssef and Bartoli, Nathalie and Laurendeau, Eric},
+    title       = {{Multi-Fidelity Constrained Bayesian Optimization with Application to Aircraft Wing Design}},
+    booktitle   = {{AIAA AVIATION FORUM AND ASCEND 2025}},
+    year        = {2025},
+    address     = {Las Vegas, Nevada},
+    month       = jul,
+    publisher   = {American Institute of Aeronautics and Astronautics},
+    doi         = {10.2514/6.2025-3474}
+    }
+```
 
 ## Focus on constrained Bayesian optimization
 
@@ -49,8 +61,24 @@ getting_started/mixed_var_optim
 ```
 
 ```{toctree}
-:maxdepth: 3
+:maxdepth: 1
+:caption: Reference: 
+API <api/index>
+```
+
+```{toctree}
+:maxdepth: 1
 :caption: Advanced features:
 advanced_features/examples/index.md
-API reference <api/smt_optim>
 ```
+
+## Contributing institutions
+
+&nbsp;
+
+```{image} _static/banner.png
+    :scale: 20%
+    :alt: logo banner
+    :align: center
+```
+

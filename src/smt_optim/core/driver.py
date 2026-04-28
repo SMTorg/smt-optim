@@ -13,12 +13,11 @@ from typing import Callable, Type
 
 import pickle
 
-from smt_optim.core.state import State
+from smt_optim.core import Problem, State
 from smt_optim.surrogate_models import Surrogate
 from smt_optim.acquisition_strategies import AcquisitionStrategy
 
 from smt_optim.core import Sample, OptimizationDataset, Evaluator
-from smt_optim.core import State
 
 from smt_optim.utils.initial_design import generate_initial_design
 from smt_optim.utils.stop_criteria import check_stop_criteria
@@ -129,7 +128,7 @@ class ObjectiveConfig:
 
     objective: list[Callable]
     surrogate: type[Surrogate]
-    type: str = "minimize"  # problem's type -> "minimize" or "maximize")
+    type: str = "minimize"                      # problem's type -> "minimize" or "maximize"
     surrogate_kwargs: dict | None = None
 
 
@@ -147,10 +146,23 @@ class ConstraintConfig:
         List of constraint functions. Each callable must accept a decision
         variable vector ``x`` and return a scalar constraint value. The functions
         must be ordered in increasing level of fidelity.
+    lower: float | None
+        Lower bound of the constraint. If not specified, the constraint is considered
+        unconstrained in this direction.
+    upper: float | None
+        Upper bound of the constraint. If not specified, the constraint is considered
+        unconstrained in this direction.
+    equal: float | None
+        Equality constraint.
     surrogate : Surrogate or None, default=None
         Surrogate model used to approximate the constraint function.
     surrogate_kwargs : dict or None, default=None
         Optional keyword arguments passed to the surrogate model.
+
+    Notes
+    -----
+    A constraint must either be an inequality constraint or an equality constraint. For inequality
+    constraints, it is possible to define a lower and upper bound.
     """
 
     constraint: list[Callable]
@@ -216,8 +228,25 @@ class DriverConfig:
 
 
 class Driver:
-    def __init__(self, problem, config, strategy, strategy_kwargs={}):
+    def __init__(self, problem: Problem, config: DriverConfig, strategy: AcquisitionStrategy, strategy_kwargs: dict = {}):
+        """
+        Initializes the object with the given parameters.
 
+        Parameters
+        ----------
+        problem : Problem
+            The problem instance to be optimized.
+        config : DriverConfig
+            The configuration settings for the optimization process.
+        strategy : AcquisitionStrategy
+            The infill sampling strategy to use.
+        strategy_kwargs : dict, optional
+            Additional keyword arguments passed to the strategy constructor (default is an empty dictionary).
+
+        Notes
+        -----
+        This method sets up the object's internal state and initializes its components.
+        """
         self.problem = problem
         self.config = config
 
@@ -246,22 +275,23 @@ class Driver:
 
     def iteration(self, state):
         """
-        Perform an optimization iteration. An iteration consists of:
-        - scaling all the training data
-        - building the surrogate models
-        - acquiring points to sample (and their associated fidelity level)
-        - sampling the expensive-to-evaluate functions
+        Performs an optimization iteration on the given state.
+
+        The iteration process involves the following steps:
+        1. Scaling the training data according to the specified scaling configuration.
+        2. Building surrogate models for approximating the expensive-to-evaluate functions.
+        3. Acquiring points to sample and their associated fidelity levels using the infill strategy.
+        4. Sampling the original, unmodified functions with the acquired points.
 
         Parameters
         ----------
-        state: State
-            Optimization state on which to perform an iteration.
+        state : State
+            The optimization state on which to perform an iteration.
 
         Returns
         -------
-        State
-            Return optimization state on which an iteration was performed.
-
+        State:
+            The updated optimization state after completing the iteration.
         """
         state.iter += 1
 
@@ -276,12 +306,6 @@ class Driver:
         infill = self.strategy.get_infill(state)
         t1 = time.perf_counter()
         state.iter_log["acq_opt_time"] = t1 - t0
-
-        # for i in range(len(infill)):
-        #     if infill[i] is not None:
-        #         infill[i] *= state.x_factor
-        #         infill[i] += state.x_step
-        #         state.iter_log["fidelity"] = i + 1
 
         # safe descale, clip infill to the bounds, verify design space
         for i in range(len(infill)):
@@ -299,20 +323,20 @@ class Driver:
 
         return state
 
+
     def optimize(self):
         """
-        Perform the optimization process which consists of:
-        - generating a DoE if the initial dataset is empty
-        - while no termination criteria is met, perform iterations
+        Performs an optimization process on the current state.
 
+        The process consists of two stages:
+        1. If the initial dataset is empty, it generates a Design of Experiment (DoE).
+        2. Iteratively performs optimization iterations until termination criteria are met.
 
         Returns
         -------
-        State
-            optimization state on which the optimization process was performed.
-
+        State:
+            The updated optimization state after completing the optimization process.
         """
-
         self.start_optim()
 
         # loop - check stop criteria
@@ -323,6 +347,16 @@ class Driver:
         return self.state
 
     def start_optim(self):
+        """
+        Initializes the optimization process by creating an initial Design of Experiment (DoE) if necessary.
+
+        If the State dataset is empty (i.e., contains no samples), a new DoE will be generated.
+        Otherwise, no action is taken to avoid modifying existing sampling points.
+
+        Returns
+        -------
+        None
+        """
         # generate initial design
         if len(self.state.dataset.samples) == 0:
             generate_initial_design(self.state, self.evaluator, self.config)
@@ -337,7 +371,22 @@ class Driver:
                 print(f"Error while logging: {e}")
 
     def make_res_dir(self, res_dir: str | None) -> str | None:
+        """
+        Creates a unique results directory path based on the provided input.
 
+        If a directory with the same name already exists, the method will append an incrementing index to it
+        (e.g., "results" -> "results_1", "results_2", etc.) until a unique name is found. No directory will be
+        created if `res_dir` is set to `None`.
+
+        Parameters
+        ----------
+        res_dir : Optional[str]
+            The desired results directory path. If `None`, no directory will be created.
+        Returns
+        -------
+        str or None:
+            The unique results directory path, or `None` if the input was `None`.
+        """
         og_res_dir = res_dir
 
         if res_dir is not None:

@@ -19,7 +19,79 @@ from smt_optim.subsolvers import multistart_minimize
 
 
 class MFSEGO(AcquisitionStrategy):
+    """
+    Multi-Fidelity Super Efficient Global Optimization (MF-SEGO) strategy.
+
+    This acquisition strategy can perform Efficient Global Optimization (EGO) (unconstrained optimization),
+    SEGO (constrained optimization), and MF-SEGO (multi-fidelity unconstrained or constrained optimization).
+
+    It is compatible with various acquisition functions, including:
+    - expected improvement,
+    - log expected improvement,
+    - probability of improvement, and
+    - log probability of improvement.
+
+    The constraints are handled by maximizing the acquisition function with respect to predictions from
+    constraint surrogate models, instead of using the Probability-of-Improvement approach.
+
+    In the multi-fidelity setting, the acquisition function is first maximized, followed by fidelity level selection.
+    This strategy maintains a nested Design of Experiments (DoE), meaning that for each new fidelity level sampled,
+    all lower-fidelity levels are also requested to be sampled.
+
+    MF-SEGO offers different fidelity selection criteria:
+    - obj-only,
+    - optimistic,
+    - pessimistic, and
+    - average.
+
+    Parameters
+    ----------
+    state : State
+        Optimization state containing surrogate models, data, and problem definition.
+
+    Other Parameters
+    ----------------
+    acq_func: callable, optional
+        Acquisition function used to rank candidate points (default: log_ei).
+    n_start: int, optional
+        Number of multistart initializations for the inner optimizer. Default: 20.
+    fidelity_crit: {"obj-only", "average", "optimistic", "pessimistic"}, optional
+        Strategy used to select fidelity level.
+    select_fidelity: bool, optional
+        If False, always evaluate all fidelity levels.
+    sp_method: str, optional
+        Optimization method passed to SciPy (e.g., "SLSQP", "COBYLA"). Default = "SLSQP".
+    sp_tol: float, optional
+        Tolerance for the SciPy optimizer. Default = sqrt(machine epsilon).
+
+    Notes
+    -----
+    When optimizing a high-dimensional problem, it is recommended to increase the number of
+    starting points (`n_start`). The default setting may be insufficient for problems with higher
+    dimensions or many constraints.
+
+    This acquisition strategy is designed to work with SMT's surrogate models. In the multi-fidelity setting,
+    SMT's MFK model must be used.
+    """
+
+
     def __init__(self, state: State, **kwargs):
+        """
+        Initialize the MFSEGO acquisition strategy.
+
+        Parameters
+        ----------
+        state : State
+            Optimization state.
+
+        **kwargs
+            Optional configuration parameters. See class docstring for full list.
+
+        Raises
+        ------
+        TypeError
+            If unexpected keyword arguments are provided.
+        """
         super().__init__()
 
         self.acq_context = state
@@ -44,6 +116,9 @@ class MFSEGO(AcquisitionStrategy):
 
         if state and self.n_start is None:
             self.n_start = 20 # * state.problem.num_dim
+
+        self.fmin: float | None = None  # current best feasible objective value
+
 
     def validate_config(self, acq_context: State) -> None:
 
@@ -75,29 +150,37 @@ class MFSEGO(AcquisitionStrategy):
 
 
     def get_infill(self, acq_context: State) -> list[np.ndarray]:
+        """
+        Compute the next infill point(s) using the acquisition strategy.
 
+        Parameters
+        ----------
+        acq_context : State
+            Current optimization state, including surrogate models and data.
+
+        Returns
+        -------
+        list of ndarray
+            List of selected infill points. Each entry corresponds to a point
+            (and potentially a fidelity level, depending on configuration).
+
+        Notes
+        -----
+        This method:
+        - Optimizes the acquisition function using a multistart strategy
+        - Applies the selected fidelity criterion if `select_fidelity=True`
+        - Uses SciPy optimizers (controlled via `sp_method`, `sp_tol`)
+        """
 
         if isinstance(self.seed, int) or isinstance(self.seed, float):
             self.seed += 1
 
         acq_data = dict()
 
-        # TODO: correct .dataset -> .scaled_dataset
+        # gets the current best feasible objective value from the scaled dataset
         best_sample = acq_context.get_best_sample(ctol=0., scaled=True)
-        self.fmin = best_sample.obj[0]      # mono-objective only
-        # y = acq_context.scaled_dataset.export_data([0], acq_context.problem.num_fidelity-1)
-
-        # if acq_context.problem.num_cstr > 0:
-        #     indices = [idx for idx in range(acq_context.problem.num_obj, acq_context.problem.num_obj+acq_context.problem.num_cstr)]
-        #     c = acq_context.dataset.export_data(indices, acq_context.problem.num_fidelity-1)
-        #     self.fmin = get_fmin(y, c, acq_context.cstr_types)
-        # else:
-        #     self.fmin = get_fmin(y)
-
+        self.fmin = best_sample.obj[0]                                          # mono-objective only
         acq_data["fmin"] = self.fmin
-        # acq_data["fmin_descaled"] = self.fmin * optimizer.yt[-1].std(axis=0) + optimizer.yt[-1].mean()
-
-
 
         # scipy objective wrapper
         scipy_obj = self.build_scipy_objective(acq_context)
@@ -111,10 +194,12 @@ class MFSEGO(AcquisitionStrategy):
                 mix_var = True
                 break
 
+        # TODO: merge continuous and mixvar multistart optimization
         if not mix_var:
             # generate starting points for the multistart optimization
             gen_t0 = perf_counter()
             # multi_x0 = self.generate_multistart_points(optimizer)
+            # TODO: initialize sampler in init class method
             sampler = stats.qmc.LatinHypercube(d=acq_context.problem.num_dim, rng=acq_context.iter)
             multi_x0 = sampler.random(self.n_start)
             gen_t1 = perf_counter()
@@ -136,12 +221,14 @@ class MFSEGO(AcquisitionStrategy):
                                              tol=self.sp_tol,
                                              seed=self.seed)
 
+        # next infill location
         next_x = res.x
 
-        # select highest fidelity level to sample
+        # selects highest fidelity level to sample
         fid_crit_t0 = perf_counter()
         level = self.get_fidelity(next_x.reshape(1, -1), acq_context)[0]
 
+        # keeps the DoE nested -> requests sampling all lower fidelity levels
         infills = []
         for lvl in range(acq_context.problem.num_fidelity):
             if lvl <= level:
@@ -217,10 +304,29 @@ class MFSEGO(AcquisitionStrategy):
         return scipy_cstr
 
 
-    def get_fidelity(self, next_x: np.ndarray, state: State) -> int:
+    def get_fidelity(self, next_x: np.ndarray, state: State) -> list[int]:
+        """
+        Select the highest fidelity level to sample at the given point(s).
+
+        Parameters
+        ----------
+        next_x : np.ndarray
+            The point(s) to sample at.
+        state : State
+            The current optimization state.
+
+        Returns
+        -------
+        levels : list[int] or array of int
+            The selected fidelity level(s). If `state.problem.num_fidelity` is 1, returns the single fidelity level;
+            otherwise, returns a list of fidelity levels, one for each point in `next_x`.
+
+        Notes
+        -----
+        This method takes into account the problem's cost model and the available surrogate models.
+        """
 
         num_points = next_x.shape[0]
-        num_dim = next_x.shape[1]
 
         if state.problem.num_fidelity > 1 and self.select_fidelity:
 
