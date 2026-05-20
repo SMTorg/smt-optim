@@ -20,11 +20,18 @@ authors:
   - name: Rémi Lafage
     orcid: 0000-0001-5479-2961
     affiliation: 2
+  - name: Eric Laurendeau
+    orcid: 0000-0001-5770-2597
+    affiliation: 3
 affiliations:
  - name: GERAD and Department of Mathematics and Industrial Engineering, Polytechnique Montréal, Canada
    index: 1
  - name: Fédération ENAC ISAE-SUPAERO ONERA, Université de Toulouse, France
    index: 2
+ - name: Department of Mechanical Engineering, Polytechnique Montréal, Canada
+   index: 3
+  
+
 date: 19 May 2026
 bibliography: paper.bib
 
@@ -48,17 +55,16 @@ The SMT-Optim package also provides various benchmark optimization frameworks, a
 
 : Optimization frameworks available in SMT-Optim \label{tab:frameworks}
 
-| Framework | Surrogate | Eq. constraints | Ineq. constraints | Multi-fidelity | Mixed-variabled |
-| --------- | :-------: | :-------------: | :---------------: | :------------: | :-------------: |
-| EGO       |  GPX/KRG  |        No       |         No        |       No       |       Yes       |
-| SEGO      |  GPX/KRG  |       Yes       |        Yes        |       No       |       Yes       |
-| MFSEGO    |    MFK    |       Yes       |        Yes        |       Yes      |       Yes       |
-| VF-PI     |    MFCK   |        No       |        Yes        |       Yes      |        No       |
-
+| Framework | Surrogate | Equality constraints | Inequality constraints | Multi-fidelity | Mixed-variable |
+| --------- | :-------: | :------------------: | :--------------------: | :------------: | :------------: |
+| EGO       |  GPX/KRG  |        No            |         No             |       No       |       Yes      |
+| SEGO      |  GPX/KRG  |       Yes            |        Yes             |       No       |       Yes      |
+| MFSEGO    |    MFK    |       Yes            |        Yes             |       Yes      |       Yes      |
+| VF-PI     |    MFCK   |        No            |        Yes             |       Yes      |        No      |
 
 # Statement of need
 
-One of SMT-Optim's goals is to provide a frictionless interface for solving constrained, multi-fidelity, and mixed-variable problems with Bayesian optimization. SMT-Optim has two target audiences:
+One of SMT-Optim's goals is to provide an interface for solving constrained, multi-fidelity, and mixed-variable problems with Bayesian optimization. SMT-Optim has two target audiences:
 
 1. Users who want to apply Bayesian optimization to expensive-to-evaluate blackbox problems; 
 2. Researchers who want to experiment with Bayesian optimization and develop new frameworks.
@@ -69,7 +75,7 @@ In engineering, Multidisciplinary Design Analysis (MDA) couples physical discipl
 
 ## Illustration of multi-fidelity Bayesian optimization
 
-Figure \ref{fig:rosenbrock} illustrates the sampling behavior of SMT-Optim's MFSEGO implementation on the constrained multi-fidelity Rosenbrock test problem [@lam_2015] with low- and high-fidelity sampling costs of 0.1 and 1, respectively. The initial design of experiment (DoE) is comprised of 8 low- and 4 high-fidelity samples, totaling a initial sampling budget of 4.8 units. The solution is found after 15 iterations. The final DoE is comprised of 23 LF samples and 6 HF samples, resulting in a final sampling budget of 8.3 units. 
+Figure \ref{fig:rosenbrock} illustrates the sampling behavior of SMT-Optim's MFSEGO implementation on the constrained multi-fidelity Rosenbrock test problem [@lam_2015] with low- (LF) and high-fidelity (HF) sampling costs of 0.1 and 1, respectively. The initial Design of Experiments (DOE) is comprised of 8 low- and 4 high-fidelity samples, totaling a initial sampling budget of 4.8 units. The solution is found after 15 iterations. The final DOE is comprised of 23 LF samples and 6 HF samples, resulting in a final sampling budget of 8.3 units. 
 
 ![Constrained Rosenbrock low-fidelity (LF) and high-fidelity (HF) functions and the sampled points at the end of the optimization process. The shaded areas denote the unfeasible regions due to the inequality constraint. \label{fig:rosenbrock}](figures/rosenbrock_multifidelity.pdf)
 
