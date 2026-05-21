@@ -361,6 +361,8 @@ class Driver:
         if len(self.state.dataset.samples) == 0:
             generate_initial_design(self.state, self.evaluator, self.config)
 
+        self.call_loggers(self.state)
+
 
     def call_loggers(self, state):
         # if self.loggers is not None:
