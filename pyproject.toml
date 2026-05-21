@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smt-optim"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name="Oihan Cordelier", email="oihan.cordelier@polymtl.ca" },
 ]
-description = "A constrained, multi-fidelity, mixed variable Bayesian optimization toolkit"
+description = "A Python toolbox for constrained and multi-fidelity Bayesian optimization"
 readme = "README.md"
 requires-python = ">=3.11"
 
@@ -28,7 +28,7 @@ license-files = ["LICEN[CS]E*"]
 
 [project.optional-dependencies]
 dev = [
-    "smt>=2.10",
+    "smt>=2.13.0",
 ]
 
 [project.urls]
