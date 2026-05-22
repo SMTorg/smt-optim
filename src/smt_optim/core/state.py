@@ -255,6 +255,8 @@ class State:
             Tolerance for constraint violation. Default is 1e-4.
         fidelity : int, optional
             Fidelity level to consider. If -1, uses the highest fidelity. Default is -1.
+        scaled : bool, optional
+            Return scaled sample. Default is False.
 
         Returns
         -------

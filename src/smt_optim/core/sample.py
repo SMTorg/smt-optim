@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 import time
 import warnings
+import numbers
 import csv
 import os
 
@@ -159,7 +160,7 @@ class OptimizationDataset:
     def export_as_dict(self) -> dict:
         """
         Exports the samples data as a dictionary, including fidelity levels, evaluation times, input values,
-        objective function values, constraint function values, and RSCV values.
+        objective function values, constraint function values, and RSCV values. Numeric metadata are also exported.
 
         Returns
         -------
@@ -172,34 +173,70 @@ class OptimizationDataset:
                 - "rscv": an array of shape (num_samples,) representing the Root Square Constraint Violation value for each sample.
                 - "x": an array of shape (num_samples, nvar) representing the input values for each sample.
         """
-        # TODO: add metadata to exported dict
-
         num_sample = len(self.samples)
-        fidelity = np.empty((num_sample, 1))
+        fidelity = np.empty(num_sample)
         eval_time = np.empty((num_sample, self.num_obj+self.num_cstr))
 
         nvar = len(self.samples[0].x)
         xt = np.empty((num_sample, nvar))               # inputs
         yt = np.empty((num_sample, self.num_obj))       # objectives
         ct = np.empty((num_sample, self.num_cstr))      # constraints
-        rscv = np.empty(num_sample)                     # constraints
-
-        for idx, sample in enumerate(self.samples):
-            fidelity[idx, 0] = sample.fidelity
-            eval_time[idx, :] = sample.eval_time
-            xt[idx, :] = sample.x
-            yt[idx, :] = sample.obj
-            ct[idx, :] = sample.cstr
-            rscv[idx] = sample.metadata["rscv"]
 
         data = {
             "cstr": ct,
             "eval_time": eval_time,
             "fidelity": fidelity,
             "obj": yt,
-            "rscv": rscv,
             "x": xt,
         }
+
+        metadata_keys = {}
+        metadata_shapes = {}
+        reserved_keys = set(data.keys())
+
+        for sample in self.samples:
+            for key, value in sample.metadata.items():
+
+                # Ignore conflicting names
+                if key in reserved_keys:
+                    warnings.warn(
+                        f"Metadata key '{key}' conflicts with an exported "
+                        "attribute name and will be ignored.")
+                    continue
+
+                # Scalar numeric case
+                if isinstance(value, numbers.Number):
+                    metadata_keys[key] = "scalar"
+                    continue
+
+                # 1D numpy array case
+                if isinstance(value, np.ndarray) and value.ndim == 1:
+                    metadata_keys[key] = "vector"
+                    metadata_shapes[key] = value.shape[0]
+                    continue
+
+        # Allocate arrays for metadata
+        for key, kind in metadata_keys.items():
+            if kind == "scalar":
+                data[key] = np.empty(num_sample)
+            elif kind == "vector":
+                data[key] = np.empty((num_sample, metadata_shapes[key]))
+
+        for idx, sample in enumerate(self.samples):
+            fidelity[idx] = sample.fidelity
+            eval_time[idx, :] = sample.eval_time
+            xt[idx, :] = sample.x
+            yt[idx, :] = sample.obj
+            ct[idx, :] = sample.cstr
+
+            # Export metadata
+            for key, kind in metadata_keys.items():
+                value = sample.metadata.get(key, np.nan)
+
+                if kind == "scalar":
+                    data[key][idx] = value
+                elif kind == "vector":
+                    data[key][idx, :] = value
 
         return data
 
@@ -313,7 +350,6 @@ class Evaluator:
                         metadata={
                             "iter": state.iter,
                             "budget": state.budget,
-                            "fidelity": lvl,
                             "rscv": compute_rscv(cstr_values.reshape(1, -1), state.problem.cstr_configs).item()
                         }
                     )
@@ -344,8 +380,8 @@ class Evaluator:
             row = dict()
 
             row["iter"] = sample.metadata.get("iter", np.nan)
-            row["budget"] = sample.metadata.get("budget", np.nan)  # self.compute_used_budget() # self.budget
-            row["fidelity"] = sample.metadata.get("fidelity", np.nan)  # self.compute_used_budget() # self.budget
+            row["budget"] = sample.metadata.get("budget", np.nan)       # self.compute_used_budget() # self.budget
+            row["fidelity"] = sample.fidelity                               # self.compute_used_budget() # self.budget
 
             # save variables
             for i in range(len(sample.x)):

@@ -59,6 +59,19 @@ class TestOptimizationDataset(unittest.TestCase):
             eval_time=None,
         )
 
+        self.s4 = Sample(
+            x=np.array([4.1, 5.1]),
+            fidelity=1,
+            obj=np.array([5.0, 6.0]),
+            cstr=np.array([30.0]),
+            eval_time=None,
+            metadata={
+                "scalar": np.pi,
+                "array": np.full((2,), np.pi),
+                "alpha": "word",
+            }
+        )
+
 
     def test_add_initializes_dimensions(self):
         self.dataset.add(self.s1)
@@ -165,6 +178,41 @@ class TestOptimizationDataset(unittest.TestCase):
 
         self.assertEqual(result.shape, (0,))
         self.assertEqual(result.size, 0)
+
+
+    def test_export_as_dict(self):
+
+        self.dataset.add(self.s1)
+        self.dataset.add(self.s2)
+        self.dataset.add(self.s3)
+        self.dataset.add(self.s4)
+
+        data_as_dict = self.dataset.export_as_dict()
+
+
+        keys = set(data_as_dict.keys())
+
+        self.assertIn("scalar", keys)
+        # test that there is a single scalar value in data_as_dict["scalar"],
+        # all other values in the array should be np.nan
+        self.assertEqual(data_as_dict["scalar"].shape, (4,))
+        finite_idx = np.where(~np.isnan(data_as_dict["scalar"]))[0]
+        self.assertEqual(len(finite_idx), 1)
+        self.assertEqual(finite_idx[0], 3)
+        self.assertEqual(data_as_dict["scalar"][3], self.s4.metadata["scalar"])
+
+        self.assertIn("array", keys)
+        # test that the dimension of data_as_dict["array"], should be (4, 2)
+        self.assertEqual(data_as_dict["array"].shape, (4, 2))
+        self.assertTrue(np.all(np.isnan(data_as_dict["array"][:3, :])))
+        # test that only the last row is numerical, all the other value should be np.nan
+        np.testing.assert_array_equal(
+            data_as_dict["array"][3, :],
+            self.s4.metadata["array"]
+        )
+
+        self.assertNotIn("alpha", keys)
+
 
 
 class TestEvaluator(unittest.TestCase):
