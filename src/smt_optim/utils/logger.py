@@ -25,13 +25,13 @@ class ConsoleLogger:
         self.row_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
 
         self.formats = {
-            "iter": ".0f",
-            "budget": ".3f",
-            "fmin": ".5e",
-            "rscv": ".3e",
-            "fidelity": ".0f",
-            "gp_time": ".3f",
-            "acq_time": ".3f",
+            "iter":         ".0f",
+            "budget":       ".3f",
+            "fmin":         ".5e",
+            "rscv":         ".3e",
+            "fidelity":     ".0f",
+            "gp_time":      ".3f",
+            "acq_time":     ".3f",
         }
 
         self.iter = 0
@@ -45,20 +45,22 @@ class ConsoleLogger:
 
         sample = state.get_best_sample(ctol=1e-4)
 
+        iter_log = getattr(state, "iter_log", {}) or {}
+
         data = {
             "iter": state.iter,
             "budget": state.budget,
             "fmin": sample.obj[0],
             "rscv": sample.metadata["rscv"],
-            "fidelity": state.iter_log["fidelity"],
-            "gp_time": state.iter_log["gp_training_time"],
-            "acq_time": state.iter_log["acq_opt_time"],
+            "fidelity": iter_log.get("fidelity", np.nan),
+            "gp_time": iter_log.get("gp_training_time", np.nan),
+            "acq_time": iter_log.get("acq_opt_time", np.nan),
         }
         row = [format_value(data[h], self.formats[h]) for h in self.headers]
         print(self.row_fmt.format(*row))
 
         self.iter += 1
-        #print(f"iter={state.iter}/{self.config.max_iter}  |  budget={state.budget:.2f}/{self.config.max_budget:.2f}  |  fmin={sample.obj[0]:.2e}  |  fid={state.iter_log["fidelity"]}/{state.problem.num_fidelity}  |  gp_time={state.iter_log["gp_training_time"]:.1f}  |  acq_time={state.iter_log["acq_opt_time"]:.1f}")
+
 
     def print_header(self):
         print(self.header_fmt.format(*self.headers))
