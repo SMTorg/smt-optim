@@ -16,4 +16,5 @@
 ../../_collections/tutorial/mixed_variable
 ../../_collections/tutorial/benchmark_registry
 ../../_collections/tutorial/imse_example
+../../_collections/tutorial/multi_obj
 ```

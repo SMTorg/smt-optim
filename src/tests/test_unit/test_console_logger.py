@@ -16,6 +16,7 @@ class DummyState:
     def __init__(self, iter_, budget):
         self.iter = iter_
         self.budget = budget
+        self.problem = DummyProblem()
         self.iter_log = {
             "fidelity": 2,
             "gp_training_time": 0.123,
@@ -24,6 +25,11 @@ class DummyState:
 
     def get_best_sample(self, ctol):
         return DummySample([1.2345])
+
+
+class DummyProblem:
+    def __init__(self, num_obj=1):
+        self.num_obj = num_obj
 
 
 class DummyConfig:

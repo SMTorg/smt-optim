@@ -14,6 +14,7 @@ from .sfu import many_local_minima, bowl_shaped
 from .gotestproblems import constrained
 from .avt311 import avt311
 from .misc import mixvar_branin
+from .multiobj import zdt, zdt_mf, constrained as mo_constrained
 
 from .misc import mf_colville
 from .misc import mf_borehole
@@ -41,6 +42,9 @@ _register_from_module(bowl_shaped)
 _register_from_module(constrained)
 _register_from_module(avt311)
 _register_from_module(mixvar_branin)
+_register_from_module(zdt)
+_register_from_module(mo_constrained)
+_register_from_module(zdt_mf)
 
 _register_from_module(mf_colville)
 _register_from_module(mf_borehole)

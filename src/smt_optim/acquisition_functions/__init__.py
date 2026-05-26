@@ -6,6 +6,8 @@ from .probability_improvement import (
 )
 from .fidelity_correlation import fidelity_correlation
 from .integrated_variance_reduction import integrated_variance_reduction
+from .ehvi import init_ehvi_2o
+from .mpi import init_mpi
 
 __all__ = [
     "expected_improvement",
@@ -16,4 +18,6 @@ __all__ = [
     "log_pi",
     "fidelity_correlation",
     "integrated_variance_reduction",
+    "init_ehvi_2o",
+    "init_mpi",
 ]
