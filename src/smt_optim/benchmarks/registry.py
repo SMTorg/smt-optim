@@ -9,6 +9,7 @@ from .misc import edge_cases
 from .sfu import many_local_minima
 from .avt311 import avt311
 from .misc import mixvar_branin
+from .multiobj import multiobj
 
 available = {}
 
@@ -26,6 +27,7 @@ _register_from_module(edge_cases)
 _register_from_module(many_local_minima)
 _register_from_module(avt311)
 _register_from_module(mixvar_branin)
+_register_from_module(multiobj)
 
 
 # def list_problems(**criteria):

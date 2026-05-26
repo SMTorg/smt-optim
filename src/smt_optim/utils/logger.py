@@ -6,6 +6,7 @@ import numpy as np
 
 from .json import json_safe
 
+from smt_optim.acquisition_functions.multi_obj import hypervolume_2d, get_pareto_front
 
 def format_value(v, fmt):
     if isinstance(v, float):
@@ -14,6 +15,102 @@ def format_value(v, fmt):
 
 
 class ConsoleLogger:
+    def __init__(self, config):
+        self.config = config
+
+        self.headers = ["iter", "budget", "fmin", "rscv", "fidelity", "gp_time", "acq_time"]
+        self.widths: list | None = None
+        self.header_fmt: str | None = None
+        self.row_fmt: str | None = None
+        self.update_header_format()
+
+        self.formats = {
+            "iter":         ".0f",
+            "budget":       ".3f",
+            "fmin":         ".5e",
+            "HV":           ".5e",      # hypervolume (for multi-obj only)
+            "rscv":         ".3e",
+            "fidelity":     ".0f",
+            "gp_time":      ".3f",
+            "acq_time":     ".3f",
+        }
+
+        self.iter = 0
+        self.repeat_header = 10
+
+        self.multi_obj_ref = None   # reference objective values (for multi-obj only)
+
+
+    def on_iter_end(self, state) -> None:
+
+        if self.iter % self.repeat_header == 0:
+
+            if state.problem.num_obj > 1 and "fmin" in self.headers:
+                self.headers[2] = "HV"
+                self.headers.pop(3)
+                self.update_header_format()
+
+                dataset = state.dataset.export_as_dict()
+                obj = dataset["obj"]
+                rscv = dataset["rscv"]
+
+                self.multi_obj_ref = np.array([
+                    obj[:, 0][rscv <= 1e-4].max(),
+                    obj[:, 1][rscv <= 1e-4].max(),
+                ])
+
+            self.print_header()
+
+        sample = state.get_best_sample(ctol=1e-4)
+
+        iter_log = getattr(state, "iter_log", {}) or {}
+
+        data = {
+            "iter": state.iter,
+            "budget": state.budget,
+            # "rscv": sample.metadata["rscv"],
+            "fidelity": iter_log.get("fidelity", np.nan),
+            "gp_time": iter_log.get("gp_training_time", np.nan),
+            "acq_time": iter_log.get("acq_opt_time", np.nan),
+        }
+
+        if state.problem.num_obj == 1:
+            data["fmin"] = sample.obj[0]
+            data["rscv"] = sample.metadata["rscv"]
+
+        elif state.problem.num_obj == 2:
+
+            dataset = state.dataset.export_as_dict()
+            obj = dataset["obj"]
+            rscv = dataset["rscv"]
+            obj = obj[rscv <= 1e-4, :]
+            pf = get_pareto_front(obj)
+
+            hv = hypervolume_2d(pf, self.multi_obj_ref)
+            data["HV"] = hv
+
+        else:
+            data["HV"] = np.nan
+
+        row = [format_value(data[h], self.formats[h]) for h in self.headers]
+        print(self.row_fmt.format(*row))
+
+        self.iter += 1
+
+
+    def print_header(self):
+        print(self.header_fmt.format(*self.headers))
+
+    def update_header_format(self):
+        width = 14
+        self.widths = [max(len(h), width) for h in self.headers]
+
+        self.header_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
+        self.row_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
+
+
+
+class BiObjConsoleLogger:
     def __init__(self, config):
         self.config = config
 
@@ -27,7 +124,7 @@ class ConsoleLogger:
         self.formats = {
             "iter":         ".0f",
             "budget":       ".3f",
-            "fmin":         ".5e",
+            "HV":           ".5e",
             "rscv":         ".3e",
             "fidelity":     ".0f",
             "gp_time":      ".3f",
@@ -48,12 +145,12 @@ class ConsoleLogger:
         iter_log = getattr(state, "iter_log", {}) or {}
 
         data = {
-            "iter": state.iter,
-            "budget": state.budget,
-            "fmin": sample.obj[0],
-            "rscv": sample.metadata["rscv"],
+            "iter":     state.iter,
+            "budget":   state.budget,
+            "HV":       sample.obj[0],
+            "rscv":     sample.metadata["rscv"],
             "fidelity": iter_log.get("fidelity", np.nan),
-            "gp_time": iter_log.get("gp_training_time", np.nan),
+            "gp_time":  iter_log.get("gp_training_time", np.nan),
             "acq_time": iter_log.get("acq_opt_time", np.nan),
         }
         row = [format_value(data[h], self.formats[h]) for h in self.headers]
