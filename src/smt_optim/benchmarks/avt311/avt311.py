@@ -3,7 +3,7 @@ Paper:  https://arxiv.org/pdf/2204.07867
 Code:   https://gitlab.com/qudo046/avt-331-l1-benchmarks
 """
 from functools import partial
-import math
+import warnings
 
 import numpy as np
 
@@ -18,23 +18,23 @@ class Alos1(BenchmarkProblem):
         self.num_dim = 1
         self.num_cstr = 0
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 1],
         ])
 
         # self.costs = [0.15/9, 1]
 
-        self.objectives = [
+        self.objective = [
             partial(self.f, fid=0),
             partial(self.f, fid=1),
         ]
 
-        self.constraints = []
+        # self.constraints = []
 
         self.tags = [
-            "avt311"
+            "avt311",
         ]
-
 
     def f(self, x, fid=1):
         if fid == 1:
@@ -43,14 +43,16 @@ class Alos1(BenchmarkProblem):
             return (self.f(x) - 1.0 + x) / (1.0 + 0.25 * x)
 
 
-class Alos2(BenchmarkProblem):
+class Alos(BenchmarkProblem):
 
     def __init__(self):
         super().__init__()
 
+        self.name = "Alos"
         self.num_dim = 2
         self.num_cstr = 0
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 1],
             [0, 1],
@@ -58,55 +60,63 @@ class Alos2(BenchmarkProblem):
 
         # self.costs = [0.15/9, 1]
 
-        self.objectives = [
+        self.objective = [
             partial(self.f, fid=0),
             partial(self.f, fid=1),
         ]
 
-        self.constraints = []
+        # self.constraints = []
 
         self.tags = [
-            "avt311"
+            "avt311",
+            "n_variable",
         ]
+
+
+    def set_dim(self, dim: int):
+        if "n_variable" in self.tags:
+
+            if dim < 2 or dim > 3:
+                warnings.warn("Alos is either a 2D or 3D benchmark problem.")
+
+            self.num_dim = dim
+            self.bounds = self.bounds[-1, :].reshape(1, 2)
+            self.bounds = self.bounds.repeat(dim, axis=0)
+
 
     def f(self, x, fid=1):
         if fid == 1:
-            return math.sin(21.0*(x[0]-0.9)**4)*math.cos(2.0*(x[0]-0.9))+(x[0]-0.7)/2.0+ 2.0*x[1]**2*math.sin(x[0]*x[1])
+
+            val = np.sin(21*(x[0] - 0.9)**4) * np.cos(2*(x[0] - 0.9)) + (x[0] - 0.7)/2
+
+            for i in range(1, self.num_dim):
+                prod = np.prod(x[:i+1])
+                val += (i+1) * x[i]**(i+1) * np.sin(prod)
+
+            return val
+
         else:
-            return (self.f(x)-2.0+x[0]+x[1])/(5.0+0.25*x[0]+0.5*x[1])
+
+            val = self.f(x, fid=1)
+
+            num = val - 2 + np.sum(x)
+
+            term1 = 0.
+            for i in range(0, 2):
+                term1 += (i+1)*x[i]
+            term1 *= 0.25
+
+            term2 = 0.
+            for i in range(2, self.num_dim):
+                term2 += (i+1)*x[i]
+            term2 *= 0.25
+
+            denom = 5. + term1 - term2
+
+            return num/denom
 
 
-class Alos3(BenchmarkProblem):
-
-    def __init__(self):
-        super().__init__()
-
-        self.num_dim = 3
-        self.num_cstr = 0
-        self.num_fidelity = 2
-        self.bounds = np.array([[0, 1]] * self.num_dim)
-
-        # self.costs = [0.15/9, 1]
-
-        self.objectives = [
-            partial(self.f, fid=0),
-            partial(self.f, fid=1),
-        ]
-
-        self.constraints = []
-
-        self.tags = [
-            "avt311"
-        ]
-
-    def f(self, x, fid=1):
-        if fid == 1:
-            return math.sin(21.0 * (x[0] - 0.9) ** 4) * math.cos(2.0 * (x[0] - 0.9)) + (x[0] - 0.7) / 2.0 + 2.0 * x[1] ** 2 * math.sin(x[0] * x[1]) + 3.0 * x[2] ** 3 * math.sin(x[0] * x[1] * x[2])
-        else:
-            return (f(x) - 2.0 + x[0] + x[1] + x[2]) / (5.0 + 0.25 * x[0] + 0.5 * x[1] - 0.75 * x[2])
-
-
-class MFRosenbrock2D(BenchmarkProblem):
+class MFRosenbrock(BenchmarkProblem):
 
     def __init__(self):
         super().__init__()
@@ -114,63 +124,49 @@ class MFRosenbrock2D(BenchmarkProblem):
         self.num_dim = 2        # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 3
+        self.num_obj = 1
         self.bounds = np.array([[-2, 2]] * self.num_dim)
 
         # self.costs = [0.1, 1]
 
-        self.objectives = [
+        self.objective = [
             partial(self.f, fid=0),
             partial(self.f, fid=1),
             partial(self.f, fid=2),
         ]
 
-        self.constraints = []
+        # self.constraints = []
 
         self.tags = [
-            "avt311"
+            "avt311",
+            "n_variable",
         ]
 
     def f(self, x, fid=2):
 
-        f = 0
+        val = 0.
 
-        # high fidelity
         if fid == 2:
-            for k in range(self.num_dim - 1):
-                f += 100.0 * (x[k + 1] - x[k] ** 2) ** 2 + (1.0 - x[k]) ** 2
+            for i in range(self.num_dim-1):
+                val += 100*(x[i+1] - x[i]**2)**2 + (1 - x[i])**2
 
-        # medium fidelity
         elif fid == 1:
-            for k in range(self.num_dim - 1):
-                f += 50.0 * (x[k + 1] - x[k] ** 2) ** 2 + (-2.0 - x[k]) ** 2 - 0.5 * x[k]
-            f -= 0.5 * x[self.num_dim - 1]
+            for i in range(self.num_dim-1):
+                val += 50*(x[i+1] - x[i]**2)**2 + (-2 - x[i])**2
 
-        # low fidelity
-        if fid == 0:
-            for k in range(self.num_dim - 1):
-                f += 100.0 * (x[k + 1] - x[k] ** 2) ** 2 + (1.0 - x[k]) ** 2
+            val -= 0.5*np.sum(x)
 
-            b0 = 4.0
-            bi = [0.5 for x in range(self.num_dim)]
-            a0 = 10.0
-            ai = [0.25 for x in range(self.num_dim)]  # Be careful that the denom != 0
-            # subtract additive terms
-            delta = b0
-            for i in range(self.num_dim):
-                delta = delta + bi[i] * x[i]
-            uval = f - delta
-            # divide by multiplicative terms
-            fac = a0
-            for i in range(self.num_dim):
-                fac = fac + ai[i] * x[i]
-            uval = uval / fac
+        elif fid == 0:
+            sum_x = np.sum(x)
+            val = (self.f(x, fid=2) - 4. - 0.5*sum_x)/(10 + 0.25*sum_x)
 
-            f = uval
+        else:
+            raise ValueError()
 
-        return f
+        return val
 
 
-class MFRastrigin2D(BenchmarkProblem):
+class MFRastrigin(BenchmarkProblem):
 
     def __init__(self):
         super().__init__()
@@ -178,60 +174,124 @@ class MFRastrigin2D(BenchmarkProblem):
         self.num_dim = 2        # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 3
+        self.num_obj = 1
         self.bounds = np.array([[-0.1, 0.2]] * self.num_dim)
 
         # self.costs = [0.1, 1]
 
-        self.objectives = [
-            partial(self.f, fid=0),
-            partial(self.f, fid=1),
-            partial(self.f, fid=2),
+        self.objective = [
+            partial(self.fi, phi=2_500),
+            partial(self.fi, phi=5_000),
+            partial(self.fi, phi=10_000),
         ]
 
-        self.constraints = []
+        # self.constraints = []
 
         self.tags = [
-            "avt311"
+            "avt311",
+            "n_variable",
         ]
 
-        self.xStar = [0.1 for x in range(self.num_dim)]
-        self.Xtrasla = [0.0 for x in range(self.num_dim)]
-        self.Theta = 0.2
-        self.Rmat = [[math.cos(self.Theta), -math.sin(self.Theta)], [math.sin(self.Theta), math.cos(self.Theta)]]
+        self.xStar = np.full(self.num_dim, 0.1)
+        self.theta = 0.2
+        self.Rmat = self.rotation_matrix(self.num_dim,
+                                         np.zeros((self.num_dim, self.num_dim-1)),
+                                         self.theta)
 
-    def f(self, x, fid=2):
 
-        for k in range(self.num_dim):
-            self.Xtrasla[k] = x[k] - self.xStar[k]
 
-        z = [0.0 for x in range(self.num_dim)]
-        for k in range(self.num_dim):
-            for j in range(self.num_dim):
-                z[k] += self.Rmat[k][j] * self.Xtrasla[j]
+    def set_dim(self, dim: int):
+        if "n_variable" in self.tags:
+            self.num_dim = dim
+            self.bounds = self.bounds[-1, :].reshape(1, 2)
+            self.bounds = self.bounds.repeat(dim, axis=0)
 
-        f = 0.0
-        for k in range(self.num_dim):
-            f += (z[k] ** 2.0 + 1.0 - math.cos(10.0 * math.pi * z[k]))
+            self.xStar = np.full(self.num_dim, 0.1)
+            self.Rmat = self.rotation_matrix(self.num_dim,
+                                             np.zeros((self.num_dim, self.num_dim-1)),
+                                             self.theta)
 
-        if fid == 2:
-            Phi = 10000.0
-        elif fid == 1:
-            Phi = 5000.0
-        else:
-            Phi = 2500.0
 
-        TH = 1.0 - 0.0001 * Phi
-        a = TH
-        w = 10.0 * math.pi * TH
-        b = 0.5 * math.pi * TH
+    def f1(self, z):
+        return np.sum(z**2 + 1 - np.cos(10*np.pi*z))
 
-        er = 0.0
-        for k in range(self.num_dim):
-            er += a * (math.cos(w * z[k] + b + math.pi) ** 2.0)
 
-        f += er
+    def z(self, x):
+        return self.Rmat @ (x - self.xStar)
 
-        return f
+
+    def resolution_error(self, z: np.ndarray, phi: float):
+
+        omega = 1 - phi/10_000
+        a = omega
+        w = 10*np.pi*omega
+        b = 0.5*np.pi*omega
+
+        return np.sum(a * np.cos(w*z + b + np.pi)**2)
+
+    def rotation_matrix(self, n, v, theta):
+        """
+        Aguilera-Perez algorithm
+
+        Parameters
+        ----------
+        n : int
+            Dimension
+        v : (n, n-1) array
+            Input matrix
+        theta : float
+            Final rotation angle
+
+        Returns
+        -------
+        R : (n, n) array
+            Final rotation matrix
+        """
+
+        v = v.copy().astype(float)
+        M = np.eye(n)
+
+        for c in range(n - 2):
+            for rr in range(n - 1, c, -1):
+                t = np.arctan2(v[rr, c], v[rr - 1, c])
+
+                R = np.eye(n)
+
+                # Givens rotation in (rr-1, rr)
+                coss = np.cos(t)
+                sins = np.sin(t)
+
+                R[rr, rr] = coss
+                R[rr, rr - 1] = sins
+                R[rr - 1, rr] = -sins
+                R[rr - 1, rr - 1] = coss
+
+                # v = R v
+                v1 = R @ v
+                v = v1
+
+                # M = R M
+                M1 = R @ M
+                M = M1
+
+        R = np.eye(n)
+
+        coss = np.cos(theta)
+        sins = np.sin(theta)
+
+        R[n - 1, n - 1] = coss
+        R[n - 1, n - 2] = sins
+        R[n - 2, n - 1] = -sins
+        R[n - 2, n - 2] = coss
+
+        B = R @ M
+        X = np.linalg.solve(M, B)
+
+        return X
+
+    def fi(self, x: np.ndarray, phi: float):
+        z = self.z(x)
+        return self.f1(z) + self.resolution_error(z, phi)
 
 
 class Forrester(BenchmarkProblem):
@@ -242,29 +302,30 @@ class Forrester(BenchmarkProblem):
         self.num_dim = 1        # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 4
+        self.num_obj = 1
         self.bounds = np.array([[0, 1]] * self.num_dim)
 
         # self.costs = [0.1, 1]
 
-        self.objectives = [
+        self.objective = [
             partial(self.f, fid=0),
             partial(self.f, fid=1),
             partial(self.f, fid=2),
             partial(self.f, fid=3),
         ]
 
-        self.constraints = []
+        # self.constraints = []
 
         self.tags = [
-            "avt311"
+            "avt311",
         ]
 
     def f(self, x, fid=3):
 
         if fid == 3:
-            f = ((6.0 * x - 2.0) ** 2.0) * math.sin(12.0 * x - 4.0)
+            f = ((6.0 * x - 2.0) ** 2.0) * np.sin(12.0 * x - 4.0)
         elif fid == 2:
-            f = ((5.50 * x - 2.5) ** 2.0) * math.sin(12.0 * x - 4.0)
+            f = ((5.50 * x - 2.5) ** 2.0) * np.sin(12.0 * x - 4.0)
         elif fid == 1:
             f = 0.75 * self.f(x) + 5.0 * (x - 0.5) - 2.0
         else:
@@ -281,27 +342,28 @@ class DiscForrester(BenchmarkProblem):
         self.num_dim = 1        # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([[0, 1]] * self.num_dim)
 
         # self.costs = [0.1, 1]
 
-        self.objectives = [
+        self.objective = [
             partial(self.f, fid=0),
             partial(self.f, fid=1),
         ]
 
-        self.constraints = []
+        # self.constraints = []
 
         self.tags = [
-            "avt311"
+            "avt311",
         ]
 
     def f(self, x, fid=1):
 
         if x <= 0.5:
-            f = ((6.0 * x - 2.0) ** 2.0) * math.sin(12.0 * x - 4.0)
+            f = ((6.0 * x - 2.0) ** 2.0) * np.sin(12.0 * x - 4.0)
         elif x > 0.5:
-            f = 10 + ((6.0 * x - 2.0) ** 2.0) * math.sin(12.0 * x - 4.0)
+            f = 10 + ((6.0 * x - 2.0) ** 2.0) * np.sin(12.0 * x - 4.0)
 
         if fid == 0:
             if x <= 0.5:

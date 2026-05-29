@@ -4,3 +4,4 @@ sphinx-collections
 sphinx-book-theme
 myst-parser
 myst-nb
+itables

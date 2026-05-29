@@ -24,6 +24,7 @@ class MixVarBranin(BenchmarkProblem):
         self.num_dim = 4
         self.num_obj = 1
         self.num_cstr = 1
+        self.num_fidelity = 1
 
         self.design_space = ds.DesignSpace([
             ds.FloatVariable(0, 1),
@@ -87,6 +88,7 @@ class MixVarGoldstein(BenchmarkProblem):
         self.num_dim = 4
         self.num_obj = 1
         self.num_cstr = 1
+        self.num_fidelity = 1
 
         self.design_space = ds.DesignSpace([
             ds.FloatVariable(0, 100),
@@ -194,7 +196,7 @@ class MultiFidelityMixVarBranin(BenchmarkProblem):
 
         self.children = MixVarBranin()
 
-        self.objectives = [self.objective_lf, self.children.objective]
+        self.objective = [self.objective_lf, self.children.objective]
 
         self.constraints = [
             [self.constraint_lf, self.children.constraint]

@@ -14,4 +14,5 @@
 ../../_collections/tutorial/api
 ../../_collections/tutorial/vfpi
 ../../_collections/tutorial/mixed_variable
+../../_collections/tutorial/benchmark_registry
 ```

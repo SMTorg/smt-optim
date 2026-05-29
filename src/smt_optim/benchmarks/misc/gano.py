@@ -9,6 +9,7 @@ class Gano(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 1
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0.1, 10],
             [0.1, 10]
@@ -42,6 +43,7 @@ class G8(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 2
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 10],
             [0, 10]
@@ -63,7 +65,7 @@ class G8(BenchmarkProblem):
     def G8b_f(self, x: np.ndarray) -> np.ndarray:
         x[0] += 0.1
         x[1] -= 0.1
-        return G8a_f(x)
+        return self.G8a_f(x)
 
         # if x[0]+0.1 == 0:
         #     return 0
@@ -80,11 +82,11 @@ class G8(BenchmarkProblem):
     def G8b_g1(self, x: np.ndarray) -> np.ndarray:
         x[0] += 0.1
         x[1] -= 0.1
-        return G8a_g1(x)
+        return self.G8a_g1(x)
         # return x[0] - (x[1] - 0.1) + 1
 
     def G8b_g2(self, x: np.ndarray) -> np.ndarray:
         x[0] += 0.1
         x[1] -= 0.1
-        return G8a_g2(x)
+        return self.G8a_g2(x)
         # return 1 - x[0]

@@ -1,12 +1,14 @@
 import inspect
+import warnings
+
 from smt_optim.benchmarks.base import BenchmarkProblem
 
 from .misc import original
 from .misc import gano
-from .misc import avt
-from .misc import modified_avt
-from .misc import edge_cases
-from .sfu import many_local_minima
+# from .misc import avt
+# from .misc import modified_avt
+# from .misc import edge_cases
+from .sfu import many_local_minima, bowl_shaped
 from .avt311 import avt311
 from .misc import mixvar_branin
 
@@ -19,11 +21,12 @@ def _register_from_module(module):
 
 _register_from_module(original)
 _register_from_module(gano)
-_register_from_module(avt)
-_register_from_module(modified_avt)
-_register_from_module(edge_cases)
+# _register_from_module(avt)
+# _register_from_module(modified_avt)
+# _register_from_module(edge_cases)
 
 _register_from_module(many_local_minima)
+_register_from_module(bowl_shaped)
 _register_from_module(avt311)
 _register_from_module(mixvar_branin)
 
@@ -38,7 +41,13 @@ _register_from_module(mixvar_branin)
 #
 #     return results
 
-def list_problems(n: list[int] = None, tags: list[str] = None) -> list[BenchmarkProblem]:
+def list_problems(n: list[int] = None,
+                  num_obj: list[int] = [1, 1],
+                  num_dim: list[int] = None,
+                  num_cstr: list[int] = None,
+                  num_fidelity: list[int] = None,
+
+                  tags: list[str] = None) -> list[BenchmarkProblem]:
     """
     Retrieves a list of BenchmarkProblem objects that match the specified problem features.
 
@@ -47,6 +56,9 @@ def list_problems(n: list[int] = None, tags: list[str] = None) -> list[Benchmark
     n : Optional[list[int]]
         A list containing minimum and maximum problem dimensions (inclusive).
         If `None`, no dimension filtering is applied.
+    m : Optional[list[int]]
+        A list containing minimum and maximum problem constraints (inclusive).
+        If `None`, no constraint filtering is applied.
     tags : Optional[list[str]]
         A list of problem tags to filter by. If `None`, no tag filtering is applied.
 
@@ -58,11 +70,25 @@ def list_problems(n: list[int] = None, tags: list[str] = None) -> list[Benchmark
 
     results = []
 
+    if n is not None:
+        warnings.deprecated("`n` will be removed in future version. Use `num_dim instead.")
+        num_dim = n
+
     for prob in available.values():
         try:
-            if n is not None:
-                if prob.num_dim < n[0] or prob.num_dim > n[1]:
+            if num_dim is not None:
+                if prob.num_dim < num_dim[0] or prob.num_dim > num_dim[1]:
                     continue
+            if num_cstr is not None:
+                if prob.num_cstr < num_cstr[0] or prob.num_cstr > num_cstr[1]:
+                    continue
+            if num_obj is not None:
+                if prob.num_obj < num_obj[0] or prob.num_obj > num_obj[1]:
+                    continue
+            if num_fidelity is not None:
+                if prob.num_fidelity < num_fidelity[0] or prob.num_fidelity > num_fidelity[1]:
+                    continue
+
             if tags is not None:
                 if not set(tags).issubset(set(prob.tags)):
                     continue
