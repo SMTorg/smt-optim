@@ -62,6 +62,7 @@ getting_started/mixed_var_optim
 :maxdepth: 1
 :caption: Reference: 
 API <api/index>
+Benchmark registry <benchmark_registry.ipynb>
 ```
 
 ```{toctree}

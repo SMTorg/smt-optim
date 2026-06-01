@@ -12,7 +12,7 @@ class BenchmarkProblem(ABC):
     num_fidelity: int = None
 
     bounds: np.ndarray = None
-    objective: Callable = None
+    objective: Callable | list[Callable] = None
     constraints: list = None
 
     tags: list = None

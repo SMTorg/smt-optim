@@ -28,6 +28,7 @@ class Branin1(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 1
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 1],
             [0, 1]
@@ -165,6 +166,7 @@ class Rosenbrock(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 1
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [-2, 2],
             [-2, 2]
@@ -212,6 +214,7 @@ class Sasena1(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 1
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 5],
             [0, 5]
@@ -253,6 +256,7 @@ class Branin2(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 1
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 1],
             [0, 1]
@@ -360,6 +364,7 @@ class BraninMF(BenchmarkProblem):
         self.num_dim = 2
         self.num_cstr = 1
         self.num_fidelity = 2
+        self.num_obj = 1
         self.bounds = np.array([
             [0, 1],
             [0, 1]
