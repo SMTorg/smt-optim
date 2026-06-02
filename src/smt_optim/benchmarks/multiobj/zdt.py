@@ -29,6 +29,7 @@ class ZDT1(BenchmarkProblem):
         self.num_dim: int | str = "variable"
         self.num_obj: int = 2
         self.num_cstr: int = 0
+        self.num_fidelity = 1
 
         self.tags = [
             "n_variable",
@@ -40,7 +41,7 @@ class ZDT1(BenchmarkProblem):
             [0, 1],
         ])
 
-        self.objectives = [
+        self.objective = [
             self.f1, self.f2,
         ]
 
@@ -72,6 +73,7 @@ class ZDT2(BenchmarkProblem):
         self.num_dim: int | str = "variable"
         self.num_obj: int = 2
         self.num_cstr: int = 0
+        self.num_fidelity = 1
 
         self.tags = [
             "n_variable",
@@ -83,7 +85,7 @@ class ZDT2(BenchmarkProblem):
             [0, 1],
         ])
 
-        self.objectives = [
+        self.objective = [
             self.f1, self.f2,
         ]
 
@@ -115,6 +117,7 @@ class ZDT3(BenchmarkProblem):
         self.num_dim: int | str = "variable"
         self.num_obj: int = 2
         self.num_cstr: int = 0
+        self.num_fidelity = 1
 
         self.tags = [
             "n_variable",
@@ -126,7 +129,7 @@ class ZDT3(BenchmarkProblem):
             [0, 1],
         ])
 
-        self.objectives = [
+        self.objective = [
             self.f1, self.f2,
         ]
 
@@ -158,6 +161,7 @@ class ZDT4(BenchmarkProblem):
         self.num_dim: int | str = "variable"
         self.num_obj: int = 2
         self.num_cstr: int = 0
+        self.num_fidelity = 1
 
         self.tags = [
             "n_variable",
@@ -170,7 +174,7 @@ class ZDT4(BenchmarkProblem):
             [np.nan, np.nan],
         ])
 
-        self.objectives = [
+        self.objective = [
             self.f1, self.f2,
         ]
 

@@ -19,8 +19,10 @@ from smt_optim.subsolvers import multistart_minimize
 
 from smt_optim.acquisition_functions.multi_obj import init_mpi
 
+from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints
 
-class MultiObj(AcquisitionStrategy):
+
+class MOSEGO(AcquisitionStrategy):
     def __init__(self, state: State, **kwargs):
         super().__init__()
 
@@ -28,6 +30,7 @@ class MultiObj(AcquisitionStrategy):
         self.n_start = kwargs.pop("n_start", 20)
         self.sp_method = kwargs.pop("sp_method", "Cobyla")
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))
+        self.seed = kwargs.pop("seed", None)
 
 
     def validate_config(self, state):
@@ -36,93 +39,56 @@ class MultiObj(AcquisitionStrategy):
 
     def get_infill(self, state):
 
-        self.seed = state.iter
+        if isinstance(self.seed, int) or isinstance(self.seed, float):
+            self.seed += 1
 
-        sampler = stats.qmc.LatinHypercube(d=state.problem.num_dim, rng=state.iter)
-        multi_x0 = sampler.random(self.n_start)
+        acq_data = dict()
 
         acq_func: Callable = self.acq_func_gen(state)
 
-        cstr_func: list = build_scipy_constraints(state)
+        def scipy_obj(x):
+            x = x.reshape(1, -1)
+            return -acq_func(x)
 
-        if self.sp_method is None:
-            val = np.empty(multi_x0.shape[0])
-            c_val = np.empty((multi_x0.shape[0], state.problem.num_cstr))
+        scipy_cstr: list = build_scipy_constraints(state)
 
-            for idx in range(multi_x0.shape[0]):
-                val[idx] = acq_func(multi_x0[idx, :].reshape(1, -1))
+        mix_var = False
+        for dv in state.problem.design_space.design_variables:
+            if not isinstance(dv, ds.FloatVariable):
+                mix_var = True
+                break
 
-                for jdx in range(state.problem.num_cstr):
-                    c_val[idx, jdx] = -cstr_func[jdx]["fun"](multi_x0[idx, :].reshape(1, -1))
+        # TODO: merge continuous and mixvar multistart optimization
+        if not mix_var:
+            # generate starting points for the multistart optimization
+            gen_t0 = perf_counter()
+            # multi_x0 = self.generate_multistart_points(optimizer)
+            # TODO: initialize sampler in init class method
+            sampler = stats.qmc.LatinHypercube(d=state.problem.num_dim, seed=state.iter)
+            multi_x0 = sampler.random(self.n_start)
+            gen_t1 = perf_counter()
+            acq_data["generate_init_points_time"] = gen_t1 - gen_t0
 
-            # constrained problem
-            if state.problem.num_cstr > 0:
-                rscv = np.sqrt(np.sum(np.maximum(c_val, 0) ** 2, axis=1))
-                feas_mask = rscv <= 1e-4    # RSCV tolerance
-
-                # no feasible points
-                if len(feas_mask) == 0:
-                    idx = np.argmin(rscv)
-
-                # at least on feasible point
-                else:
-                    idx = np.argmax(np.where(rscv, val, -np.inf))
-
-            # unconstrained problem
-            else:
-                idx = np.argmax(val)
-            next_x = multi_x0[idx, :]
-
-        else:
-            def sp_wrapper(x):
-                x = x.reshape(1, -1)
-                return -acq_func(x)
-
-            res = multistart_minimize(sp_wrapper,
+            res = multistart_minimize(scipy_obj,
                                       bounds=np.array([[0, 1]] * state.problem.num_dim),
-                                      constraints=cstr_func,
-                                      n_start=self.n_start,
+                                      multi_x0=multi_x0,
+                                      constraints=scipy_cstr,
                                       seed=self.seed,
                                       tol=self.sp_tol,
-                                      method=self.sp_method, )
+                                      method=self.sp_method,)
+        else:
+            res = mixvar_multistart_minimize(scipy_obj,
+                                             design_space=state.problem.design_space,
+                                             constraints=scipy_cstr,
+                                             n_start=self.n_start,
+                                             method=self.sp_method,
+                                             tol=self.sp_tol,
+                                             seed=self.seed)
 
-            next_x = res.x
+        next_x = res.x
         infill = [next_x.reshape(1, -1)]
 
+        state.iter_log["acquisition"] = acq_data
+
         return infill
-
-def build_scipy_constraints(state: State) -> list[dict]:
-
-    # TODO: merge with similar method in mfsego.py
-
-    scipy_cstr = []
-
-    def append_sp_cstr(func: Callable, type: str) -> None:
-        scipy_cstr.append({
-            "fun": func,
-            "type": type,
-        })
-
-    def sp_constraint(x, model):
-        x = x.reshape(1, -1)
-        mu = model.predict_values(x)
-        return mu.item()
-
-
-    for c_id, c_config in enumerate(state.problem.cstr_configs):
-
-        if c_config.equal is not None:
-            func = lambda x, f=sp_constraint, value=state.cstr_equal[c_id], m=state.cstr_models[c_id]: f(x, m) - value
-            append_sp_cstr(func, "eq")
-
-        else:
-            if c_config.lower is not None:
-                func = lambda x, f=sp_constraint, value=state.cstr_lower[c_id], m=state.cstr_models[c_id]: - value + f(x, m)
-                append_sp_cstr(func, "ineq")
-
-            if c_config.upper is not None:
-                func = lambda x, f=sp_constraint, value=state.cstr_upper[c_id], m=state.cstr_models[c_id]: - f(x, m) + value
-                append_sp_cstr(func, "ineq")
-
-    return scipy_cstr
 

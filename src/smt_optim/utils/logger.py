@@ -6,7 +6,8 @@ import numpy as np
 
 from .json import json_safe
 
-from smt_optim.acquisition_functions.multi_obj import hypervolume_2d, get_pareto_front
+from smt_optim.utils.multi_obj import get_pareto_front, hypervolume, spacing
+
 
 def format_value(v, fmt):
     if isinstance(v, float):
@@ -29,6 +30,7 @@ class ConsoleLogger:
             "budget":       ".3f",
             "fmin":         ".5e",
             "HV":           ".5e",      # hypervolume (for multi-obj only)
+            "spacing":      ".5e",      # spacing     (for multi-obj only)
             "rscv":         ".3e",
             "fidelity":     ".0f",
             "gp_time":      ".3f",
@@ -47,7 +49,8 @@ class ConsoleLogger:
 
             if state.problem.num_obj > 1 and "fmin" in self.headers:
                 self.headers[2] = "HV"
-                self.headers.pop(3)
+                self.headers[3] = "spacing"
+                # self.headers.pop(3)
                 self.update_header_format()
 
                 dataset = state.dataset.export_as_dict()
@@ -86,11 +89,15 @@ class ConsoleLogger:
             obj = obj[rscv <= 1e-4, :]
             pf = get_pareto_front(obj)
 
-            hv = hypervolume_2d(pf, self.multi_obj_ref)
+            # hv_indicator = HV(ref_point=self.multi_obj_ref)
+            hv = hypervolume(pf, self.multi_obj_ref)
+            sp = spacing(pf)
             data["HV"] = hv
+            data["spacing"] = sp
 
         else:
             data["HV"] = np.nan
+            data["spacing"] = np.nan
 
         row = [format_value(data[h], self.formats[h]) for h in self.headers]
         print(self.row_fmt.format(*row))
@@ -107,60 +114,6 @@ class ConsoleLogger:
 
         self.header_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
         self.row_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
-
-
-
-class BiObjConsoleLogger:
-    def __init__(self, config):
-        self.config = config
-
-        self.headers = ["iter", "budget", "fmin", "rscv", "fidelity", "gp_time", "acq_time"]
-        width = 14
-        self.widths = [max(len(h), width) for h in self.headers]
-
-        self.header_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
-        self.row_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
-
-        self.formats = {
-            "iter":         ".0f",
-            "budget":       ".3f",
-            "HV":           ".5e",
-            "rscv":         ".3e",
-            "fidelity":     ".0f",
-            "gp_time":      ".3f",
-            "acq_time":     ".3f",
-        }
-
-        self.iter = 0
-        self.repeat_header = 10
-
-
-    def on_iter_end(self, state) -> None:
-
-        if self.iter % self.repeat_header == 0:
-            self.print_header()
-
-        sample = state.get_best_sample(ctol=1e-4)
-
-        iter_log = getattr(state, "iter_log", {}) or {}
-
-        data = {
-            "iter":     state.iter,
-            "budget":   state.budget,
-            "HV":       sample.obj[0],
-            "rscv":     sample.metadata["rscv"],
-            "fidelity": iter_log.get("fidelity", np.nan),
-            "gp_time":  iter_log.get("gp_training_time", np.nan),
-            "acq_time": iter_log.get("acq_opt_time", np.nan),
-        }
-        row = [format_value(data[h], self.formats[h]) for h in self.headers]
-        print(self.row_fmt.format(*row))
-
-        self.iter += 1
-
-
-    def print_header(self):
-        print(self.header_fmt.format(*self.headers))
 
 
 class JsonLogger:
