@@ -9,6 +9,7 @@ from .misc import gano
 # from .misc import modified_avt
 # from .misc import edge_cases
 from .sfu import many_local_minima, bowl_shaped
+from .gotestproblems import constrained
 from .avt311 import avt311
 from .misc import mixvar_branin
 
@@ -27,6 +28,7 @@ _register_from_module(gano)
 
 _register_from_module(many_local_minima)
 _register_from_module(bowl_shaped)
+_register_from_module(constrained)
 _register_from_module(avt311)
 _register_from_module(mixvar_branin)
 
