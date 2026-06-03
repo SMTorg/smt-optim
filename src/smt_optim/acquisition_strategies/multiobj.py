@@ -19,7 +19,7 @@ from smt_optim.subsolvers import multistart_minimize
 
 from smt_optim.acquisition_functions.multi_obj import init_mpi
 
-from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints
+from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints, select_fidelity_level
 
 
 class MOSEGO(AcquisitionStrategy):
@@ -30,6 +30,8 @@ class MOSEGO(AcquisitionStrategy):
         self.n_start = kwargs.pop("n_start", 20)
         self.sp_method = kwargs.pop("sp_method", "Cobyla")
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))
+        self.select_fidelity = kwargs.pop("select_fidelity", True)
+        self.cr_override = kwargs.pop("cr_override", None)
         self.seed = kwargs.pop("seed", None)
 
 
@@ -86,9 +88,75 @@ class MOSEGO(AcquisitionStrategy):
                                              seed=self.seed)
 
         next_x = res.x
-        infill = [next_x.reshape(1, -1)]
+        print(f"next_x = {next_x}")
+
+        # selects highest fidelity level to sample
+        fid_crit_t0 = perf_counter()
+        level = self.get_fidelity(next_x.reshape(1, -1), state)[0]
+
+        # keeps the DoE nested -> requests sampling all lower fidelity levels
+        infills = []
+        for lvl in range(state.problem.num_fidelity):
+            if lvl <= level:
+                infills.append(next_x.copy().reshape(1, -1))
+            else:
+                infills.append(None)
+
+        fid_crit_t1 = perf_counter()
+        acq_data["fid_crit_time"] = fid_crit_t1 - fid_crit_t0
 
         state.iter_log["acquisition"] = acq_data
 
-        return infill
+        return infills
+
+
+    def get_fidelity(self, next_x: np.ndarray, state: State) -> list[int]:
+        """
+        Select the highest fidelity level to sample at the given point(s).
+
+        Parameters
+        ----------
+        next_x : np.ndarray
+            The point(s) to sample at.
+        state : State
+            The current optimization state.
+
+        Returns
+        -------
+        levels : list[int] or array of int
+            The selected fidelity level(s). If `state.problem.num_fidelity` is 1, returns the single fidelity level;
+            otherwise, returns a list of fidelity levels, one for each point in `next_x`.
+
+        Notes
+        -----
+        This method takes into account the problem's cost model and the available surrogate models.
+        """
+
+        num_points = next_x.shape[0]
+
+        if state.problem.num_fidelity > 1 and self.select_fidelity:
+
+            all_surrogates = []
+
+            for o_surrogate in state.obj_models:
+                all_surrogates.append(o_surrogate)
+            for c_surrogate in state.cstr_models:
+                all_surrogates.append(c_surrogate)
+
+            if self.cr_override is not None:
+                costs = self.cr_override
+            else:
+                costs = state.problem.costs
+
+            levels, s2_red_norm = select_fidelity_level(next_x,
+                                                        costs,
+                                                        all_surrogates,
+                                                        "pessimistic")
+
+            print(f"level(1) = {levels} | {s2_red_norm}")
+
+        else:
+            levels = [(state.problem.num_fidelity - 1) for _ in range(num_points)]
+
+        return levels
 

@@ -11,7 +11,7 @@ from .misc import gano
 from .sfu import many_local_minima, bowl_shaped
 from .avt311 import avt311
 from .misc import mixvar_branin
-from .multiobj import multiobj, mf_zdt
+from .multiobj import zdt, zdt_mf
 
 available = {}
 
@@ -30,8 +30,8 @@ _register_from_module(many_local_minima)
 _register_from_module(bowl_shaped)
 _register_from_module(avt311)
 _register_from_module(mixvar_branin)
-_register_from_module(multiobj)
-_register_from_module(mf_zdt)
+_register_from_module(zdt)
+_register_from_module(zdt_mf)
 
 
 # def list_problems(**criteria):
