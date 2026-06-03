@@ -78,7 +78,6 @@ class TestMinimizeAPI(unittest.TestCase):
 
     def test_vfpi(self):
 
-
         problem = get_problem("Branin1")
 
         constraint = [

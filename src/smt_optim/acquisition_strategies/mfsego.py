@@ -110,6 +110,7 @@ class MFSEGO(AcquisitionStrategy):
         self.cr_override = kwargs.pop("cr_override", None)                      # override optimizer Cost Ratio
         self.sp_method = kwargs.pop("sp_method", "SLSQP")                       # SciPy optimizer method
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))        # SciPy optimizer tolerance
+        self.var_red_corr = kwargs.pop("var_red_corr", None)                    # Variance reduction correction scheme
 
         self.seed = kwargs.pop("seed", None)
 
@@ -344,9 +345,11 @@ class MFSEGO(AcquisitionStrategy):
                 costs = state.problem.costs
 
             levels, s2_red_norm = select_fidelity_level(next_x,
-                                                             costs,
-                                                             all_surrogates,
-                                                             self.fidelity_crit)
+                                                        costs,
+                                                        all_surrogates,
+                                                        self.fidelity_crit,
+                                                        self.var_red_corr,
+                                                        )
 
         else:
             levels = [(state.problem.num_fidelity - 1) for _ in range(num_points)]
@@ -400,7 +403,7 @@ def corrected_predict_variances_all_levels(x_pred: np.ndarray, model, method: st
 
 
 
-def compute_sigma2_red(x_pred: np.ndarray, surrogate, method="max") -> np.ndarray:
+def compute_sigma2_red(x_pred: np.ndarray, surrogate, method=None) -> np.ndarray:
     r"""
     Compute the variance contribution of each fidelity level viewed from the highest fidelity level.
 
@@ -479,7 +482,7 @@ def compute_norm_squared_cost(costs: list[float]) -> np.ndarray:
 
     return tot_costs2
 
-def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrogate) -> np.ndarray:
+def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrogate, corr_method=None) -> np.ndarray:
     """
     Normalize the variance reduction of each level by their corresponding normalized total squared costs.
 
@@ -489,9 +492,10 @@ def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrog
         Prediction points.
     norm_costs2: list of float
         normalized total squared costs.
-
     surrogate : Surrogate
         SMT-Optim surrogate model with a model attribute corresponding to a SMT MFK model.
+    corr_method : str, optional
+        `corrected_predict_variances_all_levels` correction method.
 
     Returns
     -------
@@ -501,7 +505,7 @@ def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrog
 
     num_levels = len(norm_costs2)
 
-    s2_red = compute_sigma2_red(x_pred, surrogate)
+    s2_red = compute_sigma2_red(x_pred, surrogate, corr_method)
     s2_norm = np.empty_like(s2_red)
 
     for k in range(num_levels):
@@ -520,7 +524,7 @@ def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrog
     return s2_norm
 
 
-def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: list) -> list[np.ndarray]:
+def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: list, corr_method=None) -> list[np.ndarray]:
     """
     Compute the normalized the variance reduction of all models in the `surrogates` list.
 
@@ -532,6 +536,8 @@ def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: 
         Evaluation cost of each fidelity level.
     surrogates : list of Surrogate
         List of SMT-Optim surrogate models.
+    corr_method : str, optional
+        `corrected_predict_variances_all_levels` correction method.
 
     Returns
     -------
@@ -547,12 +553,13 @@ def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: 
     s2_red_norm = [np.empty((num_pts, num_levels)) for _ in range(len(surrogates))]
 
     for i, surrogate in enumerate(surrogates):
-        s2_red_norm[i] = compute_norm_sigma2_red(x_pred, norm_costs2, surrogate)
+        s2_red_norm[i] = compute_norm_sigma2_red(x_pred, norm_costs2, surrogate, corr_method)
 
     return s2_red_norm
 
 
-def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates: list[Surrogate], criterion: str = "pessimistic") -> tuple[np.ndarray, np.ndarray]:
+def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates: list[Surrogate],
+                          criterion: str = "pessimistic", corr_method=None) -> tuple[np.ndarray, np.ndarray]:
     """
     Select the highest fidelity level to sample based on the `criterion`.
 
@@ -566,6 +573,8 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
         List of surrogate models.
     criterion : str, optional
         Fidelity criterion. The possible values are : "obj-only", "optimistic", "pessimistic", "average", and "cstr-only".
+    corr_method : str, optional
+        `corrected_predict_variances_all_levels` correction method.
 
     Returns
     -------
@@ -589,11 +598,11 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
 
     if criterion == "obj-only":
         surrogates = [all_surrogates[0]]
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, surrogates)
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, surrogates, corr_method)
         level = s2_red_norm[0].argmax(axis=1)
 
     elif criterion == "optimistic":
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates, corr_method)
 
         # TODO: make it compatible with multiple infill points
         level = s2_red_norm[0].argmax(axis=1)
@@ -602,7 +611,7 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
             level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).min(axis=0)
 
     elif criterion == "pessimistic":
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates, corr_method)
 
         level = s2_red_norm[0].argmax(axis=1)
 
@@ -612,7 +621,7 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
     elif criterion == "average":
         # s2_red of each surrogate is normalized by the cost. Should it be normalized after the sum?
         # -> should be the same
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates, corr_method)
         s2_red_avg = np.zeros((num_pts, s2_red_norm[0].shape[1]))
 
         # sum the s2_red from all surrogates
