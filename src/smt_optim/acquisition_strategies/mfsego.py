@@ -3,10 +3,12 @@ from typing import Callable
 
 import numpy as np
 from scipy import optimize as so, stats as stats
+from scipy.spatial.distance import cdist
 
 import smt.design_space as ds
 
 from smt_optim.acquisition_functions import log_ei
+from smt_optim.surrogate_models.base import Surrogate
 from smt_optim.acquisition_strategies import AcquisitionStrategy
 # from smt_optim.surrogate_models.smt import SmtMFK
 
@@ -330,7 +332,9 @@ class MFSEGO(AcquisitionStrategy):
 
         if state.problem.num_fidelity > 1 and self.select_fidelity:
 
-            all_surrogates = state.obj_models
+            all_surrogates = []
+            for o_surrogate in state.obj_models:
+                all_surrogates.append(o_surrogate)
             for c_surrogate in state.cstr_models:
                 all_surrogates.append(c_surrogate)
 
@@ -339,7 +343,7 @@ class MFSEGO(AcquisitionStrategy):
             else:
                 costs = state.problem.costs
 
-            levels, s2_red_norm = self.select_fidelity_level(next_x,
+            levels, s2_red_norm = select_fidelity_level(next_x,
                                                              costs,
                                                              all_surrogates,
                                                              self.fidelity_crit)
@@ -349,288 +353,287 @@ class MFSEGO(AcquisitionStrategy):
 
         return levels
 
-        self.acq_log["infill_level"] = level
-
-        if state.problem.num_fidelity > 1 and self.select_fidelity:
-            self.acq_log["normalized_s2_reduction"] = s2_red_norm
-
-    # acq_data["multi_idx"] = idx
-    # acq_data["multi_x"] = multi_x
-    # acq_data["multi_f"] = multi_f
-    # acq_data["multi_c"] = multi_c
-    # acq_data["acq_success"] = success_rate
-
-    # if optimizer.num_cstr > 0:
-    #     acq_data["rscv"] = rscv
-
-    # if self.optimize_best:
-    #
-    #     if optimizer.num_cstr > 0:
-    #         optimized_cstr = np.empty(optimizer.num_cstr)
-    #
-    #     res = so.minimize(scipy_acq_func,
-    #                       x0=x_min,
-    #                       bounds=optimizer.domain_scaled,
-    #                       constraints=scipy_cstr,
-    #                       method="SLSQP",
-    #                       tol=1e-15,
-    #                       options={"maxiter": 50 * optimizer.num_dim})
-    #
-    #
-    #     optimized_x = np.clip(res.x, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
-    #     acq_data["optimized_x"] = optimized_x
-    #
-    #     optimized_l2 = np.linalg.norm(optimized_x - x_min)
-    #     acq_data["optimized_l2"] = optimized_l2
-    #
-    #     optimized_acq = scipy_acq_func(optimized_x)
-    #     acq_data["optimized_acq"] = optimized_acq
-    #
-    #     if optimizer.num_cstr > 0:
-    #         for c_id in range(len(scipy_cstr)):
-    #             optimized_cstr[c_id] = -scipy_cstr[c_id]["fun"](optimized_x)
-    #             acq_data["optimized_cstr"] = optimized_cstr
-    #
-    #     # update x_min
-    #     x_min = optimized_x
-
-    # log expected values
-    # expected_values = np.empty(acq_context.problem.num_cstr+1)
-    # expected_values[0] = acq_context.obj_models[0].predict_values(next_x.reshape(1, -1)).item()
-
-    # if acq_context.scaling:
-    #     yt_scaled, yt_mean, yt_std = acq_context._standardize_data(acq_context.yt[-1])
-    #     expected_values[0] *= yt_std
-    #     expected_values[0] +=  yt_mean
-    #
-    # for c_id, c_surrogate in enumerate(acq_context.cstr_models):
-    #     expected_values[c_id+1] = c_surrogate.predict_values(x_min.reshape(1, -1)).item()
-    #     if acq_context.scaling:
-    #         yt_scaled, yt_mean, yt_std = acq_context._standardize_data(acq_context.ct[-1][:, c_id])
-    #         expected_values[c_id+1] *= yt_std
-    #
-    # acq_data["expected_values"] = expected_values
-    #
-    # acq_context.iter_data["acquisition"] = acq_data
-
-
-    # def generate_multistart_points(self, optimizer) -> np.ndarray:
-    #
-    #     sampler = stats.qmc.LatinHypercube(d=optimizer.domain_scaled.shape[0])
-    #
-    #     # LHS filter
-    #     large_x0 = sampler.random(10*self.n_start)
-    #     # large_x0 = sampler.random(self.n_start)
-    #     large_x0 = stats.qmc.scale(large_x0, optimizer.domain_scaled[:, 0], optimizer.domain_scaled[:, 1])
-    #
-    #     mu = optimizer.obj_models.predict_values(large_x0)
-    #     s2 = optimizer.obj_models.predict_variances(large_x0)
-    #     large_f = -self.acq_func(mu, s2, self.fmin)
-    #
-    #     # no constraints -> selects the best starting points
-    #     if optimizer.num_cstr == 0:
-    #         sorted_idx = np.argsort(large_f.ravel())
-    #
-    #     # with constraints -> selects the best points with the lowest constraint violation
-    #     else:
-    #         large_c = np.empty((large_x0.shape[0], optimizer.num_cstr))
-    #
-    #         for c_id, c_surrogate in enumerate(optimizer.cstr_models):
-    #             large_c[:, c_id] = c_surrogate.predict_values(large_x0).ravel()
-    #
-    #         rscv = self.compute_rscv(large_c, optimizer.cstr_config)
-    #         sorted_idx = np.lexsort((large_f.ravel(), rscv))
-    #         rscv = rscv[sorted_idx][:self.n_start]
-    #
-    #     multi_x0 = large_x0[sorted_idx][:self.n_start, :]
-    #
-    #     # with constraints -> try to reduce the starting point RSCV
-    #     if optimizer.num_cstr > 0 and self.min_rscv_first:
-    #
-    #         def min_rscv(x):
-    #             cstr_values = np.empty((1, len(optimizer.cstr_models)))
-    #             for c_id, c_surrogate in enumerate(optimizer.cstr_models):
-    #                 cstr_values[0, c_id] = c_surrogate.predict_values(x.reshape(1, -1)).item()
-    #             return self.compute_rscv(cstr_values, optimizer.cstr_config).item()
-    #
-    #
-    #         for i in range(multi_x0.shape[0]):
-    #             # try to reduce the constraint violation if the starting point is not feasible
-    #             if rscv[i] != 0.0:
-    #                 res = so.minimize(min_rscv,
-    #                                   x0=multi_x0[i, :],
-    #                                   bounds=optimizer.domain_scaled,
-    #                                   method="COBYLA",
-    #                                   tol=1e-8,
-    #                                   options={"maxiter": 50*optimizer.num_dim})
-    #
-    #                 rscv[i] = res.fun
-    #                 multi_x0[i, :] = res.x
-    #
-    #     return multi_x0
 
-    def compute_sigma2_red(self, x_pred: np.ndarray, surrogate) -> np.ndarray:
+def corrected_predict_variances_all_levels(x_pred: np.ndarray, model, method: str = "max") -> tuple[np.ndarray, list]:
+    """
+    Predict the variance at all fidelity levels for given prediction points `x_pred`.
 
-        # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
-        s2, rho2 = surrogate.model.predict_variances_all_levels(x_pred)
-        num_levels = s2.shape[1]
+    Parameters
+    ----------
+    x_pred: np.ndarray of shape (num_points, num_dim)
+        Prediction points.
+    model: MFK
+        SMT's MFK model.
+    method: str, optional
+        Correction method for ill-conditioned models.
 
-        tot_rho2 = np.ones((x_pred.shape[0], num_levels))
-        s2_red = np.empty((x_pred.shape[0], num_levels))
+    Returns
+    -------
+    np.ndarray
+        Variances for all points at all fidelity levels.
+    list[float]
+        The squared correlation coefficient for each level.
 
-        for k in range(num_levels):
-            for l in range(k, num_levels-1):
-                tot_rho2[:, k] *= rho2[l][:]
+    Notes
+    -----
+    If `method` is set to `None`, no correction is performed. If set to `max`, the maximum variance for each level is
+    subtracted  to the variance of `x_pred`. If set to `closest`, for each prediction point and each fidelity level
+    the variance of the closest training point is subtracted  to the predicted variance.
+    """
 
-            s2_red[:, k] = s2[:, k] * tot_rho2[:, k]
+    noise2, rho2 = model.predict_variances_all_levels(model.X[-1])
 
-        # np.array(num_points, num_levels)
-        return s2_red
+    if method is None:
+        noise2_corr = np.zeros((x_pred.shape[0], noise2.shape[1]))
+    elif method == "max":
+        noise2_corr = np.max(noise2, axis=0).reshape(1, -1).repeat(x_pred.shape[0], axis=0)
+    elif method == "closest":
+        min_dist_idx = np.argmin(cdist(x_pred, model.X[-1]), axis=1)
+        noise2_corr = noise2[min_dist_idx, :]
+    else:
+        raise Exception(f"`{method}` is not a valid method.")
 
+    s2, rho2 = model.predict_variances_all_levels(x_pred)
+    s2_corr = np.clip(s2 - noise2_corr, 0, np.inf)
 
-    def compute_norm_squared_cost(self, costs: list[float]) -> np.ndarray:
+    return s2_corr, rho2
 
-        num_levels = len(costs)
-        tot_costs2 = np.empty(num_levels)
 
-        for k in range(num_levels):
-            tot_costs2[k] = np.sum(costs[0:k+1])**2
 
-        # normalize the aggregate costs squared by its maximum
-        tot_costs2 /= np.max(tot_costs2)
+def compute_sigma2_red(x_pred: np.ndarray, surrogate, method="max") -> np.ndarray:
+    r"""
+    Compute the variance contribution of each fidelity level viewed from the highest fidelity level.
 
-        return tot_costs2
+    For a given surrogate model, the output corresponds to
 
-    def compute_norm_sigma2_red(self, x_pred: np.ndarray, norm_costs2: list[float], surrogate) -> np.ndarray:
+    .. math::
+        \sigma_{\text{red}}^2(\ell, \boldsymbol{x}_{i}) = \sum_{\ell'=1}^{\ell}\sigma^2_{(\delta, \ell')}(\boldsymbol{x}_{i}) \prod_{j=\ell'}^{L-1}{\rho^2_j}.
 
-        num_levels = len(norm_costs2)
+    where :math:`\ell` corresponds to the fidelity level evaluated and :math:`L` to the total number of fidelity level.
 
-        s2_red = self.compute_sigma2_red(x_pred, surrogate)
-        s2_norm = np.empty_like(s2_red)
+    Parameters
+    ----------
+    x_pred : np.ndarray of shape (num_points, num_dim)
+        Prediction points.
+    surrogate : Surrogate
+        SMT-Optim surrogate model with a model attribute corresponding to a SMT MFK model.
+    method : str, optional
+        `corrected_predict_variances_all_levels` correction method.
 
-        for k in range(num_levels):
-            s2_norm[:, k] = s2_red[:, k] / norm_costs2[k]
+    Returns
+    -------
+    np.ndarray of shape (num_points, num_level)
+        Variance contribution of each level viewed from the highest fidelity level.
 
-        return s2_norm
+    """
 
+    # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
+    # s2, rho2 = surrogate.model.predict_variances_all_levels(x_pred)
+    s2, rho2 = corrected_predict_variances_all_levels(x_pred, surrogate.model, method=method)
+    num_levels = s2.shape[1]
 
-    def compute_all_s2_red_norm(self, x_pred: np.ndarray, costs: list[float], surrogates: list) -> list[np.ndarray]:
+    tot_rho2 = np.ones((x_pred.shape[0], num_levels))
+    s2_red = np.empty((x_pred.shape[0], num_levels))
 
-        num_pts = x_pred.shape[0]
-        num_levels = len(costs)
+    for k in range(num_levels):
+        for l in range(k, num_levels-1):
+            tot_rho2[:, k] *= rho2[l][:]
 
-        norm_costs2 = self.compute_norm_squared_cost(costs)
+        s2_red[:, k] = s2[:, k] * tot_rho2[:, k]
 
-        s2_red_norm = [np.empty((num_pts, num_levels)) for _ in range(len(surrogates))]
+    # np.array(num_points, num_levels)
+    return s2_red
 
-        for i, surrogate in enumerate(surrogates):
-            s2_red_norm[i] = self.compute_norm_sigma2_red(x_pred, norm_costs2, surrogate)
 
-        return s2_red_norm
+def compute_norm_squared_cost(costs: list[float]) -> np.ndarray:
+    r"""
+    Compute the normalized total squared cost of each fidelity level.
 
+    The output corresponds to:
 
-    def select_fidelity_level(self, x_pred: np.ndarray, costs: list[float], all_surrogates: list, criterion: str) -> np.ndarray:
+    .. math::
+        \text{cost}_{\ell} = \left(\sum_{\ell'=1}^{\ell}{c_{\ell'}} \; \bigg/ \; \sum_{\ell'=1}^{L}{c_{\ell'}}\right)^{2}.
 
-        num_pts: int = x_pred.shape[0]
-        # level: np.ndarray = np.zeros(num_pts)
+    where :math:`\ell` corresponds to the fidelity level evaluated and :math:`L` to the total number of fidelity levels.
 
-        if criterion == "obj-only":
-            surrogates = [all_surrogates[0]]
-            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, surrogates)
-            level = s2_red_norm[0].argmax(axis=1)
+    Parameters
+    ----------
+    costs : list of float
+        Evaluation cost of each fidelity level.
 
-        elif criterion == "optimistic":
-            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+    Returns
+    -------
+    np.ndarray
+        Normalized total squared cost of each fidelity level.
 
-            # TODO: make it compatible with multiple infill points
-            level = s2_red_norm[0].argmax(axis=1)
+    """
 
-            for i in range(1, len(all_surrogates)):
-                level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).min(axis=0)
+    num_levels = len(costs)
+    tot_costs2 = np.empty(num_levels)
 
-        elif criterion == "pessimistic":
-            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+    for k in range(num_levels):
+        tot_costs2[k] = np.sum(costs[0:k+1])**2
 
-            level = s2_red_norm[0].argmax(axis=1)
+    # normalize the aggregate costs squared by its maximum
+    tot_costs2 /= np.max(tot_costs2)
 
-            for i in range(1, len(all_surrogates)):
-                level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).max(axis=0)
+    return tot_costs2
 
-        elif criterion == "average":
-            # s2_red of each surrogate is normalized by the cost. Should it be normalized after the sum?
-            # -> should be the same
-            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, all_surrogates)
-            s2_red_avg = np.zeros((num_pts, s2_red_norm[0].shape[1]))
+def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrogate) -> np.ndarray:
+    """
+    Normalize the variance reduction of each level by their corresponding normalized total squared costs.
 
-            # sum the s2_red from all surrogates
-            for i in range(len(all_surrogates)):
-                s2_red_avg[:, :] += s2_red_norm[i][:, :]
+    Parameters
+    ----------
+    x_pred : np.ndarray of shape (num_points, num_dim)
+        Prediction points.
+    norm_costs2: list of float
+        normalized total squared costs.
 
-            level = s2_red_avg.argmax(axis=1)
+    surrogate : Surrogate
+        SMT-Optim surrogate model with a model attribute corresponding to a SMT MFK model.
 
-        elif criterion == "cstr-only":
+    Returns
+    -------
+    np.ndarray of shape (num_points, num_level)
 
-            if len(all_surrogates) == 1:
-                raise Exception("cstr-only criterion requires one constraint surrogate.")
+    """
 
-            surrogates = all_surrogates[1:]
+    num_levels = len(norm_costs2)
 
-            if len(surrogates) > 1:
-                raise Exception("cstr-only is not implemented for more than 1 constraints.")
+    s2_red = compute_sigma2_red(x_pred, surrogate)
+    s2_norm = np.empty_like(s2_red)
 
-            s2_red_norm = self.compute_all_s2_red_norm(x_pred, costs, surrogates)
+    for k in range(num_levels):
+        s2_norm[:, k] = s2_red[:, k] / norm_costs2[k]
 
-            level = s2_red_norm[0].argmax(axis=1)
 
-        # np.ndarray(num_pts) -> fidelity level for each infill points
-        return level, s2_red_norm
 
+    # if equal 0 somewhere override...
+    # has_zero = np.any(s2_norm == 0, axis=1)
+    # indices = s2_norm.shape[1] - 1 - np.argmax((s2_norm == 0)[:, ::-1], axis=1)
+    # s2_norm[has_zero, indices[has_zero]] = np.inf
 
-def build_scipy_constraints(state: State) -> list[dict]:
+    all_zero = np.all(s2_norm == 0, axis=1)
+    s2_norm[all_zero, -1] = np.inf
 
-    scipy_cstr = []
+    return s2_norm
 
-    def append_sp_cstr(func: Callable, type: str) -> None:
-        scipy_cstr.append({
-            "fun": func,
-            "type": type,
-        })
 
-    # TODO: re-implement constraint relaxation
-    # def sp_constraint(x):
-    #     x = x.reshape(1, -1)
-    #     mu = mu_func(x).item()
-    #
-    #     if relax:
-    #         s = np.sqrt(s2_func(x).item())
-    #         if type == "ineq":
-    #             return -(mu - 3 * s)
-    #         elif type == "eq":
-    #             return -(np.abs(mu) - 3 * s)
-    #
-    #     return -mu
-    #
-    # return sp_constraint
+def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: list) -> list[np.ndarray]:
+    """
+    Compute the normalized the variance reduction of all models in the `surrogates` list.
 
-    def sp_constraint(x, model):
-        x = x.reshape(1, -1)
-        mu = model.predict_values(x)
-        return mu.item()
+    Parameters
+    ----------
+    x_pred : np.ndarray of shape (num_points, num_dim)
+        Prediction points.
+    costs: list of float
+        Evaluation cost of each fidelity level.
+    surrogates : list of Surrogate
+        List of SMT-Optim surrogate models.
 
+    Returns
+    -------
+    List of np.ndarray of shape (num_points, num_level).
 
-    for c_id, c_config in enumerate(state.problem.cstr_configs):
+    """
 
-        if c_config.equal is not None:
-            func = lambda x, f=sp_constraint, value=state.cstr_equal[c_id], m=state.cstr_models[c_id]: f(x, m) - value
-            append_sp_cstr(func, "eq")
+    num_pts = x_pred.shape[0]
+    num_levels = len(costs)
 
-        else:
-            if c_config.lower is not None:
-                func = lambda x, f=sp_constraint, value=state.cstr_lower[c_id], m=state.cstr_models[c_id]: - value + f(x, m)
-                append_sp_cstr(func, "ineq")
+    norm_costs2 = compute_norm_squared_cost(costs)
 
-            if c_config.upper is not None:
-                func = lambda x, f=sp_constraint, value=state.cstr_upper[c_id], m=state.cstr_models[c_id]: - f(x, m) + value
-                append_sp_cstr(func, "ineq")
+    s2_red_norm = [np.empty((num_pts, num_levels)) for _ in range(len(surrogates))]
 
-    return scipy_cstr
+    for i, surrogate in enumerate(surrogates):
+        s2_red_norm[i] = compute_norm_sigma2_red(x_pred, norm_costs2, surrogate)
+
+    return s2_red_norm
+
+
+def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates: list[Surrogate], criterion: str = "pessimistic") -> tuple[np.ndarray, np.ndarray]:
+    """
+    Select the highest fidelity level to sample based on the `criterion`.
+
+    Parameters
+    ----------
+    x_pred : np.ndarray of shape(num_points, num_dim)
+        Prediction points.
+    costs : list of float
+        Evaluation cost of each fidelity level.
+    all_surrogates : list of Surrogate
+        List of surrogate models.
+    criterion : str, optional
+        Fidelity criterion. The possible values are : "obj-only", "optimistic", "pessimistic", "average", and "cstr-only".
+
+    Returns
+    -------
+    np.ndarray of shape (num_points,)
+        Highest fidelity level to sample based on the `criterion`.
+    np.ndarray
+        The criterion value for each fidelity level. The index corresponds to the corresponding fidelity level.
+
+    Notes
+    -----
+    The `obj-only` criterion only evaluates the variance reduction of the first objective model. The `optimistic`
+    criterion selects the overall lowest fidelity level from all the models. The `pessimistic` criterion selects
+    the overall highest fidelity level from all the models. The `average` criterion averages the variance reduction
+    of all the models on a fidelity level basis, and selects the level with the highest averaged variance reduction.
+    The `cstr-only` criterion only works for a single constraint.
+
+    """
+
+    num_pts: int = x_pred.shape[0]
+    # level: np.ndarray = np.zeros(num_pts)
+
+    if criterion == "obj-only":
+        surrogates = [all_surrogates[0]]
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, surrogates)
+        level = s2_red_norm[0].argmax(axis=1)
+
+    elif criterion == "optimistic":
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+
+        # TODO: make it compatible with multiple infill points
+        level = s2_red_norm[0].argmax(axis=1)
+
+        for i in range(1, len(all_surrogates)):
+            level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).min(axis=0)
+
+    elif criterion == "pessimistic":
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+
+        level = s2_red_norm[0].argmax(axis=1)
+
+        for i in range(1, len(all_surrogates)):
+            level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).max(axis=0)
+
+    elif criterion == "average":
+        # s2_red of each surrogate is normalized by the cost. Should it be normalized after the sum?
+        # -> should be the same
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates)
+        s2_red_avg = np.zeros((num_pts, s2_red_norm[0].shape[1]))
+
+        # sum the s2_red from all surrogates
+        for i in range(len(all_surrogates)):
+            s2_red_avg[:, :] += s2_red_norm[i][:, :]
+
+        level = s2_red_avg.argmax(axis=1)
+
+    elif criterion == "cstr-only":
+
+        if len(all_surrogates) == 1:
+            raise Exception("cstr-only criterion requires one constraint surrogate.")
+
+        surrogates = all_surrogates[1:]
+
+        if len(surrogates) > 1:
+            raise Exception("cstr-only is not implemented for more than 1 constraints.")
+
+        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, surrogates)
+
+        level = s2_red_norm[0].argmax(axis=1)
+
+    # np.ndarray(num_pts) -> fidelity level for each infill points
+    return level, s2_red_norm

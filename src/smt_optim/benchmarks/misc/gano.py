@@ -35,7 +35,7 @@ class Gano(BenchmarkProblem):
         return 1 / x[0] + 1 / (x[1] + 0.1) - 2 - 0.001
 
 
-class G8(BenchmarkProblem):
+class MFG08(BenchmarkProblem):
 
     def __init__(self):
         super().__init__()

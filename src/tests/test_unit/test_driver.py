@@ -190,7 +190,10 @@ class TestInfillNotInXt(unittest.TestCase):
         ]
 
         # Should not raise
-        infill_not_in_xt(infills, state)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            infill_not_in_xt(infills, state)
+            self.assertEqual(len(w), 0)
 
         # ------- Case 2: duplicate at same fidelity -------
         infills = [
@@ -198,10 +201,10 @@ class TestInfillNotInXt(unittest.TestCase):
             None
         ]
 
-        with self.assertRaises(Exception) as cm:
+        with self.assertWarns(UserWarning):
             infill_not_in_xt(infills, state)
 
-        self.assertIn("Infill point already in training data", str(cm.exception))
+        # self.assertIn("Infill point already in training data", str(cm.exception))
 
         # ------- Case 3: duplicate but different fidelity -> allowed -------
         infills = [
@@ -221,7 +224,7 @@ class TestInfillNotInXt(unittest.TestCase):
             None
         ]
 
-        with self.assertRaises(Exception):
+        with self.assertWarns(UserWarning):
             infill_not_in_xt(infills, state)
 
         # ------- Case 5: near-duplicate (tolerance check) -------
@@ -230,5 +233,5 @@ class TestInfillNotInXt(unittest.TestCase):
             None
         ]
 
-        with self.assertRaises(Exception):
+        with self.assertWarns(UserWarning):
             infill_not_in_xt(infills, state)

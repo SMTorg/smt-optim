@@ -469,7 +469,7 @@ def infill_not_in_xt(infills: list[np.ndarray], state: State) -> None:
                 l2_norms = np.linalg.norm(diff, axis=1)
                 if np.min(l2_norms) < 1e-8: # TODO: add customizable tolerance
                     # raise Exception("Infill point already in training data.")
-                    warnings.warn(f"Infill point already in training data. {infills[lvl][idx, :]}")
+                    warnings.warn(f"Infill point {infills[lvl][idx, :]} already in training data. L2 = {np.min(l2_norms)}")
 
     return None
 

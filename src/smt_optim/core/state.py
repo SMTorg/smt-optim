@@ -286,7 +286,7 @@ class State:
             filtered_rscv = np.where(fidelity_mask, rscv, np.inf)
             idx = np.argmin(filtered_rscv)
 
-        best_sample = self.dataset.samples[idx]
+        best_sample = dataset.samples[idx]
 
         return best_sample
 

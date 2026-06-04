@@ -10,6 +10,7 @@ from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driv
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
 from smt_optim.acquisition_strategies import MFSEGO
+from smt_optim.acquisition_strategies.mfsego import compute_sigma2_red
 
 
 def branin_forrester(x):
@@ -243,11 +244,11 @@ class TestOptimization(unittest.TestCase):
         state = State(problem)
         state.obj_models[0].model = model
 
-        mfsego = MFSEGO(state)
+        # mfsego = MFSEGO(state)
 
         x_valid = np.linspace(0, 10, 101)
 
-        s2_red = mfsego.compute_sigma2_red(x_valid.reshape(-1, 1), state.obj_models[0])
+        s2_red = compute_sigma2_red(x_valid.reshape(-1, 1), state.obj_models[0], method=None)
         delta = s2_red[:, 0] - s2_red[:, 1]
 
         self.assertTrue(all(d < 0 for d in delta))
