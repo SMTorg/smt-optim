@@ -88,7 +88,6 @@ class MOSEGO(AcquisitionStrategy):
                                              seed=self.seed)
 
         next_x = res.x
-        print(f"next_x = {next_x}")
 
         # selects highest fidelity level to sample
         fid_crit_t0 = perf_counter()
@@ -152,8 +151,6 @@ class MOSEGO(AcquisitionStrategy):
                                                         costs,
                                                         all_surrogates,
                                                         "pessimistic")
-
-            print(f"level(1) = {levels} | {s2_red_norm}")
 
         else:
             levels = [(state.problem.num_fidelity - 1) for _ in range(num_points)]

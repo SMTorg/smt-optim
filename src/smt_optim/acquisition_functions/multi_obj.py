@@ -28,6 +28,13 @@ def init_mpi(state) -> Callable:
 
     pareto_front = get_pf_from_dataset(state.scaled_dataset)         # shape: (n_points, n_objective)
 
+    # if no feasible point in pareto front (possible in constrained optimization)
+    if pareto_front.shape[0] == 0:
+        data = state.scaled_dataset.export_as_dict()
+        min_rscv_idx = np.argmin(data["rscv"])
+        pareto_front = data["obj"][min_rscv_idx, :].reshape(1, -1)
+
+
     def mpi_func(x: np.ndarray) -> float:
         """
         Minimum Probability of Improvement (MPoI / MPI) multi-objective acquisition function

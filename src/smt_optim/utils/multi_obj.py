@@ -5,6 +5,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 
 from moocore import hypervolume as moocore_hv
+from pymoo.core.problem import Problem as PymooProblem
 
 
 def get_pareto_mask(Y: np.ndarray) -> np.ndarray:
@@ -166,6 +167,9 @@ def spacing(pf: np.ndarray) -> float:
 
     num_pf = pf.shape[0]
 
+    if num_pf <= 1:
+        return np.nan
+
     distances = cdist(pf, pf, "cityblock")
     np.fill_diagonal(distances, np.inf)
 
@@ -175,3 +179,83 @@ def spacing(pf: np.ndarray) -> float:
     value = np.sqrt(1/(num_pf-1) * np.sum((d1_mean - d1) ** 2))
 
     return value
+
+
+class PymooStateWrapper(PymooProblem):
+
+    def __init__(self, state):
+
+        self.state = state
+
+        self.state.scale_dataset(False)
+        self.state.build_models()
+
+        prob = self.state.problem
+
+
+        l_bounds = []
+        u_bounds = []
+        for idx, var in enumerate(prob.design_space.design_variables):
+            l_bounds.append(var.lower)
+            u_bounds.append(var.upper)
+
+        self.l_bounds = np.array(l_bounds)
+        self.u_bounds = np.array(u_bounds)
+
+        self.f_callables = []
+        self.g_callables = []
+        self.h_callables = []
+
+        for o_id, o_config in enumerate(prob.obj_configs):
+            self.f_callables.append(
+                lambda x, f=self.state.obj_models[o_id].predict_values: f(x).ravel()
+            )
+
+        for c_id, c_config in enumerate(prob.cstr_configs):
+            if c_config.equal is not None:
+                self.h_callables.append(
+                    lambda x, f=self.state.cstr_models[c_id].predict_values, val=c_config.equal: f(x).ravel() - val
+                )
+
+            else:
+                if c_config.lower is not None:
+                    self.g_callables.append(
+                        lambda x, f=self.state.cstr_models[c_id].predict_values, val=c_config.lower: val - f(x).ravel()
+                    )
+
+                if c_config.upper is not None:
+                    self.g_callables.append(
+                        lambda x, f=self.state.cstr_models[c_id].predict_values, val=c_config.upper: f(x).ravel() - val
+                    )
+
+        super().__init__(n_var=prob.num_dim,
+                         n_obj=prob.num_obj,
+                         n_eq_constr=len(self.h_callables),
+                         n_ieq_constr=len(self.g_callables),
+                         xl=self.l_bounds,
+                         xu=self.u_bounds,)
+
+
+    def _evaluate(self, x, out, *args, **kwargs):
+
+        num_pt = x.shape[0]
+
+        x_scaled = (x - self.l_bounds)/(self.u_bounds - self.l_bounds)
+
+        out["F"] = np.full((num_pt, self.n_obj), np.nan)
+
+        if self.n_eq_constr > 0:
+            out["H"] = np.empty((num_pt, self.n_eq_constr))
+
+        if self.n_ieq_constr > 0:
+            out["G"] = np.empty((num_pt, self.n_ieq_constr))
+
+        for o_idx in range(self.n_obj):
+            out["F"][:, o_idx] = self.f_callables[o_idx](x_scaled).ravel()
+
+        for h_idx in range(self.n_eq_constr):
+            out["H"][:, h_idx] = self.h_callables[h_idx](x_scaled).ravel()
+
+        for g_idx in range(self.n_ieq_constr):
+            out["G"][:, g_idx] = self.g_callables[g_idx](x_scaled).ravel()
+

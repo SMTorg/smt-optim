@@ -354,6 +354,57 @@ class MFSEGO(AcquisitionStrategy):
         return levels
 
 
+def build_scipy_constraints(state: State) -> list[dict]:
+
+    scipy_cstr = []
+
+    def append_sp_cstr(func: Callable, type: str) -> None:
+        scipy_cstr.append({
+            "fun": func,
+            "type": type,
+        })
+
+    # TODO: re-implement constraint relaxation
+    # def sp_constraint(x):
+    #     x = x.reshape(1, -1)
+    #     mu = mu_func(x).item()
+    #
+    #     if relax:
+    #         s = np.sqrt(s2_func(x).item())
+    #         if type == "ineq":
+    #             return -(mu - 3 * s)
+    #         elif type == "eq":
+    #             return -(np.abs(mu) - 3 * s)
+    #
+    #     return -mu
+    #
+    # return sp_constraint
+
+    def sp_constraint(x, model):
+        x = x.reshape(1, -1)
+        mu = model.predict_values(x)
+        return mu.item()
+
+
+    for c_id, c_config in enumerate(state.problem.cstr_configs):
+
+        if c_config.equal is not None:
+            func = lambda x, f=sp_constraint, value=state.cstr_equal[c_id], m=state.cstr_models[c_id]: f(x, m) - value
+            append_sp_cstr(func, "eq")
+
+        else:
+            if c_config.lower is not None:
+                func = lambda x, f=sp_constraint, value=state.cstr_lower[c_id], m=state.cstr_models[c_id]: - value + f(x, m)
+                append_sp_cstr(func, "ineq")
+
+            if c_config.upper is not None:
+                func = lambda x, f=sp_constraint, value=state.cstr_upper[c_id], m=state.cstr_models[c_id]: - f(x, m) + value
+                append_sp_cstr(func, "ineq")
+
+    return scipy_cstr
+
+
+
 def corrected_predict_variances_all_levels(x_pred: np.ndarray, model, method: str = "max") -> tuple[np.ndarray, list]:
     """
     Predict the variance at all fidelity levels for given prediction points `x_pred`.

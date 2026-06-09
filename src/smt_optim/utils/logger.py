@@ -6,7 +6,7 @@ import numpy as np
 
 from .json import json_safe
 
-from smt_optim.utils.multi_obj import get_pareto_front, hypervolume, spacing
+from smt_optim.utils.multi_obj import get_pareto_front, hypervolume, spacing, get_pf_from_dataset
 
 
 def format_value(v, fmt):
@@ -57,10 +57,14 @@ class ConsoleLogger:
                 obj = dataset["obj"]
                 rscv = dataset["rscv"]
 
-                self.multi_obj_ref = np.array([
-                    obj[:, 0][rscv <= 1e-4].max(),
-                    obj[:, 1][rscv <= 1e-4].max(),
-                ])
+                # self.multi_obj_ref = np.array([
+                #     obj[:, 0][rscv <= 1e-4].max(),
+                #     obj[:, 1][rscv <= 1e-4].max(),
+                # ])
+
+                self.multi_obj_ref = np.empty(state.problem.num_obj)
+                for obj_idx in range(state.problem.num_obj):
+                    self.multi_obj_ref[obj_idx] = obj[:, obj_idx].max()
 
             self.print_header()
 
@@ -81,17 +85,22 @@ class ConsoleLogger:
             data["fmin"] = sample.obj[0]
             data["rscv"] = sample.metadata["rscv"]
 
-        elif state.problem.num_obj == 2:
+        elif state.problem.num_obj > 1:
 
-            dataset = state.dataset.export_as_dict()
-            obj = dataset["obj"]
-            rscv = dataset["rscv"]
-            obj = obj[rscv <= 1e-4, :]
-            pf = get_pareto_front(obj)
+            # dataset = state.dataset.export_as_dict()
+            # obj = dataset["obj"]
+            # rscv = dataset["rscv"]
+            # obj = obj[rscv <= 1e-4, :]
+            # pf = get_pareto_front(obj)
+            pf = get_pf_from_dataset(state.dataset, ctol=1e-4)
 
             # hv_indicator = HV(ref_point=self.multi_obj_ref)
-            hv = hypervolume(pf, self.multi_obj_ref)
-            sp = spacing(pf)
+            if pf.shape[0] > 0:
+                hv = hypervolume(pf, self.multi_obj_ref)
+                sp = spacing(pf)
+            else:
+                hv = np.nan
+                sp = np.nan
             data["HV"] = hv
             data["spacing"] = sp
 
