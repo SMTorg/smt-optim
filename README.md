@@ -1,4 +1,4 @@
-[![Tests](https://github.com/SMTorg/smt-optim/actions/workflows/tests.yml/badge.svg)](https://github.com/SMTorg/smt-optim/actions/workflows/tests.yml)
+[![Tests](https://github.com/SMTorg/smt-optim/actions/workflows/ci.yml/badge.svg)](https://github.com/SMTorg/smt-optim/actions/workflows/ci.yml)
 
 # SMT-Optim: A Python toolbox for constrained and multi-fidelity Bayesian optimization
 
