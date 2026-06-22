@@ -75,8 +75,8 @@ advanced_features/examples/index.md
 
 &nbsp;
 
-```{image} _static/banner.png
-    :scale: 20%
+```{image} _static/banner_institutions.png
+    :scale: 65%
     :alt: logo banner
     :align: center
 ```

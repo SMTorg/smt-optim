@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath('../src'))
 from sphinx.highlighting import lexers
 from pygments.lexers import PythonLexer
 
-project = 'smt-optim'
+project = 'SMT-optim'
 copyright = '2026, SMT-optim contributors'
 author = 'O. Cordelier'
 release = '0.0.1'
@@ -60,9 +60,9 @@ html_theme_options = {
 
     # header
     "logo": {
-        "text": "smt-optim",
-        "image_light": "smt_logo.png",
-        "image_dark": "smt_logo.png",
+        # "text": "SMT-optim",
+        "image_light": "logo_smt-optim_light.svg",
+        "image_dark": "logo_smt-optim_dark.svg",
     },
 
     "repository_url": "https://github.com/SMTorg/smt-optim",
@@ -88,7 +88,7 @@ exclude_patterns = []
 html_theme = "sphinx_book_theme"
 html_static_path = ['_static']
 
-html_favicon = "_static/smt_logo.png"
+html_favicon = "_static/logo_smt-optim_letters_light.svg"
 
 nb_render_plugin = "default"
 

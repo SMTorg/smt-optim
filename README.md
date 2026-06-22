@@ -1,5 +1,10 @@
 [![Tests](https://github.com/SMTorg/SMT-optim/actions/workflows/ci.yml/badge.svg)](https://github.com/SMTorg/SMT-optim/actions/workflows/ci.yml)
 
+
+<div align="center">
+<img src="docs/source/_static/logo_smt-optim_light.svg" alt="logo" width="250"></img>
+</div>
+
 # SMT-optim: A Python toolbox for constrained and multi-fidelity Bayesian optimization
 
 ## Introduction
@@ -55,18 +60,6 @@ SMT-optim supports continuous, integer, and categorical variables. It relies on 
 SMT-optim is designed to be modular, allowing users to swap components such as surrogate models, acquisition strategies, and acquisition functions while maintaining a consistent overall structure that is well suited to research benchmarking. The package also offers a straightforward interface through the `minimize` method, enabling seamless implementation and automatically selecting an appropriate optimization framework based on the characteristics of the problem.
 
 # Getting started
-
-## Prerequisites
-
-SMT-optim requires the following package to be installed in the Python environment:
-
-- Numpy
-- SciPy
-- SMT (with the GPX surrogate model)
-
-It can be done via PIP:
-
-`pip install numpy scipy smt[gpx]`
 
 ## Installation
 
