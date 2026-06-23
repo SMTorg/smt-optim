@@ -73,10 +73,10 @@ pip install smt-optim
 
 Comprehensive examples are available in the documentation:
 
-- [Unconstrained optimization](https://smtorg.github.io/SMT-optim/getting_started/unconstrained_optim.html)
-- [Constrained optimization](https://smtorg.github.io/SMT-optim/getting_started/constrained_optim.html)
-- [Multi-fidelity optimization](https://smtorg.github.io/SMT-optim/getting_started/multifidelity_optim.html)
-- [Mixed variable optimization](https://smtorg.github.io/SMT-optim/getting_started/mixed_var_optim.html)
+- [Unconstrained optimization](https://smtorg.github.io/smt-optim/getting_started/unconstrained_optim.html)
+- [Constrained optimization](https://smtorg.github.io/smt-optim/getting_started/constrained_optim.html)
+- [Multi-fidelity optimization](https://smtorg.github.io/smt-optim/getting_started/multifidelity_optim.html)
+- [Mixed variable optimization](https://smtorg.github.io/smt-optim/getting_started/mixed_var_optim.html)
 
 ```python
 import numpy as np
@@ -100,7 +100,7 @@ print(best_sample)
 
 The documentation is available online:
 
-[SMT-optim documentation](https://smtorg.github.io/SMT-optim/)
+[SMT-optim documentation](https://smtorg.github.io/smt-optim/)
 
 # License
 
