@@ -6,9 +6,9 @@ import scipy.stats as stats
 
 import smt.design_space as ds
 from smt.sampling_methods import LHS
+from smt.applications.mixed_integer import MixedIntegerSamplingMethod
 
-from smt_optim.benchmarks.registry import list_problems
-
+from smt_optim.benchmarks.registry import list_problems, get_problem
 
 
 class TestBenchmarkProblems(unittest.TestCase):
@@ -130,10 +130,14 @@ class TestBenchmarkProblems(unittest.TestCase):
                     doe = stats.qmc.scale(doe, prob.bounds[:, 0], prob.bounds[:, 1])
 
                 elif isinstance(prob.design_space, ds.DesignSpace):
-                    sampler = LHS(xlimits=prob.design_space.get_unfolded_num_bounds(),
-                                  criterion="ese",
-                                  seed=0)
-                    doe = sampler(num_sample)
+                    # sampler = LHS(xlimits=prob.design_space.get_unfolded_num_bounds(),
+                    #               criterion="ese",
+                    #               seed=0)
+                    # doe = sampler(num_sample)
+
+                    sampler = MixedIntegerSamplingMethod(LHS, prob.design_space, criterion="ese", seed=0)
+                    doe = sampler(10)
+
                 else:
                     raise TypeError()
 
@@ -161,6 +165,36 @@ class TestBenchmarkProblems(unittest.TestCase):
                             is_np_1d = (isinstance(val, np.ndarray) and val.ndim == 1)
                             self.assertTrue(is_scalar or is_np_1d)
 
+
+    def test_get_problem_returns_independent_instances(self):
+        prob1 = get_problem("Alos")
+        prob2 = get_problem("Alos")
+
+        # Different objects
+        self.assertIsNot(prob1, prob2)
+
+        # Mutate one instance
+        original = prob2.num_dim
+        prob1.num_dim = 999
+
+        # Other instance is unchanged
+        self.assertIsNot(prob1, prob2)
+        self.assertEqual(prob2.num_dim, original)
+
+        prob1.tags.append("new_tag")
+        self.assertNotIn("new_tag", prob2.tags)
+
+
+    def test_list_problems_returns_independent_instances(self):
+        probs1 = list_problems()
+        probs2 = list_problems()
+
+        # Lists themselves are different objects
+        self.assertIsNot(probs1, probs2)
+
+        # Problem instances are different objects
+        for p1, p2 in zip(probs1, probs2):
+            self.assertIsNot(p1, p2)
 
 
 if __name__ == "__main__":

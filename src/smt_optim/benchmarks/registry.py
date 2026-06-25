@@ -1,5 +1,6 @@
 import inspect
 import warnings
+import copy
 
 from smt_optim.benchmarks.base import BenchmarkProblem
 
@@ -12,6 +13,12 @@ from .sfu import many_local_minima, bowl_shaped
 from .gotestproblems import constrained
 from .avt311 import avt311
 from .misc import mixvar_branin
+
+from .misc import mf_colville
+from .misc import mf_borehole
+from .misc import misc2
+from .misc import weldedbeam_variants
+
 
 available = {}
 
@@ -31,6 +38,11 @@ _register_from_module(bowl_shaped)
 _register_from_module(constrained)
 _register_from_module(avt311)
 _register_from_module(mixvar_branin)
+
+_register_from_module(mf_colville)
+_register_from_module(mf_borehole)
+_register_from_module(misc2)
+_register_from_module(weldedbeam_variants)
 
 
 # def list_problems(**criteria):
@@ -136,7 +148,7 @@ def list_problems(n: list[int] = None,
                 if not set(tags).issubset(set(prob.tags)):
                     continue
 
-            results.append(prob)
+            results.append(copy.deepcopy(prob))
 
         except:
             continue
@@ -157,4 +169,5 @@ def get_problem(name: str) -> BenchmarkProblem:
     result : BenchmarkProblem or None
         The retrieved BenchmarkProblem object, or None if no matching problem is found.
     """
-    return available.get(name)
+    problem = available.get(name)
+    return copy.deepcopy(problem) if problem is not None else None
