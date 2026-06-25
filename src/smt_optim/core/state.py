@@ -275,13 +275,19 @@ class State:
 
         data = dataset.export_as_dict()
         fidelity_mask = (data["fidelity"] == fidelity).ravel()
-        yt = data["obj"][:, 0]
+
         rscv = data["rscv"]
-        feasible = rscv <= ctol
-        if np.any(feasible):
+        fid_feas_mask = fidelity_mask & (rscv <= ctol)
+
+        yt = data["obj"][:, 0]
+
+        # selects sample with lowest objective value
+        if np.any(fid_feas_mask):
             # mono-objective only
-            filtered_yt = np.where(np.logical_and(fidelity_mask, feasible), yt * coeff, np.inf)
+            filtered_yt = np.where(fid_feas_mask, yt * coeff, np.inf)
             idx = np.argmin(filtered_yt)
+
+        # if no sample is feasible, selects sample with lowest RSCV
         else:
             filtered_rscv = np.where(fidelity_mask, rscv, np.inf)
             idx = np.argmin(filtered_rscv)

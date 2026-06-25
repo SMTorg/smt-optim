@@ -17,7 +17,7 @@ from pygments.lexers import PythonLexer
 project = 'SMT-optim'
 copyright = '2026, SMT-optim contributors'
 author = 'O. Cordelier'
-release = '0.0.1'
+release = '0.1.3'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
