@@ -27,6 +27,12 @@ jobs:
         run: |
           pip install -r src/tests/requirements.txt
           pip install -e .
+          pip install coverage
 
       - name: Run all tests
-        run: python -m unittest discover -s src/tests
+        run: |
+          coverage run -m unittest discover -s src/tests
+          coverage lcov
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
