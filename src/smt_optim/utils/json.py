@@ -20,7 +20,7 @@ def json_safe(obj):
             for k, v in obj.items():
                 try:
                     safe[str(k)] = json_safe(v)
-                except:
+                except Exception:
                     safe[str(k)] = None
             return safe
 

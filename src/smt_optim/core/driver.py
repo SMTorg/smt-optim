@@ -1,23 +1,18 @@
 import numpy as np
-import scipy.stats as stats
 from dataclasses import dataclass
 import warnings
 import time
-import json
-import csv
-import copy
 
 import os
 
-from typing import Callable, Type
+from typing import Callable
 
-import pickle
 
 from smt_optim.core import Problem, State
 from smt_optim.surrogate_models import Surrogate
 from smt_optim.acquisition_strategies import AcquisitionStrategy
 
-from smt_optim.core import Sample, OptimizationDataset, Evaluator
+from smt_optim.core import Evaluator
 
 from smt_optim.utils.initial_design import generate_initial_design
 from smt_optim.utils.stop_criteria import check_stop_criteria
@@ -128,7 +123,7 @@ class ObjectiveConfig:
 
     objective: list[Callable]
     surrogate: type[Surrogate]
-    type: str = "minimize"                      # problem's type -> "minimize" or "maximize"
+    type: str = "minimize"  # problem's type -> "minimize" or "maximize"
     surrogate_kwargs: dict | None = None
 
 
@@ -208,6 +203,7 @@ class DriverConfig:
     seed: default=None
         Seed for experiment reproducibility
     """
+
     ctol: float = 1e-4  # tolerance for all constraints
     max_iter: int | None = None  # max number of BO iterations
     max_budget: float = float("inf")  # max BO budget
@@ -228,7 +224,13 @@ class DriverConfig:
 
 
 class Driver:
-    def __init__(self, problem: Problem, config: DriverConfig, strategy: AcquisitionStrategy, strategy_kwargs: dict = {}):
+    def __init__(
+        self,
+        problem: Problem,
+        config: DriverConfig,
+        strategy: AcquisitionStrategy,
+        strategy_kwargs: dict = {},
+    ):
         """
         Initializes the object with the given parameters.
 
@@ -271,7 +273,6 @@ class Driver:
             self.loggers.append(ConsoleLogger(self.config))
         if self.config.log_stats:
             self.loggers.append(JsonLogger(self.config))
-
 
     def iteration(self, state):
         """
@@ -323,7 +324,6 @@ class Driver:
 
         return state
 
-
     def optimize(self):
         """
         Performs an optimization process on the current state.
@@ -362,7 +362,6 @@ class Driver:
             generate_initial_design(self.state, self.evaluator, self.config)
 
         self.call_loggers(self.state)
-
 
     def call_loggers(self, state):
         # if self.loggers is not None:
@@ -434,7 +433,7 @@ def safe_descale(x_scaled: np.ndarray, state: State) -> np.ndarray:
     # clips bounds for all variables
     x_clip = np.clip(x_corr, ds_bounds[:, 0], ds_bounds[:, 1])
 
-    if np.linalg.norm(x_clip - x_raw) > 1e-10: # TODO: add customizable tolerance
+    if np.linalg.norm(x_clip - x_raw) > 1e-10:  # TODO: add customizable tolerance
         warnings.warn("Infill point did not respect the design space.")
 
     return x_clip
@@ -460,19 +459,19 @@ def infill_not_in_xt(infills: list[np.ndarray], state: State) -> None:
 
     for lvl in range(len(infills)):
         if infills[lvl] is not None:
-
             fid_mask = fidelity == lvl
             xt_lvl = xt[fid_mask, :]
 
             for idx in range(infills[lvl].shape[0]):
                 diff = xt_lvl - infills[lvl][idx, :]
                 l2_norms = np.linalg.norm(diff, axis=1)
-                if np.min(l2_norms) < 1e-8: # TODO: add customizable tolerance
+                if np.min(l2_norms) < 1e-8:  # TODO: add customizable tolerance
                     # raise Exception("Infill point already in training data.")
-                    warnings.warn(f"Infill point {infills[lvl][idx, :]} already in training data. L2 = {np.min(l2_norms)}")
+                    warnings.warn(
+                        f"Infill point {infills[lvl][idx, :]} already in training data. L2 = {np.min(l2_norms)}"
+                    )
 
     return None
-
 
 
 # # ======= old =======

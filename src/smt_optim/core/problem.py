@@ -1,4 +1,3 @@
-
 import numpy as np
 import smt.design_space as ds
 
@@ -9,6 +8,7 @@ import smt.design_space as ds
 #     OrdinalVariable,
 #     CategoricalVariable,
 # )
+
 
 class Problem:
     """
@@ -37,7 +37,14 @@ class Problem:
         cstr_funcs : list
             Constraint functions.
     """
-    def __init__(self, obj_configs: list, design_space: np.ndarray | ds.DesignSpace, cstr_configs: list = [], costs: list[float] | None = None) -> None:
+
+    def __init__(
+        self,
+        obj_configs: list,
+        design_space: np.ndarray | ds.DesignSpace,
+        cstr_configs: list = [],
+        costs: list[float] | None = None,
+    ) -> None:
 
         # convert np.ndarray into ds.DesignSpace, and assumes all variable are continuous
         if isinstance(design_space, np.ndarray):
@@ -52,7 +59,11 @@ class Problem:
 
         self.num_obj = 0
         self.num_cstr = 0
-        self.num_fidelity = len(obj_configs[0].objective) if isinstance(obj_configs[0].objective, list) else 1
+        self.num_fidelity = (
+            len(obj_configs[0].objective)
+            if isinstance(obj_configs[0].objective, list)
+            else 1
+        )
 
         self.design_space = design_space
 
@@ -84,19 +95,18 @@ class Problem:
 
     def __repr__(self):
 
-        data = f"num_dim =       {self.num_dim}\n"\
-               f"num_obj =       {self.num_obj}\n"\
-               f"num_cstr =      {self.num_cstr}\n"\
-               f"num_fidelity =  {self.num_fidelity}\n"\
-               f"design_space =  {self.design_space}\n"
+        data = (
+            f"num_dim =       {self.num_dim}\n"
+            f"num_obj =       {self.num_obj}\n"
+            f"num_cstr =      {self.num_cstr}\n"
+            f"num_fidelity =  {self.num_fidelity}\n"
+            f"design_space =  {self.design_space}\n"
+        )
 
         return data
-
 
     def _validate_obj(self, config):
         pass
 
-
     def _validate_cstr(self, config):
         pass
-

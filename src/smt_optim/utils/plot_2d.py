@@ -1,7 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 from typing import Callable
+
 
 def get_plot2d_data(func: Callable, bounds: np.ndarray, num_points: int = 101) -> tuple:
 

@@ -2,7 +2,7 @@ from time import perf_counter
 from typing import Callable
 
 import numpy as np
-from scipy import optimize as so, stats as stats
+from scipy import stats as stats
 from scipy.spatial.distance import cdist
 
 import smt.design_space as ds
@@ -15,7 +15,6 @@ from smt_optim.acquisition_strategies import AcquisitionStrategy
 from smt_optim.core.state import State
 from smt_optim.subsolvers.multistart import mixvar_multistart_minimize
 
-from smt_optim.utils.get_fmin import get_fmin
 
 from smt_optim.subsolvers import multistart_minimize
 
@@ -76,7 +75,6 @@ class MFSEGO(AcquisitionStrategy):
     SMT's MFK model must be used.
     """
 
-
     def __init__(self, state: State, **kwargs):
         """
         Initialize the MFSEGO acquisition strategy.
@@ -97,20 +95,38 @@ class MFSEGO(AcquisitionStrategy):
         super().__init__()
 
         self.acq_context = state
-        self.acq_func = kwargs.pop("acq_func", log_ei)                          # expected_improvement, log_ei
-        self.fmin_crit = kwargs.pop("fmin_crit", "min_rscv")                    # broken -> to be removed (min_rscv, fmin, mean_rscv)
+        self.acq_func = kwargs.pop("acq_func", log_ei)  # expected_improvement, log_ei
+        self.fmin_crit = kwargs.pop(
+            "fmin_crit", "min_rscv"
+        )  # broken -> to be removed (min_rscv, fmin, mean_rscv)
         # self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
-        self.n_start = kwargs.pop("n_start", None)                              # optimizer multistart
-        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")            # obj-only, average, optimistic, pessimistic
-        self.select_fidelity = kwargs.pop("select_fidelity", True)              # if set to False, will always sample (LF+HF)
-        self.min_rscv_first = kwargs.pop("min_rscv_first", False)               # broken -> to be fixed!
-        self.filter_rscv = kwargs.pop("filter_rscv", False)                     # broken -> to be fixed!
-        self.optimize_best = kwargs.pop("optimize_best", False)                 # broken -> to be fixed!
-        self.relax_constraints = kwargs.pop("relax_constraints", False)         # broken -> to be fixed!
-        self.cr_override = kwargs.pop("cr_override", None)                      # override optimizer Cost Ratio
-        self.sp_method = kwargs.pop("sp_method", "SLSQP")                       # SciPy optimizer method
-        self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))        # SciPy optimizer tolerance
-        self.var_red_corr = kwargs.pop("var_red_corr", None)                    # Variance reduction correction scheme
+        self.n_start = kwargs.pop("n_start", None)  # optimizer multistart
+        self.fidelity_crit = kwargs.pop(
+            "fidelity_crit", "obj-only"
+        )  # obj-only, average, optimistic, pessimistic
+        self.select_fidelity = kwargs.pop(
+            "select_fidelity", True
+        )  # if set to False, will always sample (LF+HF)
+        self.min_rscv_first = kwargs.pop(
+            "min_rscv_first", False
+        )  # broken -> to be fixed!
+        self.filter_rscv = kwargs.pop("filter_rscv", False)  # broken -> to be fixed!
+        self.optimize_best = kwargs.pop(
+            "optimize_best", False
+        )  # broken -> to be fixed!
+        self.relax_constraints = kwargs.pop(
+            "relax_constraints", False
+        )  # broken -> to be fixed!
+        self.cr_override = kwargs.pop(
+            "cr_override", None
+        )  # override optimizer Cost Ratio
+        self.sp_method = kwargs.pop("sp_method", "SLSQP")  # SciPy optimizer method
+        self.sp_tol = kwargs.pop(
+            "sp_tol", np.sqrt(np.finfo(float).eps)
+        )  # SciPy optimizer tolerance
+        self.var_red_corr = kwargs.pop(
+            "var_red_corr", None
+        )  # Variance reduction correction scheme
 
         self.seed = kwargs.pop("seed", None)
 
@@ -118,10 +134,9 @@ class MFSEGO(AcquisitionStrategy):
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
 
         if state and self.n_start is None:
-            self.n_start = 20 # * state.problem.num_dim
+            self.n_start = 20  # * state.problem.num_dim
 
         self.fmin: float | None = None  # current best feasible objective value
-
 
     def validate_config(self, acq_context: State) -> None:
 
@@ -130,7 +145,6 @@ class MFSEGO(AcquisitionStrategy):
 
         if not isinstance(acq_context.design_space, np.ndarray):
             raise Exception("Design space must be a numpy array.")
-
 
         obj_required_methods = [
             "predict_values",
@@ -149,8 +163,6 @@ class MFSEGO(AcquisitionStrategy):
             for method in cstr_required_methods:
                 if not callable(getattr(acq_context.cstr_models[c_id], method, None)):
                     raise TypeError(f"Constraint model requires: '{method}' method.")
-
-
 
     def get_infill(self, acq_context: State) -> list[np.ndarray]:
         """
@@ -181,8 +193,8 @@ class MFSEGO(AcquisitionStrategy):
         acq_data = dict()
 
         # gets the current best feasible objective value from the scaled dataset
-        best_sample = acq_context.get_best_sample(ctol=0., scaled=True)
-        self.fmin = best_sample.obj[0]                                          # mono-objective only
+        best_sample = acq_context.get_best_sample(ctol=0.0, scaled=True)
+        self.fmin = best_sample.obj[0]  # mono-objective only
         acq_data["fmin"] = self.fmin
 
         # scipy objective wrapper
@@ -203,26 +215,32 @@ class MFSEGO(AcquisitionStrategy):
             gen_t0 = perf_counter()
             # multi_x0 = self.generate_multistart_points(optimizer)
             # TODO: initialize sampler in init class method
-            sampler = stats.qmc.LatinHypercube(d=acq_context.problem.num_dim, rng=acq_context.iter)
+            sampler = stats.qmc.LatinHypercube(
+                d=acq_context.problem.num_dim, rng=acq_context.iter
+            )
             multi_x0 = sampler.random(self.n_start)
             gen_t1 = perf_counter()
             acq_data["generate_init_points_time"] = gen_t1 - gen_t0
 
-            res = multistart_minimize(scipy_obj,
-                                      bounds=np.array([[0, 1]] * acq_context.problem.num_dim),
-                                      multi_x0=multi_x0,
-                                      constraints=scipy_cstr,
-                                      seed=self.seed,
-                                      tol=self.sp_tol,
-                                      method=self.sp_method,)
+            res = multistart_minimize(
+                scipy_obj,
+                bounds=np.array([[0, 1]] * acq_context.problem.num_dim),
+                multi_x0=multi_x0,
+                constraints=scipy_cstr,
+                seed=self.seed,
+                tol=self.sp_tol,
+                method=self.sp_method,
+            )
         else:
-            res = mixvar_multistart_minimize(scipy_obj,
-                                             design_space=acq_context.problem.design_space,
-                                             constraints=scipy_cstr,
-                                             n_start=self.n_start,
-                                             method=self.sp_method,
-                                             tol=self.sp_tol,
-                                             seed=self.seed)
+            res = mixvar_multistart_minimize(
+                scipy_obj,
+                design_space=acq_context.problem.design_space,
+                constraints=scipy_cstr,
+                n_start=self.n_start,
+                method=self.sp_method,
+                tol=self.sp_tol,
+                seed=self.seed,
+            )
 
         # next infill location
         next_x = res.x
@@ -246,7 +264,6 @@ class MFSEGO(AcquisitionStrategy):
 
         return infills
 
-
     def build_scipy_objective(self, acq_context: State) -> Callable:
 
         def scipy_acq_func(x):
@@ -262,10 +279,12 @@ class MFSEGO(AcquisitionStrategy):
         scipy_cstr = []
 
         def append_sp_cstr(func: Callable, type: str) -> None:
-            scipy_cstr.append({
-                "fun": func,
-                "type": type,
-            })
+            scipy_cstr.append(
+                {
+                    "fun": func,
+                    "type": type,
+                }
+            )
 
         # TODO: re-implement constraint relaxation
         # def sp_constraint(x):
@@ -288,24 +307,45 @@ class MFSEGO(AcquisitionStrategy):
             mu = model.predict_values(x)
             return mu.item()
 
-
         for c_id, c_config in enumerate(state.problem.cstr_configs):
-
             if c_config.equal is not None:
-                func = lambda x, f=sp_constraint, value=state.cstr_equal[c_id], m=state.cstr_models[c_id]: f(x, m) - value
+
+                def func(
+                    x,
+                    f=sp_constraint,
+                    value=state.cstr_equal[c_id],
+                    m=state.cstr_models[c_id],
+                ):
+                    return f(x, m) - value
+
                 append_sp_cstr(func, "eq")
 
             else:
                 if c_config.lower is not None:
-                    func = lambda x, f=sp_constraint, value=state.cstr_lower[c_id], m=state.cstr_models[c_id]: - value + f(x, m)
+
+                    def func(
+                        x,
+                        f=sp_constraint,
+                        value=state.cstr_lower[c_id],
+                        m=state.cstr_models[c_id],
+                    ):
+                        return -value + f(x, m)
+
                     append_sp_cstr(func, "ineq")
 
                 if c_config.upper is not None:
-                    func = lambda x, f=sp_constraint, value=state.cstr_upper[c_id], m=state.cstr_models[c_id]: - f(x, m) + value
+
+                    def func(
+                        x,
+                        f=sp_constraint,
+                        value=state.cstr_upper[c_id],
+                        m=state.cstr_models[c_id],
+                    ):
+                        return -f(x, m) + value
+
                     append_sp_cstr(func, "ineq")
 
         return scipy_cstr
-
 
     def get_fidelity(self, next_x: np.ndarray, state: State) -> list[int]:
         """
@@ -332,7 +372,6 @@ class MFSEGO(AcquisitionStrategy):
         num_points = next_x.shape[0]
 
         if state.problem.num_fidelity > 1 and self.select_fidelity:
-
             all_surrogates = []
             for o_surrogate in state.obj_models:
                 all_surrogates.append(o_surrogate)
@@ -344,12 +383,13 @@ class MFSEGO(AcquisitionStrategy):
             else:
                 costs = state.problem.costs
 
-            levels, s2_red_norm = select_fidelity_level(next_x,
-                                                        costs,
-                                                        all_surrogates,
-                                                        self.fidelity_crit,
-                                                        self.var_red_corr,
-                                                        )
+            levels, s2_red_norm = select_fidelity_level(
+                next_x,
+                costs,
+                all_surrogates,
+                self.fidelity_crit,
+                self.var_red_corr,
+            )
 
         else:
             levels = [(state.problem.num_fidelity - 1) for _ in range(num_points)]
@@ -357,7 +397,9 @@ class MFSEGO(AcquisitionStrategy):
         return levels
 
 
-def corrected_predict_variances_all_levels(x_pred: np.ndarray, model, method: str = "max") -> tuple[np.ndarray, list]:
+def corrected_predict_variances_all_levels(
+    x_pred: np.ndarray, model, method: str = "max"
+) -> tuple[np.ndarray, list]:
     """
     Predict the variance at all fidelity levels for given prediction points `x_pred`.
 
@@ -389,7 +431,9 @@ def corrected_predict_variances_all_levels(x_pred: np.ndarray, model, method: st
     if method is None:
         noise2_corr = np.zeros((x_pred.shape[0], noise2.shape[1]))
     elif method == "max":
-        noise2_corr = np.max(noise2, axis=0).reshape(1, -1).repeat(x_pred.shape[0], axis=0)
+        noise2_corr = (
+            np.max(noise2, axis=0).reshape(1, -1).repeat(x_pred.shape[0], axis=0)
+        )
     elif method == "closest":
         min_dist_idx = np.argmin(cdist(x_pred, model.X[-1]), axis=1)
         noise2_corr = noise2[min_dist_idx, :]
@@ -400,7 +444,6 @@ def corrected_predict_variances_all_levels(x_pred: np.ndarray, model, method: st
     s2_corr = np.clip(s2 - noise2_corr, 0, np.inf)
 
     return s2_corr, rho2
-
 
 
 def compute_sigma2_red(x_pred: np.ndarray, surrogate, method=None) -> np.ndarray:
@@ -432,15 +475,17 @@ def compute_sigma2_red(x_pred: np.ndarray, surrogate, method=None) -> np.ndarray
 
     # np.ndarray(num_points, num_levels), list[np.ndarray(num_points)]
     # s2, rho2 = surrogate.model.predict_variances_all_levels(x_pred)
-    s2, rho2 = corrected_predict_variances_all_levels(x_pred, surrogate.model, method=method)
+    s2, rho2 = corrected_predict_variances_all_levels(
+        x_pred, surrogate.model, method=method
+    )
     num_levels = s2.shape[1]
 
     tot_rho2 = np.ones((x_pred.shape[0], num_levels))
     s2_red = np.empty((x_pred.shape[0], num_levels))
 
     for k in range(num_levels):
-        for l in range(k, num_levels-1):
-            tot_rho2[:, k] *= rho2[l][:]
+        for lvl2 in range(k, num_levels - 1):
+            tot_rho2[:, k] *= rho2[lvl2][:]
 
         s2_red[:, k] = s2[:, k] * tot_rho2[:, k]
 
@@ -475,14 +520,17 @@ def compute_norm_squared_cost(costs: list[float]) -> np.ndarray:
     tot_costs2 = np.empty(num_levels)
 
     for k in range(num_levels):
-        tot_costs2[k] = np.sum(costs[0:k+1])**2
+        tot_costs2[k] = np.sum(costs[0 : k + 1]) ** 2
 
     # normalize the aggregate costs squared by its maximum
     tot_costs2 /= np.max(tot_costs2)
 
     return tot_costs2
 
-def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrogate, corr_method=None) -> np.ndarray:
+
+def compute_norm_sigma2_red(
+    x_pred: np.ndarray, norm_costs2: list[float], surrogate, corr_method=None
+) -> np.ndarray:
     """
     Normalize the variance reduction of each level by their corresponding normalized total squared costs.
 
@@ -511,8 +559,6 @@ def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrog
     for k in range(num_levels):
         s2_norm[:, k] = s2_red[:, k] / norm_costs2[k]
 
-
-
     # if equal 0 somewhere override...
     # has_zero = np.any(s2_norm == 0, axis=1)
     # indices = s2_norm.shape[1] - 1 - np.argmax((s2_norm == 0)[:, ::-1], axis=1)
@@ -524,7 +570,9 @@ def compute_norm_sigma2_red(x_pred: np.ndarray, norm_costs2: list[float], surrog
     return s2_norm
 
 
-def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: list, corr_method=None) -> list[np.ndarray]:
+def compute_all_s2_red_norm(
+    x_pred: np.ndarray, costs: list[float], surrogates: list, corr_method=None
+) -> list[np.ndarray]:
     """
     Compute the normalized the variance reduction of all models in the `surrogates` list.
 
@@ -553,13 +601,20 @@ def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: 
     s2_red_norm = [np.empty((num_pts, num_levels)) for _ in range(len(surrogates))]
 
     for i, surrogate in enumerate(surrogates):
-        s2_red_norm[i] = compute_norm_sigma2_red(x_pred, norm_costs2, surrogate, corr_method)
+        s2_red_norm[i] = compute_norm_sigma2_red(
+            x_pred, norm_costs2, surrogate, corr_method
+        )
 
     return s2_red_norm
 
 
-def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates: list[Surrogate],
-                          criterion: str = "pessimistic", corr_method=None) -> tuple[np.ndarray, np.ndarray]:
+def select_fidelity_level(
+    x_pred: np.ndarray,
+    costs: list[float],
+    all_surrogates: list[Surrogate],
+    criterion: str = "pessimistic",
+    corr_method=None,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Select the highest fidelity level to sample based on the `criterion`.
 
@@ -602,7 +657,9 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
         level = s2_red_norm[0].argmax(axis=1)
 
     elif criterion == "optimistic":
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates, corr_method)
+        s2_red_norm = compute_all_s2_red_norm(
+            x_pred, costs, all_surrogates, corr_method
+        )
 
         # TODO: make it compatible with multiple infill points
         level = s2_red_norm[0].argmax(axis=1)
@@ -611,7 +668,9 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
             level = np.vstack((level, s2_red_norm[i].argmax(axis=1))).min(axis=0)
 
     elif criterion == "pessimistic":
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates, corr_method)
+        s2_red_norm = compute_all_s2_red_norm(
+            x_pred, costs, all_surrogates, corr_method
+        )
 
         level = s2_red_norm[0].argmax(axis=1)
 
@@ -621,7 +680,9 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
     elif criterion == "average":
         # s2_red of each surrogate is normalized by the cost. Should it be normalized after the sum?
         # -> should be the same
-        s2_red_norm = compute_all_s2_red_norm(x_pred, costs, all_surrogates, corr_method)
+        s2_red_norm = compute_all_s2_red_norm(
+            x_pred, costs, all_surrogates, corr_method
+        )
         s2_red_avg = np.zeros((num_pts, s2_red_norm[0].shape[1]))
 
         # sum the s2_red from all surrogates
@@ -631,7 +692,6 @@ def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates
         level = s2_red_avg.argmax(axis=1)
 
     elif criterion == "cstr-only":
-
         if len(all_surrogates) == 1:
             raise Exception("cstr-only criterion requires one constraint surrogate.")
 

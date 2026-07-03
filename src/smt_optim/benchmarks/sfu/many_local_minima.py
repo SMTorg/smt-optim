@@ -7,7 +7,6 @@ from smt_optim.benchmarks.base import BenchmarkProblem
 
 
 class Ackley(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -17,13 +16,15 @@ class Ackley(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [0, 40],
-        ])
+        self.bounds = np.array(
+            [
+                [0, 40],
+            ]
+        )
 
         self.a = 20
         self.b = 0.2
-        self.c = 2*np.pi
+        self.c = 2 * np.pi
         self.exp1 = np.exp(1)
 
         self.tags = [
@@ -37,8 +38,8 @@ class Ackley(BenchmarkProblem):
         sum2 = 0
 
         for i in range(self.num_dim):
-            sum1 += x[i]**2
-            sum2 += np.cos(self.c*x[i])
+            sum1 += x[i] ** 2
+            sum2 += np.cos(self.c * x[i])
 
         term1 = -self.a * np.exp(-self.b * np.sqrt(sum1 / self.num_dim))
         term2 = -np.exp(sum2 / self.num_dim)
@@ -47,7 +48,6 @@ class Ackley(BenchmarkProblem):
 
 
 class Bukin6(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -57,26 +57,26 @@ class Bukin6(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-15, 5],
-            [-3, 3],
-        ])
+        self.bounds = np.array(
+            [
+                [-15, 5],
+                [-3, 3],
+            ]
+        )
 
         self.tags = [
             "sfu",
         ]
 
-
     def objective(self, x):
 
-        term1 = 100 * np.sqrt(abs(x[1] - 0.01*x[0]**2))
+        term1 = 100 * np.sqrt(abs(x[1] - 0.01 * x[0] ** 2))
         term2 = 0.01 * abs(x[0] + 10)
 
         return term1 + term2
 
 
 class CrossInTray(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -86,10 +86,12 @@ class CrossInTray(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-5.12, 5.12],
-            [-5.12, 5.12],
-        ])
+        self.bounds = np.array(
+            [
+                [-5.12, 5.12],
+                [-5.12, 5.12],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -104,7 +106,6 @@ class CrossInTray(BenchmarkProblem):
 
 
 class DropWave(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -114,10 +115,12 @@ class DropWave(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-10, 10],
-            [-10, 10],
-        ])
+        self.bounds = np.array(
+            [
+                [-10, 10],
+                [-10, 10],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -131,7 +134,6 @@ class DropWave(BenchmarkProblem):
 
 
 class EggHolder(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -141,10 +143,12 @@ class EggHolder(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-512, 512],
-            [-514, 512],
-        ])
+        self.bounds = np.array(
+            [
+                [-512, 512],
+                [-514, 512],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -157,7 +161,6 @@ class EggHolder(BenchmarkProblem):
 
 
 class GramacyLee(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -167,9 +170,11 @@ class GramacyLee(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [0.5, 2.5],
-        ])
+        self.bounds = np.array(
+            [
+                [0.5, 2.5],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -182,7 +187,6 @@ class GramacyLee(BenchmarkProblem):
 
 
 class Griewank(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -192,15 +196,16 @@ class Griewank(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-600, 600],
-        ])
+        self.bounds = np.array(
+            [
+                [-600, 600],
+            ]
+        )
 
         self.tags = [
             "sfu",
             "n_variable",
         ]
-
 
     def objective(self, x):
         term1 = 0
@@ -208,13 +213,12 @@ class Griewank(BenchmarkProblem):
 
         for i in range(self.num_dim):
             term1 += x[i] ** 2 / 4000
-            term2 *= np.cos(x[i] / np.sqrt(float(i+1)))
+            term2 *= np.cos(x[i] / np.sqrt(float(i + 1)))
 
         return term1 - term2 + 1
 
 
 class HolderTable(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -224,10 +228,12 @@ class HolderTable(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-10, 10],
-            [-10, 10],
-        ])
+        self.bounds = np.array(
+            [
+                [-10, 10],
+                [-10, 10],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -240,20 +246,21 @@ class HolderTable(BenchmarkProblem):
 
 
 class Langermann(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
         self.name = "Langermann"
-        self.num_dim = 2    # could be variable
+        self.num_dim = 2  # could be variable
         self.num_obj = 1
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [0, 10],
-            [0, 10],
-        ])
+        self.bounds = np.array(
+            [
+                [0, 10],
+                [0, 10],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -261,13 +268,15 @@ class Langermann(BenchmarkProblem):
 
         self.m = 5
         self.c = np.array([1, 2, 5, 2, 3])
-        self.A = np.array([
-            [3, 5],
-            [5, 2],
-            [2, 1],
-            [1, 4],
-            [7, 9],
-        ])
+        self.A = np.array(
+            [
+                [3, 5],
+                [5, 2],
+                [2, 1],
+                [1, 4],
+                [7, 9],
+            ]
+        )
 
     def objective(self, x):
         outer = 0
@@ -282,7 +291,6 @@ class Langermann(BenchmarkProblem):
 
 
 class Levy(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -292,9 +300,11 @@ class Levy(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-10, 10],
-        ])
+        self.bounds = np.array(
+            [
+                [-10, 10],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -307,10 +317,12 @@ class Levy(BenchmarkProblem):
             w[i] = 1 + (x[i] - 1) / 4
 
         term1 = (np.sin(np.pi * w[0])) ** 2
-        term3 = (w[self.num_dim-1] - 1) ** 2 * (1 + (np.sin(2 * np.pi * w[self.num_dim-1])) ** 2)
+        term3 = (w[self.num_dim - 1] - 1) ** 2 * (
+            1 + (np.sin(2 * np.pi * w[self.num_dim - 1])) ** 2
+        )
 
         term2 = 0
-        for i in range(self.num_dim-1):
+        for i in range(self.num_dim - 1):
             new = (w[i] - 1) ** 2 * (1 + 10 * (np.sin(np.pi * w[i] + 1)) ** 2)
             term2 += new
 
@@ -318,7 +330,6 @@ class Levy(BenchmarkProblem):
 
 
 class Levy13(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -328,10 +339,12 @@ class Levy13(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-10, 10],
-            [-10, 10],
-        ])
+        self.bounds = np.array(
+            [
+                [-10, 10],
+                [-10, 10],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -346,7 +359,6 @@ class Levy13(BenchmarkProblem):
 
 
 class Rastrigin(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -356,9 +368,11 @@ class Rastrigin(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-5.12, 5.12],
-        ])
+        self.bounds = np.array(
+            [
+                [-5.12, 5.12],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -368,12 +382,11 @@ class Rastrigin(BenchmarkProblem):
     def objective(self, x):
         term1 = 0
         for i in range(self.num_dim):
-            term1 += (x[i] ** 2 - 10 * np.cos(2 * np.pi * x[i]))
+            term1 += x[i] ** 2 - 10 * np.cos(2 * np.pi * x[i])
         return 10 * self.num_dim + term1
 
 
 class Schaffer2(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -383,10 +396,7 @@ class Schaffer2(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-100, 100],
-            [-100, 100]
-        ])
+        self.bounds = np.array([[-100, 100], [-100, 100]])
 
         self.tags = [
             "sfu",
@@ -399,7 +409,6 @@ class Schaffer2(BenchmarkProblem):
 
 
 class Schaffer4(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -409,10 +418,7 @@ class Schaffer4(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-100, 100],
-            [-100, 100]
-        ])
+        self.bounds = np.array([[-100, 100], [-100, 100]])
 
         self.tags = [
             "sfu",
@@ -425,7 +431,6 @@ class Schaffer4(BenchmarkProblem):
 
 
 class Schwefel(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -435,9 +440,11 @@ class Schwefel(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-500, 500],
-        ])
+        self.bounds = np.array(
+            [
+                [-500, 500],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -452,7 +459,6 @@ class Schwefel(BenchmarkProblem):
 
 
 class Shubert(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -462,10 +468,12 @@ class Shubert(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 1
 
-        self.bounds = np.array([
-            [-5.12, 5.12],
-            [-5.12, 5.12],
-        ])
+        self.bounds = np.array(
+            [
+                [-5.12, 5.12],
+                [-5.12, 5.12],
+            ]
+        )
 
         self.tags = [
             "sfu",
@@ -482,5 +490,3 @@ class Shubert(BenchmarkProblem):
             sum2 += new2
 
         return sum1 * sum2
-
-

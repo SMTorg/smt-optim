@@ -1,6 +1,5 @@
 import os
 import json
-import csv
 
 import numpy as np
 
@@ -17,7 +16,15 @@ class ConsoleLogger:
     def __init__(self, config):
         self.config = config
 
-        self.headers = ["iter", "budget", "fmin", "rscv", "fidelity", "gp_time", "acq_time"]
+        self.headers = [
+            "iter",
+            "budget",
+            "fmin",
+            "rscv",
+            "fidelity",
+            "gp_time",
+            "acq_time",
+        ]
         width = 14
         self.widths = [max(len(h), width) for h in self.headers]
 
@@ -25,18 +32,17 @@ class ConsoleLogger:
         self.row_fmt = " ".join(f"{{:>{width}}}" for _ in self.headers)
 
         self.formats = {
-            "iter":         ".0f",
-            "budget":       ".3f",
-            "fmin":         ".5e",
-            "rscv":         ".3e",
-            "fidelity":     ".0f",
-            "gp_time":      ".3f",
-            "acq_time":     ".3f",
+            "iter": ".0f",
+            "budget": ".3f",
+            "fmin": ".5e",
+            "rscv": ".3e",
+            "fidelity": ".0f",
+            "gp_time": ".3f",
+            "acq_time": ".3f",
         }
 
         self.iter = 0
         self.repeat_header = 10
-
 
     def on_iter_end(self, state) -> None:
 
@@ -61,7 +67,6 @@ class ConsoleLogger:
 
         self.iter += 1
 
-
     def print_header(self):
         print(self.header_fmt.format(*self.headers))
 
@@ -70,14 +75,13 @@ class JsonLogger:
     def __init__(self, config):
         self.dir = config.results_dir
 
-
     def on_iter_end(self, state) -> None:
 
         path = os.path.join(self.dir, "stats.jsonl")
 
         os.makedirs(self.dir, exist_ok=True)
 
-        with open(path, 'a') as file:
+        with open(path, "a") as file:
             safe_iter_log = json_safe(state.iter_log)
             file.write(json.dumps(safe_iter_log) + "\n")
             # json.dump(safe_iter_log, file, indent=4)
@@ -192,4 +196,3 @@ class JsonLogger:
 #
 #             except Exception as e:
 #                 print(f"Error while saving the DoE: {e}")
-

@@ -1,5 +1,3 @@
-from typing import overload
-
 import numpy as np
 
 
@@ -50,7 +48,6 @@ import numpy as np
 #     return rscv
 
 
-
 def compute_rscv(cstr_values: np.ndarray, cstr_configs: list) -> np.ndarray:
 
     # cstr_values of shape (num_data, num_cstr)
@@ -59,21 +56,25 @@ def compute_rscv(cstr_values: np.ndarray, cstr_configs: list) -> np.ndarray:
     rscv = np.zeros(num_data)
 
     for c_id, c_config in enumerate(cstr_configs):
-
         if c_config.equal is not None:
             unfeasible = cstr_values[:, c_id] != c_config.equal
-            rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.equal)**2
+            rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.equal) ** 2
 
         else:
             if c_config.lower is not None:
                 unfeasible = cstr_values[:, c_id] < c_config.lower
-                rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.lower)** 2
+                rscv[unfeasible] += (
+                    cstr_values[unfeasible, c_id] - c_config.lower
+                ) ** 2
 
             if c_config.upper is not None:
                 unfeasible = cstr_values[:, c_id] > c_config.upper
-                rscv[unfeasible] += (cstr_values[unfeasible, c_id] - c_config.upper) ** 2
+                rscv[unfeasible] += (
+                    cstr_values[unfeasible, c_id] - c_config.upper
+                ) ** 2
 
     return np.sqrt(rscv)
+
 
 # TODO: move to multistart.py
 def compute_rscv_sp(x: np.ndarray, cstr_list: list[dict]) -> float:
@@ -89,14 +90,10 @@ def compute_rscv_sp(x: np.ndarray, cstr_list: list[dict]) -> float:
     scv = np.empty(num_cstr)
 
     for c_id, c_dict in enumerate(cstr_list):
-
         c_type = c_dict["type"]
         if c_type == "ineq":
-            scv[c_id] = min(0, c_dict["fun"](x))**2
+            scv[c_id] = min(0, c_dict["fun"](x)) ** 2
         elif c_type == "eq":
-            scv[c_id] = c_dict["fun"](x)**2
+            scv[c_id] = c_dict["fun"](x) ** 2
 
     return np.sqrt(np.sum(scv))
-
-
-

@@ -9,28 +9,29 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../src'))
+
+sys.path.insert(0, os.path.abspath("../src"))
 
 from sphinx.highlighting import lexers
 from pygments.lexers import PythonLexer
 
-project = 'SMT-optim'
-copyright = '2026, SMT-optim contributors'
-author = 'O. Cordelier'
-release = '0.1.3'
+project = "SMT-optim"
+copyright = "2026, SMT-optim contributors"
+author = "O. Cordelier"
+release = "0.1.3"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
     # 'nbsphinx',
-    'sphinx_collections',
+    "sphinx_collections",
     # 'myst_parser',
-    'myst_nb',
+    "myst_nb",
 ]
 
 
@@ -57,28 +58,26 @@ collections = {
 
 html_theme_options = {
     "show_nav_level": 2,
-
     # header
     "logo": {
         # "text": "SMT-optim",
         "image_light": "logo_smt-optim_light.svg",
         "image_dark": "logo_smt-optim_dark.svg",
     },
-
     "repository_url": "https://github.com/SMTorg/smt-optim",
     "use_repository_button": True,
 }
 
 
 source_suffix = {
-    '.rst': 'restructuredtext',
+    ".rst": "restructuredtext",
     # '.txt': 'markdown',
-    '.md': 'myst-nb',
+    ".md": "myst-nb",
     # '.ipynb': 'myst-nb',
 }
 
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
 
@@ -86,7 +85,7 @@ exclude_patterns = []
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_book_theme"
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 html_favicon = "_static/logo_smt-optim_letters_light.svg"
 
@@ -95,8 +94,8 @@ nb_render_plugin = "default"
 nb_render_markdown_format = "myst"
 myst_enable_extensions = [
     "colon_fence",
-    "dollarmath",   # enable the use of $ and $$
-    "amsmath",      # enable some latex commands (e.g., align)
+    "dollarmath",  # enable the use of $ and $$
+    "amsmath",  # enable some latex commands (e.g., align)
 ]
 
 nb_execution_mode = "off"

@@ -1,5 +1,4 @@
 from functools import partial
-import warnings
 
 import numpy as np
 
@@ -36,35 +35,36 @@ class MFColville(BenchmarkProblem):
         self.num_fidelity = 2
         self.num_obj = 1
 
-        self.bounds = np.array([
-            [-10, 10],
-        ] * self.num_dim)
+        self.bounds = np.array(
+            [
+                [-10, 10],
+            ]
+            * self.num_dim
+        )
 
         self.objective = [
             partial(self.func_lf, A=0.8),
             partial(self.func),
         ]
 
-
     def func(self, x):
-        term1 = 100 * (x[0]**2 - x[1])**2
-        term2 = (x[0] - 1)**2
-        term3 = (x[2] - 1)**2
-        term4 = 90 * (x[2]**2 - x[3])**2
-        term5 = 10.1 * ((x[1] - 1)**2 + (x[3] - 1)**2)
+        term1 = 100 * (x[0] ** 2 - x[1]) ** 2
+        term2 = (x[0] - 1) ** 2
+        term3 = (x[2] - 1) ** 2
+        term4 = 90 * (x[2] ** 2 - x[3]) ** 2
+        term5 = 10.1 * ((x[1] - 1) ** 2 + (x[3] - 1) ** 2)
         term6 = 19.8 * (x[1] - 1) * (x[3] - 1)
 
         return term1 + term2 + term3 + term4 + term5 + term6
 
     def func_lf(self, x, A):
         term1 = self.func(A**2 * x)
-        x2 = x*2
-        term2 = -(A + 0.5) * (5*x2[0] + 4*x2[1] + 3*x2[2] + x2[3])
+        x2 = x * 2
+        term2 = -(A + 0.5) * (5 * x2[0] + 4 * x2[1] + 3 * x2[2] + x2[3])
         return term1 + term2
 
 
 if __name__ == "__main__":
-
     import scipy.optimize as so
 
     prob = MFColville()
@@ -74,8 +74,7 @@ if __name__ == "__main__":
     res = so.minimize(prob.func, x0, bounds=prob.bounds, method="SLSQP")
 
     print(res.fun)
-    print(res.x)    # solution should be at x = [1, ..., 1]
-
+    print(res.x)  # solution should be at x = [1, ..., 1]
 
     from smt.sampling_methods import LHS
 
@@ -92,7 +91,6 @@ if __name__ == "__main__":
     for i in range(x_doe.shape[0]):
         y_doe_hf[i] = prob.func(x_doe[i, :])
 
-
     for a in A:
         func_lf = partial(prob.func_lf, A=a)
 
@@ -102,4 +100,3 @@ if __name__ == "__main__":
 
         corr = np.corrcoef(y_doe_hf, y_doe_lf)[0, 1]
         print(f"A={a} -> corr={corr:.4f}")
-

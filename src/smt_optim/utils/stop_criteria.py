@@ -18,7 +18,9 @@ def compute_budget(state) -> float:
     costs = state.problem.costs
     data = state.dataset.export_as_dict()
 
-    masks = [(data["fidelity"] == lvl).ravel() for lvl in range(state.problem.num_fidelity)]
+    masks = [
+        (data["fidelity"] == lvl).ravel() for lvl in range(state.problem.num_fidelity)
+    ]
 
     budget = 0
     for lvl in range(state.problem.num_fidelity):

@@ -1,7 +1,5 @@
 import os
 import sys
-import copy
-import warnings
 
 import numpy as np
 
@@ -12,13 +10,6 @@ from smt.applications import MFK, MFCK
 
 from smt.surrogate_models import MixIntKernelType
 
-from smt.design_space import (
-    DesignSpace,
-    CategoricalVariable,
-    FloatVariable,
-    IntegerVariable,
-    OrdinalVariable,
-)
 
 from smt_optim.surrogate_models import Surrogate
 
@@ -163,12 +154,12 @@ EPSILON = np.finfo(float).eps
 #         s2_pred = self.krg.predict_variances(x_pred)
 #         return s2_pred
 
+
 def _filter_none_kwargs(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
 class SmtAutoModel(Surrogate):
-
     def __init__(self, **kwargs):
         super().__init__()
         self.model = None
@@ -176,7 +167,6 @@ class SmtAutoModel(Surrogate):
 
         self.ds = kwargs.pop("design_space", None)
         self.mix_kernel = kwargs.pop("mix_kernel", MixIntKernelType.CONT_RELAX)
-
 
     def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
         """
@@ -187,26 +177,28 @@ class SmtAutoModel(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        num_dim = xt[-1].shape[1]
+        xt[-1].shape[1]
         num_fidelity = len(xt)
 
         n_start = kwargs.pop("n_start", 3)
 
-        model_kwargs = _filter_none_kwargs({
-            "print_global": False,
-            "n_start": n_start,
-            "design_space": self.ds,
-            "categorical_kernel": self.mix_kernel,
-            "hyper_opt": "Cobyla",
-            "seed": self.train_counter,
-        })
+        model_kwargs = _filter_none_kwargs(
+            {
+                "print_global": False,
+                "n_start": n_start,
+                "design_space": self.ds,
+                "categorical_kernel": self.mix_kernel,
+                "hyper_opt": "Cobyla",
+                "seed": self.train_counter,
+            }
+        )
 
         if num_fidelity == 1:
             self.model = KRG(**model_kwargs)
         else:
             self.model = MFK(**model_kwargs)
 
-            for lvl in range(num_fidelity-1):
+            for lvl in range(num_fidelity - 1):
                 self.model.set_training_values(xt[lvl], yt[lvl], name=lvl)
 
         self.model.set_training_values(xt[-1], yt[-1])
@@ -225,7 +217,7 @@ class SmtAutoModel(Surrogate):
 class HidePrints:
     def __enter__(self):
         self._original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
+        sys.stdout = open(os.devnull, "w")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
@@ -233,7 +225,6 @@ class HidePrints:
 
 
 class SmtGPX(Surrogate):
-
     def __init__(self, **kwargs):
         super().__init__()
         self.model = None
@@ -241,7 +232,6 @@ class SmtGPX(Surrogate):
 
         # self.ds = kwargs.pop("design_space", None)
         # self.mix_kernel = kwargs.pop("mix_kernel", MixIntKernelType.CONT_RELAX)
-
 
     def train(self, xt: list[np.ndarray], yt: list[np.ndarray], **kwargs) -> None:
         """
@@ -252,18 +242,20 @@ class SmtGPX(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        num_dim = xt[-1].shape[1]
+        xt[-1].shape[1]
 
         n_start = kwargs.pop("n_start", 20)
 
-        model_kwargs = _filter_none_kwargs({
-            "print_global": False,
-            "n_start": n_start,
-            "design_space": None,
-            "categorical_kernel": None,
-            "hyper_opt": None,
-            "seed": self.train_counter,
-        })
+        model_kwargs = _filter_none_kwargs(
+            {
+                "print_global": False,
+                "n_start": n_start,
+                "design_space": None,
+                "categorical_kernel": None,
+                "hyper_opt": None,
+                "seed": self.train_counter,
+            }
+        )
 
         self.model = GPX(**model_kwargs)
 
@@ -392,8 +384,8 @@ class SmtGPX(Surrogate):
 #
 #         return s2_red, tot_rho2
 
-class SmtMFCK(Surrogate):
 
+class SmtMFCK(Surrogate):
     def __init__(self, **kwargs):
         super().__init__()
         self.model = None
@@ -401,12 +393,17 @@ class SmtMFCK(Surrogate):
 
     def train(self, xt: list, yt: list, **kwargs):
 
-        num_dim = xt[-1].shape[1]
+        xt[-1].shape[1]
         num_fidelity = len(xt)
 
-        self.model = MFCK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42+self.train_counter)
+        self.model = MFCK(
+            print_global=False,
+            n_start=3,
+            hyper_opt="Cobyla",
+            seed=42 + self.train_counter,
+        )
 
-        for k in range(num_fidelity-1):
+        for k in range(num_fidelity - 1):
             self.model.set_training_values(xt[k], yt[k], name=k)
 
         self.model.set_training_values(xt[-1], yt[-1])
@@ -422,7 +419,9 @@ class SmtMFCK(Surrogate):
 
     def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
         s2_pred = self.model.predict_variances(x_pred)
-        return s2_pred.reshape(-1, 1)   # makes variance shape consistent with value prediction
+        return s2_pred.reshape(
+            -1, 1
+        )  # makes variance shape consistent with value prediction
 
     def predict_level_covariances(self, x: np.ndarray, lvli: int, lvlj: int = None):
         """
@@ -445,7 +444,9 @@ class SmtMFCK(Surrogate):
         x = (x - self.model.X_offset) / self.model.X_scale
 
         if self.model.lvl == 1:
-            raise Exception("Fidelity covariances prediction is only for MFCK with multiple fidelity levels.")
+            raise Exception(
+                "Fidelity covariances prediction is only for MFCK with multiple fidelity levels."
+            )
 
         if self.model.options["eval_noise"]:
             # TODO
@@ -454,7 +455,9 @@ class SmtMFCK(Surrogate):
         if lvlj is None:
             lvlj = self.model.lvl - 1
 
-        self.model.K = self.model.compute_blockwise_K(self.model.X_norma_all, self.model.X_norma_all, self.model.optimal_theta)
+        self.model.K = self.model.compute_blockwise_K(
+            self.model.X_norma_all, self.model.X_norma_all, self.model.optimal_theta
+        )
         L = np.linalg.cholesky(
             self.model.K + self.model.options["nugget"] * np.eye(self.model.K.shape[0])
         )
@@ -467,27 +470,36 @@ class SmtMFCK(Surrogate):
         k_xX_j = []
 
         for lvl in range(self.model.lvl):
-
             li_max = max(lvli, lvl)
             li_min = min(lvli, lvl)
 
             k_xX_i.append(
                 self.model.compute_cross_K(
-                    self.model.X_norma_all[lvl], x, li_max, li_min, self.model.optimal_theta
-                ))
+                    self.model.X_norma_all[lvl],
+                    x,
+                    li_max,
+                    li_min,
+                    self.model.optimal_theta,
+                )
+            )
 
             lj_max = max(lvlj, lvl)
             lj_min = min(lvlj, lvl)
 
             k_xX_j.append(
                 self.model.compute_cross_K(
-                    self.model.X_norma_all[lvl], x, lj_max, lj_min, self.model.optimal_theta
-                ))
+                    self.model.X_norma_all[lvl],
+                    x,
+                    lj_max,
+                    lj_min,
+                    self.model.optimal_theta,
+                )
+            )
 
         beta_i = solve_triangular(L, np.vstack(k_xX_i), lower=True)
         beta_j = solve_triangular(L, np.vstack(k_xX_j), lower=True)
 
         covariances = k_xx - np.dot(beta_j.T, beta_i)
-        covariances = np.diag(covariances) # * self.model.y_std**2
+        covariances = np.diag(covariances)  # * self.model.y_std**2
 
         return covariances.reshape(-1, 1)

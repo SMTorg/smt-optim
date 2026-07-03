@@ -1,8 +1,8 @@
-#@autor Paul-Saves
+# @autor Paul-Saves
 import numpy as np
 from scipy.linalg import solve_triangular
 from smt.utils.kriging import cross_distances, differences
-from smt.utils.misc import standardization
+
 
 def variance_update(model, point, x, inv_block=True):
     """
@@ -26,7 +26,7 @@ def variance_update(model, point, x, inv_block=True):
     """
     smt_model = getattr(model, "model", model)
     n_eval = x.shape[0]
-    ndim = point.shape[1]
+    point.shape[1]
 
     # Handle Multi-Fidelity (MFK) vs Mono-Fidelity (KRG)
     if hasattr(smt_model, "nlvl"):  # MFK
@@ -50,7 +50,7 @@ def variance_update(model, point, x, inv_block=True):
     # Standardization of data using the model's exact scaling
     X_offset = smt_model.X_offset
     X_scale = smt_model.X_scale
-    
+
     X_normalized = (X_train - X_offset) / X_scale
     x_normalized = (x - X_offset) / X_scale
 
@@ -76,15 +76,15 @@ def variance_update(model, point, x, inv_block=True):
         rn_nu = smt_model.corr(dnu)
 
         v = solve_triangular(Cn, rn_nu, lower=True)
-        
+
         c2 = (1.0 + nugget) - np.sum(v**2)
         if c2 <= 1e-6:
             # The point is already in the dataset (or numerically indistinguishable)
             # Its variance reduction is 0, so the variance remains sigma2
             return current_variance(model, x)
-            
+
         c = np.sqrt(c2)
-        
+
         C_aug = np.zeros((nt + 1, nt + 1))
         C_aug[:nt, :nt] = Cn
         C_aug[nt, :nt] = v.flatten()
@@ -98,11 +98,11 @@ def variance_update(model, point, x, inv_block=True):
         D = smt_model._componentwise_distance(dist)
         smt_model.corr.theta = theta
         r_ = smt_model.corr(D)
-        
+
         R = np.eye(nt + 1) * (1 + nugget)
         R[ij[:, 0], ij[:, 1]] = r_[:, 0]
         R[ij[:, 1], ij[:, 0]] = r_[:, 0]
-        
+
         try:
             C_aug = np.linalg.cholesky(R)
             W = solve_triangular(C_aug, r.T, lower=True)
@@ -138,7 +138,7 @@ def current_variance(model, x):
 
     X_offset = smt_model.X_offset
     X_scale = smt_model.X_scale
-    
+
     X_normalized = (X_train - X_offset) / X_scale
     x_normalized = (x - X_offset) / X_scale
 
@@ -153,12 +153,17 @@ def current_variance(model, x):
     return np.maximum(MSE, 0.0)
 
 
-def integrated_variance_reduction(model, points: np.ndarray, integration_points: np.ndarray = None, inv_block: bool = True) -> np.ndarray:
+def integrated_variance_reduction(
+    model,
+    points: np.ndarray,
+    integration_points: np.ndarray = None,
+    inv_block: bool = True,
+) -> np.ndarray:
     """
     Integrated Variance Reduction (IVR) acquisition function.
     Evaluates IVR for one or multiple candidate points.
     Returns the absolute reduction in IMSE: |IMSE_current - IMSE_new|.
-    
+
     Parameters
     ----------
     model : Surrogate
@@ -170,7 +175,7 @@ def integrated_variance_reduction(model, points: np.ndarray, integration_points:
         If None, a 500-point LHS grid is automatically generated (requires model to have xlimits or infers from training points).
     inv_block : bool, optional
         Whether to use block matrix inversion (faster). Default True.
-        
+
     Returns
     -------
     np.ndarray
@@ -178,43 +183,49 @@ def integrated_variance_reduction(model, points: np.ndarray, integration_points:
     """
     if points.ndim == 1:
         points = points.reshape(1, -1)
-        
+
     smt_model = getattr(model, "model", model)
-    
+
     if integration_points is None:
         if hasattr(smt_model, "_default_integration_points"):
             integration_points = smt_model._default_integration_points
         else:
             from smt.sampling_methods import LHS
+
             xlimits = smt_model.options.get("xlimits")
-            
+
             if xlimits is None:
                 if hasattr(smt_model, "nlvl"):
                     X_train = smt_model.training_points[None][0][0]
                 else:
                     X_train = smt_model.training_points[None][0][0]
-                
-                xlimits = np.vstack((np.min(X_train, axis=0), np.max(X_train, axis=0))).T
+
+                xlimits = np.vstack(
+                    (np.min(X_train, axis=0), np.max(X_train, axis=0))
+                ).T
                 import warnings
+
                 warnings.warn(
                     "integration_points was not provided and model does not have 'xlimits'. "
                     "Inferring domain bounds from training data, which may lead to inaccurate integration."
                 )
-                
-            integration_points = LHS(xlimits=xlimits, criterion='ese', seed=42)(500)
+
+            integration_points = LHS(xlimits=xlimits, criterion="ese", seed=42)(500)
             smt_model._default_integration_points = integration_points
-        
+
     num_points = points.shape[0]
     ivr_vals = np.zeros((num_points, 1))
-    
+
     # Compute current IMSE once
     imse_current = np.mean(current_variance(model, integration_points))
-    
+
     for i in range(num_points):
-        MSE_new = variance_update(model, points[i:i+1, :], integration_points, inv_block=inv_block)
+        MSE_new = variance_update(
+            model, points[i : i + 1, :], integration_points, inv_block=inv_block
+        )
         imse_new = np.mean(MSE_new)
         # We want to maximize the reduction (IMSE_current - IMSE_new).
         # We take the absolute value as requested, though mathematically imse_current >= imse_new.
         ivr_vals[i, 0] = imse_current - imse_new
-        
+
     return ivr_vals

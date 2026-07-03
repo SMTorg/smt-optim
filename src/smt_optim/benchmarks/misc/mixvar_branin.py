@@ -9,14 +9,13 @@ import smt.design_space as ds
 from smt_optim.benchmarks.base import BenchmarkProblem
 
 
-
 # MixVarBranin 4D (2 cont., 2 cat.)
 # MixVarAugmentedBranin 12D (10 cont., 2 cat.)
 # MixVarAugmentedBranin 12D (10 cont., 2 cat.)
 # MixVarGoldstein (2 cont., 2 cat.)
 
-class MixVarBranin(BenchmarkProblem):
 
+class MixVarBranin(BenchmarkProblem):
     def __init__(self):
         super().__init__()
 
@@ -26,25 +25,29 @@ class MixVarBranin(BenchmarkProblem):
         self.num_cstr = 1
         self.num_fidelity = 1
 
-        self.design_space = ds.DesignSpace([
-            ds.FloatVariable(0, 1),
-            ds.FloatVariable(0, 1),
-            ds.CategoricalVariable([0, 1]),
-            ds.CategoricalVariable([0, 1]),
-        ])
+        self.design_space = ds.DesignSpace(
+            [
+                ds.FloatVariable(0, 1),
+                ds.FloatVariable(0, 1),
+                ds.CategoricalVariable([0, 1]),
+                ds.CategoricalVariable([0, 1]),
+            ]
+        )
 
         self.constraints = [self.constraint]
 
-
     def h(self, x):
-        term1 = 15 * x[1] - (5 / (4 * np.pi ** 2)) * (15 * x[0] - 5) ** 2 \
-                + (5 / np.pi) * (15 * x[0] - 5) - 6
+        term1 = (
+            15 * x[1]
+            - (5 / (4 * np.pi**2)) * (15 * x[0] - 5) ** 2
+            + (5 / np.pi) * (15 * x[0] - 5)
+            - 6
+        )
 
         term2 = 10 * (1 - 1 / (8 * np.pi)) * np.cos(15 * x[0] - 5)
 
-        value = (term1 ** 2 + term2 + 10 - 54.8104) / 51.9496
+        value = (term1**2 + term2 + 10 - 54.8104) / 51.9496
         return value
-
 
     def objective(self, x):
 
@@ -80,7 +83,6 @@ class MixVarBranin(BenchmarkProblem):
 
 
 class MixVarGoldstein(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -90,39 +92,48 @@ class MixVarGoldstein(BenchmarkProblem):
         self.num_cstr = 1
         self.num_fidelity = 1
 
-        self.design_space = ds.DesignSpace([
-            ds.FloatVariable(0, 100),
-            ds.FloatVariable(0, 100),
-            ds.CategoricalVariable([0, 1, 2]),
-            ds.CategoricalVariable([0, 1, 2]),
-        ])
+        self.design_space = ds.DesignSpace(
+            [
+                ds.FloatVariable(0, 100),
+                ds.FloatVariable(0, 100),
+                ds.CategoricalVariable([0, 1, 2]),
+                ds.CategoricalVariable([0, 1, 2]),
+            ]
+        )
 
         self.constraints = [self.constraint]
 
-        self.x3_table = np.array([
-            [20, 50, 80],
-            [20, 50, 80],
-            [20, 50, 80],
-        ])
+        self.x3_table = np.array(
+            [
+                [20, 50, 80],
+                [20, 50, 80],
+                [20, 50, 80],
+            ]
+        )
 
-        self.x4_table = np.array([
-            [20, 20, 20],
-            [50, 50, 50],
-            [80, 80, 80],
-        ])
+        self.x4_table = np.array(
+            [
+                [20, 20, 20],
+                [50, 50, 50],
+                [80, 80, 80],
+            ]
+        )
 
-        self.c1_table = np.array([
-            [2, -2, 1],
-            [2, -2, 1],
-            [2, -2, 1],
-        ])
+        self.c1_table = np.array(
+            [
+                [2, -2, 1],
+                [2, -2, 1],
+                [2, -2, 1],
+            ]
+        )
 
-        self.c2_table = np.array([
-            [0.5, 0.5, 0.5],
-            [-1, -1, -1],
-            [-2, -2, -2],
-        ])
-
+        self.c2_table = np.array(
+            [
+                [0.5, 0.5, 0.5],
+                [-1, -1, -1],
+                [-2, -2, -2],
+            ]
+        )
 
     def h(self, x):
         x1, x2, x3, x4 = x
@@ -167,16 +178,12 @@ class MixVarGoldstein(BenchmarkProblem):
         c1 = self.c1_table[z2, z1]
         c2 = self.c2_table[z2, z1]
 
-        value = (
-            c1 * np.sin(x1 / 10.0) ** 3
-            + c2 * np.cos(x2 / 20.0) ** 2
-        )
+        value = c1 * np.sin(x1 / 10.0) ** 3 + c2 * np.cos(x2 / 20.0) ** 2
 
         return -value
 
 
 class MultiFidelityMixVarBranin(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -186,29 +193,26 @@ class MultiFidelityMixVarBranin(BenchmarkProblem):
         self.num_cstr = 1
         self.num_fidelity = 2
 
-        self.design_space = ds.DesignSpace([
-            ds.FloatVariable(0, 1),
-            ds.FloatVariable(0, 1),
-            ds.CategoricalVariable([0, 1]),
-            ds.CategoricalVariable([0, 1]),
-        ])
-
+        self.design_space = ds.DesignSpace(
+            [
+                ds.FloatVariable(0, 1),
+                ds.FloatVariable(0, 1),
+                ds.CategoricalVariable([0, 1]),
+                ds.CategoricalVariable([0, 1]),
+            ]
+        )
 
         self.children = MixVarBranin()
 
         self.objective = [self.objective_lf, self.children.objective]
 
-        self.constraints = [
-            [self.constraint_lf, self.children.constraint]
-        ]
-
+        self.constraints = [[self.constraint_lf, self.children.constraint]]
 
     def objective_lf(self, x):
-        return self.children.objective(x)  - np.cos(0.5*x[0]) - x[1]**3
+        return self.children.objective(x) - np.cos(0.5 * x[0]) - x[1] ** 3
 
     def constraint_lf(self, x):
-        return self.children.constraint(x) - 0.1 * np.sin(10*x[0] + 5*x[1])
-
+        return self.children.constraint(x) - 0.1 * np.sin(10 * x[0] + 5 * x[1])
 
 
 if __name__ == "__main__":
@@ -235,7 +239,6 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(14, 10))
 
     for i, (z1, z2) in enumerate(z_combinations, start=1):
-
         F = np.zeros_like(X1)
 
         for r in range(X1.shape[0]):
@@ -255,6 +258,3 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.show()
-
-
-

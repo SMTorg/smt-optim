@@ -5,8 +5,8 @@ from smt_optim.core import Sample, OptimizationDataset
 
 from smt_optim.core.sample import sample_func
 
-class TestSample(unittest.TestCase):
 
+class TestSample(unittest.TestCase):
     def test_sample_initialization(self):
         x = np.array([1.0, 2.0])
         obj = np.array([0.5, 1.5])
@@ -30,7 +30,6 @@ class TestSample(unittest.TestCase):
 
 
 class TestOptimizationDataset(unittest.TestCase):
-
     def setUp(self):
         self.dataset = OptimizationDataset()
 
@@ -69,9 +68,8 @@ class TestOptimizationDataset(unittest.TestCase):
                 "scalar": np.pi,
                 "array": np.full((2,), np.pi),
                 "alpha": "word",
-            }
+            },
         )
-
 
     def test_add_initializes_dimensions(self):
         self.dataset.add(self.s1)
@@ -87,7 +85,7 @@ class TestOptimizationDataset(unittest.TestCase):
         bad_sample = Sample(
             x=np.array([1.0, 2.0]),
             fidelity=0,
-            obj=np.array([1.0]),   # wrong size
+            obj=np.array([1.0]),  # wrong size
             cstr=np.array([10.0]),
             eval_time=None,
         )
@@ -102,7 +100,6 @@ class TestOptimizationDataset(unittest.TestCase):
         self.assertEqual(self.dataset.num_fidelity, 2)
         self.assertCountEqual(self.dataset.fidelities, [0, 1])
 
-
     def test_get_by_fidelity(self):
         self.dataset.add(self.s1)
         self.dataset.add(self.s2)
@@ -116,17 +113,18 @@ class TestOptimizationDataset(unittest.TestCase):
         self.assertTrue(all(s.fidelity == 0 for s in lvl0))
         self.assertTrue(all(s.fidelity == 1 for s in lvl1))
 
-
     def test_export_single_objective(self):
         self.dataset.add(self.s1)
         self.dataset.add(self.s2)
 
         result = self.dataset.export_data(idx=0, lvl=0)
 
-        expected = np.array([
-            [1.0],
-            [3.0],
-        ])
+        expected = np.array(
+            [
+                [1.0],
+                [3.0],
+            ]
+        )
 
         self.assertTrue(np.array_equal(result, expected))
 
@@ -136,10 +134,12 @@ class TestOptimizationDataset(unittest.TestCase):
 
         result = self.dataset.export_data(idx=[0, 1], lvl=0)
 
-        expected = np.array([
-            [1.0, 2.0],
-            [3.0, 4.0],
-        ])
+        expected = np.array(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+            ]
+        )
 
         self.assertTrue(np.array_equal(result, expected))
 
@@ -150,10 +150,12 @@ class TestOptimizationDataset(unittest.TestCase):
         # constraint index is num_obj + 0 = 2
         result = self.dataset.export_data(idx=2, lvl=0)
 
-        expected = np.array([
-            [10.0],
-            [20.0],
-        ])
+        expected = np.array(
+            [
+                [10.0],
+                [20.0],
+            ]
+        )
 
         self.assertTrue(np.array_equal(result, expected))
 
@@ -164,10 +166,12 @@ class TestOptimizationDataset(unittest.TestCase):
         # objective 1 and constraint 0
         result = self.dataset.export_data(idx=[1, 2], lvl=0)
 
-        expected = np.array([
-            [2.0, 10.0],
-            [4.0, 20.0],
-        ])
+        expected = np.array(
+            [
+                [2.0, 10.0],
+                [4.0, 20.0],
+            ]
+        )
 
         self.assertTrue(np.array_equal(result, expected))
 
@@ -179,7 +183,6 @@ class TestOptimizationDataset(unittest.TestCase):
         self.assertEqual(result.shape, (0,))
         self.assertEqual(result.size, 0)
 
-
     def test_export_as_dict(self):
 
         self.dataset.add(self.s1)
@@ -188,7 +191,6 @@ class TestOptimizationDataset(unittest.TestCase):
         self.dataset.add(self.s4)
 
         data_as_dict = self.dataset.export_as_dict()
-
 
         keys = set(data_as_dict.keys())
 
@@ -207,17 +209,13 @@ class TestOptimizationDataset(unittest.TestCase):
         self.assertTrue(np.all(np.isnan(data_as_dict["array"][:3, :])))
         # test that only the last row is numerical, all the other value should be np.nan
         np.testing.assert_array_equal(
-            data_as_dict["array"][3, :],
-            self.s4.metadata["array"]
+            data_as_dict["array"][3, :], self.s4.metadata["array"]
         )
 
         self.assertNotIn("alpha", keys)
 
 
-
 class TestEvaluator(unittest.TestCase):
-
-
     def test_float_output(self):
 
         def float_output(x):
@@ -226,7 +224,6 @@ class TestEvaluator(unittest.TestCase):
         value, time = sample_func(np.array([0.0]), float_output)
 
         self.assertEqual(value, 0.0)
-
 
     def test_array_output(self):
 
@@ -241,7 +238,6 @@ class TestEvaluator(unittest.TestCase):
 
         value, time = sample_func(np.array([0.0]), array_2d_output)
         self.assertEqual(value, 0.0)
-
 
 
 if __name__ == "__main__":
