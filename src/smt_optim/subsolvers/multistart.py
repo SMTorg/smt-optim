@@ -7,10 +7,10 @@ import scipy.stats as stats
 from smt.design_space import DesignSpace
 
 from smt.sampling_methods import LHS
-from smt.applications.mixed_integer import MixedIntegerSamplingMethod
 import smt.design_space as ds
 
 from smt_optim.utils.constraints import compute_rscv_sp
+
 
 @dataclass
 class MultistartResult:
@@ -20,38 +20,41 @@ class MultistartResult:
     multi_x: np.ndarray
     multi_f: np.ndarray
     multi_rscv: np.ndarray
-    multi_sp_res: list          # ScipPy results
+    multi_sp_res: list  # ScipPy results
+
 
 def multistart_minimize(func, bounds, **kwargs):
 
     num_dim = bounds.shape[0]
 
     # constraints
-    constraints = kwargs.pop('constraints', [])
+    constraints = kwargs.pop("constraints", [])
     num_cstr = len(constraints)
 
     # multistart number
-    n_start = kwargs.pop('n_start', 10*num_dim)
+    n_start = kwargs.pop("n_start", 10 * num_dim)
 
-    multi_x0 = kwargs.pop('multi_x0', None)
+    multi_x0 = kwargs.pop("multi_x0", None)
 
     # tolerance
-    tol = kwargs.pop('tol', np.sqrt(np.finfo(float).eps))
+    tol = kwargs.pop("tol", np.sqrt(np.finfo(float).eps))
 
     # max iteration per start
-    max_iter = kwargs.pop('max_iter', 50*num_dim)
+    kwargs.pop("max_iter", 50 * num_dim)
 
     # SciPy optimization method
-    method = kwargs.pop('method', None)
+    method = kwargs.pop("method", None)
 
     # seed for reproducibility
-    seed = kwargs.pop('seed', None)
+    seed = kwargs.pop("seed", None)
 
     if kwargs:
         raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
 
     if multi_x0 is None:
-        sampler = stats.qmc.LatinHypercube(d=num_dim, seed=seed)    # (tested) with random_state = None -> random
+        sampler = stats.qmc.LatinHypercube(
+            d=num_dim, seed=seed
+        )  # (tested) with random_state = None -> random
         multi_x0 = sampler.random(n_start)
         multi_x0 = stats.qmc.scale(multi_x0, bounds[:, 0], bounds[:, 1])
     else:
@@ -72,14 +75,15 @@ def multistart_minimize(func, bounds, **kwargs):
             method = "SLSQP"
 
     for i in range(multi_x0.shape[0]):
-
-        res = so.minimize(func,
-                          x0=multi_x0[i, :],
-                          bounds=bounds,
-                          method=method,
-                          constraints=constraints,
-                          tol=tol,
-                          options={"maxiter": 50 * num_dim})
+        res = so.minimize(
+            func,
+            x0=multi_x0[i, :],
+            bounds=bounds,
+            method=method,
+            constraints=constraints,
+            tol=tol,
+            options={"maxiter": 50 * num_dim},
+        )
 
         # check bounds
         x = np.clip(res.x, bounds[:, 0], bounds[:, 1])
@@ -94,7 +98,7 @@ def multistart_minimize(func, bounds, **kwargs):
     if num_cstr == 0:
         feas_mask = np.full(n_start, True)
     else:
-        feas_mask = multi_rscv <= np.sqrt(tol) #*2
+        feas_mask = multi_rscv <= np.sqrt(tol)  # *2
     if len(multi_f[feas_mask]) != 0:
         idx = np.argmin(multi_f[feas_mask])
         fmin = multi_f[feas_mask][idx]
@@ -107,22 +111,21 @@ def multistart_minimize(func, bounds, **kwargs):
     # TODO: add final optimization round
 
     res = MultistartResult(
-        x = xmin,
-        fun = fmin,
-        multi_x0 = multi_x0,
-        multi_x = multi_x,
-        multi_f = multi_f,
-        multi_rscv = multi_rscv,
-        multi_sp_res = multi_sp_res,
+        x=xmin,
+        fun=fmin,
+        multi_x0=multi_x0,
+        multi_x=multi_x,
+        multi_f=multi_f,
+        multi_rscv=multi_rscv,
+        multi_sp_res=multi_sp_res,
     )
 
     return res
 
 
-
-
-def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: list = [], **kwargs):
-
+def mixvar_multistart_minimize(
+    func, design_space: ds.DesignSpace, constraints: list = [], **kwargs
+):
 
     method = kwargs.get("method", "Cobyla")
     tol = kwargs.get("tol", np.sqrt(np.finfo(float).eps))
@@ -140,7 +143,7 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
         else:
             scaled_dv.append(dv)
 
-    scaled_ds = DesignSpace(scaled_dv)
+    DesignSpace(scaled_dv)
     cont_bounds = np.array([[0, 1]] * n_cont)
 
     # generate mixvar LHS
@@ -149,7 +152,9 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
     #                                      scaled_ds,
     #                                      criterion="ese",
     #                                      seed=seed)
-    sampler = LHS(xlimits=design_space.get_unfolded_num_bounds(), criterion="ese", seed=seed)
+    sampler = LHS(
+        xlimits=design_space.get_unfolded_num_bounds(), criterion="ese", seed=seed
+    )
 
     n_small = kwargs.pop("n_start", 20)
     n_large = kwargs.pop("n_large", n_small * 10)
@@ -165,7 +170,7 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
 
         for c_idx, c_dict in enumerate(constraints):
             if c_dict["type"] == "ineq":
-                rscv[idx] += min(0, c_dict["fun"](x_large[idx, :]))**2
+                rscv[idx] += min(0, c_dict["fun"](x_large[idx, :])) ** 2
             else:
                 rscv[idx] += c_dict["fun"](x_large[idx, :]) ** 2
 
@@ -186,19 +191,28 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
             return fun(x)
 
         for idx in range(x_small.shape[0]):
-
             x_ref = x_small[idx, :]
             x0 = x_ref[cont_mask]
 
             multi_x0[idx, :] = x_ref
 
-            wrapped_func = lambda x, o=func, f=wrapper: f(x, x_ref=x_ref, fun=o)
+            def wrapped_func(x, o=func, f=wrapper):
+                return f(x, x_ref=x_ref, fun=o)
 
             wrapped_cstr = copy.deepcopy(constraints)
             for c_idx, c_dict in enumerate(wrapped_cstr):
-                c_dict["fun"] = lambda x, c=constraints[c_idx]["fun"], f=wrapper: f(x, x_ref=x_ref, fun=c)
+                c_dict["fun"] = lambda x, c=constraints[c_idx]["fun"], f=wrapper: f(
+                    x, x_ref=x_ref, fun=c
+                )
 
-            res = so.minimize(wrapped_func, x0=x0, bounds=cont_bounds, constraints=wrapped_cstr, method=method, tol=tol)
+            res = so.minimize(
+                wrapped_func,
+                x0=x0,
+                bounds=cont_bounds,
+                constraints=wrapped_cstr,
+                method=method,
+                tol=tol,
+            )
 
             x_ref[cont_mask] = res.x
 
@@ -208,7 +222,7 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
             for c_idx, c_dict in enumerate(constraints):
                 # TODO: add tolerance for RSCV similar to tolerance given to SciPy solver
                 if c_dict["type"] == "ineq":
-                    multi_rscv[idx] += min(0, c_dict["fun"](x_large[idx, :]))**2
+                    multi_rscv[idx] += min(0, c_dict["fun"](x_large[idx, :])) ** 2
                 else:
                     multi_rscv[idx] += c_dict["fun"](x_large[idx, :]) ** 2
 
@@ -217,25 +231,16 @@ def mixvar_multistart_minimize(func, design_space: ds.DesignSpace, constraints: 
 
             multi_sp_res.append(res)
 
-
     best_idx = np.lexsort((multi_f, multi_rscv))[0]
 
     res = MultistartResult(
-        x = multi_x[best_idx, :],
-        fun = multi_f[best_idx],
-        multi_x0 = multi_x0,
-        multi_x = multi_x,
-        multi_f = multi_f,
-        multi_rscv = multi_rscv,
-        multi_sp_res = multi_sp_res,
+        x=multi_x[best_idx, :],
+        fun=multi_f[best_idx],
+        multi_x0=multi_x0,
+        multi_x=multi_x,
+        multi_f=multi_f,
+        multi_rscv=multi_rscv,
+        multi_sp_res=multi_sp_res,
     )
 
     return res
-
-
-
-
-
-
-
-

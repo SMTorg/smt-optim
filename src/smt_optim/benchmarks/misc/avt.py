@@ -1,6 +1,3 @@
-import numpy as np
-from smt_optim.benchmarks.base import BenchmarkProblem
-
 #
 # # rhs for first-order system of ODEs in spring-mass system
 # def f(t, y, m, k):

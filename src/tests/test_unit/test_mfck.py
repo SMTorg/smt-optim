@@ -3,8 +3,6 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 
-import scipy.stats as stats
-
 
 from smt_optim.surrogate_models.smt import SmtMFCK
 
@@ -12,7 +10,6 @@ from smt.applications import NestedLHS
 
 
 class TestSmtMFCK(unittest.TestCase):
-
     def test_level_covariance(self):
         """
         using .predict_level_covariances should be equivalent to .predict_variances when both level
@@ -25,7 +22,7 @@ class TestSmtMFCK(unittest.TestCase):
         xt = sampler(5)
         yt = []
         for lvl in range(2):
-            np.random.seed(42+lvl)
+            np.random.seed(42 + lvl)
             ar = np.random.rand(xt[lvl].shape[0])
             yt.append(ar)
 

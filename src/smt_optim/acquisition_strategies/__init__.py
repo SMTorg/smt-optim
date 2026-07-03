@@ -3,5 +3,4 @@ from .mfsego import MFSEGO
 from .vfpi import VFPI
 
 
-
 __all__ = ["AcquisitionStrategy", "MFSEGO", "VFPI"]

@@ -6,6 +6,7 @@ from smt_optim.benchmarks.base import BenchmarkProblem
 
 from .misc import original
 from .misc import gano
+
 # from .misc import avt
 # from .misc import modified_avt
 # from .misc import edge_cases
@@ -22,10 +23,12 @@ from .misc import weldedbeam_variants
 
 available = {}
 
+
 def _register_from_module(module):
     for name, obj in inspect.getmembers(module, inspect.isclass):
         if issubclass(obj, BenchmarkProblem) and obj is not BenchmarkProblem:
             available[obj.__name__] = obj()
+
 
 _register_from_module(original)
 _register_from_module(gano)
@@ -55,13 +58,15 @@ _register_from_module(weldedbeam_variants)
 #
 #     return results
 
-def list_problems(n: list[int] = None,
-                  num_obj: list[int] = [1, 1],
-                  num_dim: list[int] = None,
-                  num_cstr: list[int] = None,
-                  num_fidelity: list[int] = None,
 
-                  tags: list[str] = None) -> list[BenchmarkProblem]:
+def list_problems(
+    n: list[int] = None,
+    num_obj: list[int] = [1, 1],
+    num_dim: list[int] = None,
+    num_cstr: list[int] = None,
+    num_fidelity: list[int] = None,
+    tags: list[str] = None,
+) -> list[BenchmarkProblem]:
     """
     Retrieves all benchmark problems matching the specified filtering criteria.
 
@@ -126,7 +131,9 @@ def list_problems(n: list[int] = None,
     results = []
 
     if n is not None:
-        warnings.deprecated("`n` is deprecated and will be removed in a future release. Use `num_dim` instead.")
+        warnings.deprecated(
+            "`n` is deprecated and will be removed in a future release. Use `num_dim` instead."
+        )
         num_dim = n
 
     for prob in available.values():
@@ -141,7 +148,10 @@ def list_problems(n: list[int] = None,
                 if prob.num_obj < num_obj[0] or prob.num_obj > num_obj[1]:
                     continue
             if num_fidelity is not None:
-                if prob.num_fidelity < num_fidelity[0] or prob.num_fidelity > num_fidelity[1]:
+                if (
+                    prob.num_fidelity < num_fidelity[0]
+                    or prob.num_fidelity > num_fidelity[1]
+                ):
                     continue
 
             if tags is not None:
@@ -150,7 +160,7 @@ def list_problems(n: list[int] = None,
 
             results.append(copy.deepcopy(prob))
 
-        except:
+        except Exception:
             continue
 
     return results

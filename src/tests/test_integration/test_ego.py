@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from smt_optim.core import Problem
-from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
+from smt_optim.core import ObjectiveConfig, DriverConfig, Driver
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
@@ -25,14 +25,13 @@ def rosenbrock(x: np.ndarray) -> np.ndarray:
     if ndim == 1:
         x = x.reshape(1, -1)
 
-    n = x.shape[1]
     A = 10
 
     def temp(x):
-        return x**2 - A*np.cos(2*np.pi*x)
+        return x**2 - A * np.cos(2 * np.pi * x)
 
-    temp_vec = np.vectorize(temp)
-    value = (1 - x[:, 0])**2 + 100*(x[:, 1] - x[:, 0]**2)**2
+    np.vectorize(temp)
+    value = (1 - x[:, 0]) ** 2 + 100 * (x[:, 1] - x[:, 0] ** 2) ** 2
 
     if ndim == 1:
         value = value.item()
@@ -41,7 +40,6 @@ def rosenbrock(x: np.ndarray) -> np.ndarray:
 
 
 class TestOptimization(unittest.TestCase):
-
     def test_ego_1d(self):
 
         bounds = np.array([[0, 25]])
@@ -62,7 +60,6 @@ class TestOptimization(unittest.TestCase):
             seed=42,
         )
 
-
         optimizer = Driver(problem, config=opt_config, strategy=MFSEGO)
         state = optimizer.optimize()
 
@@ -71,15 +68,16 @@ class TestOptimization(unittest.TestCase):
             y_data[i] = sample.obj[0]
         bo_fmin = y_data.min()
 
-        self.assertLessEqual (bo_fmin, -14.)
-
+        self.assertLessEqual(bo_fmin, -14.0)
 
     def test_ego_2d(self):
 
-        bounds = np.array([
-            [-1.5, 1.5],
-            [-1.5, 1.5],
-        ])
+        bounds = np.array(
+            [
+                [-1.5, 1.5],
+                [-1.5, 1.5],
+            ]
+        )
 
         obj_config = ObjectiveConfig(
             objective=[rosenbrock],
@@ -110,7 +108,7 @@ class TestOptimization(unittest.TestCase):
             y_data[i] = sample.obj[0]
         bo_fmin = y_data.min()
 
-        self.assertLessEqual(bo_fmin, 1.)
+        self.assertLessEqual(bo_fmin, 1.0)
 
 
 if __name__ == "__main__":

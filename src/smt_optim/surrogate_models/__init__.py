@@ -3,7 +3,9 @@ from .smt import SmtAutoModel
 from .smt import SmtGPX
 from .smt import SmtMFCK
 
-__all__ = ["Surrogate",
-           "SmtAutoModel",
-           "SmtGPX",
-           "SmtMFCK", ]
+__all__ = [
+    "Surrogate",
+    "SmtAutoModel",
+    "SmtGPX",
+    "SmtMFCK",
+]

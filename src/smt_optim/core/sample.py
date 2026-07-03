@@ -11,6 +11,7 @@ import numpy as np
 
 from smt_optim.utils.constraints import compute_rscv
 
+
 @dataclass
 class Sample:
     """
@@ -29,26 +30,27 @@ class Sample:
     metadata : dict
         Dictionary with sample metadata such as iter, budget and fidelity.
     """
-    x: np.ndarray                  # (num_dim,)
+
+    x: np.ndarray  # (num_dim,)
     fidelity: int
 
-    obj: np.ndarray | None         # (num_obj,)
-    cstr: np.ndarray | None        # (num_cstr,)
+    obj: np.ndarray | None  # (num_obj,)
+    cstr: np.ndarray | None  # (num_cstr,)
 
-    eval_time: np.ndarray | None   # (num_obj + num_cstr,)
+    eval_time: np.ndarray | None  # (num_obj + num_cstr,)
 
     metadata: dict = field(default_factory=dict)
 
     def __repr__(self):
-        string = f"======= sample data =======\n"
+        string = "======= sample data =======\n"
         string += f"x =             {self.x}\n"
         string += f"obj =           {self.obj}\n"
         string += f"cstr =          {self.cstr}\n"
         string += f"eval_time =     {self.eval_time}\n"
-        string+= f"------- meta data -------\n"
+        string += "------- meta data -------\n"
         for key, value in self.metadata.items():
             string += f"{key} =     {value}\n"
-        string += f"===========================\n"
+        string += "===========================\n"
         return string
 
 
@@ -70,6 +72,7 @@ class OptimizationDataset:
     num_samples: dict
         Number of samples for each fidelity levels.
     """
+
     def __init__(self):
         self.samples: list[Sample] = []
 
@@ -79,7 +82,6 @@ class OptimizationDataset:
 
         self.fidelities: list = []
         self.num_samples: dict = dict()
-
 
     def add(self, sample: Sample):
         """
@@ -116,7 +118,6 @@ class OptimizationDataset:
 
         self.num_samples[sample.fidelity] += 1
 
-
     def get_by_fidelity(self, lvl: int) -> list[Sample]:
         """
         Fetches all the samples corresponding to the specified fidelity level.
@@ -132,7 +133,6 @@ class OptimizationDataset:
         """
         return [s for s in self.samples if s.fidelity == lvl]
 
-
     def export_data(self, idx: int | list[int], lvl: int) -> np.ndarray:
 
         if isinstance(idx, int):
@@ -143,19 +143,17 @@ class OptimizationDataset:
         samples = self.get_by_fidelity(lvl)
 
         for s in samples:
-
             row = []
 
             for i, qoi_idx in enumerate(idx):
                 if qoi_idx < self.num_obj:
                     row.append(s.obj[qoi_idx])
                 else:
-                    row.append(s.cstr[qoi_idx-self.num_obj])
+                    row.append(s.cstr[qoi_idx - self.num_obj])
 
             data.append(row)
 
         return np.array(data)
-
 
     def export_as_dict(self) -> dict:
         """
@@ -175,12 +173,12 @@ class OptimizationDataset:
         """
         num_sample = len(self.samples)
         fidelity = np.empty(num_sample)
-        eval_time = np.empty((num_sample, self.num_obj+self.num_cstr))
+        eval_time = np.empty((num_sample, self.num_obj + self.num_cstr))
 
         nvar = len(self.samples[0].x)
-        xt = np.empty((num_sample, nvar))               # inputs
-        yt = np.empty((num_sample, self.num_obj))       # objectives
-        ct = np.empty((num_sample, self.num_cstr))      # constraints
+        xt = np.empty((num_sample, nvar))  # inputs
+        yt = np.empty((num_sample, self.num_obj))  # objectives
+        ct = np.empty((num_sample, self.num_cstr))  # constraints
 
         data = {
             "cstr": ct,
@@ -196,12 +194,12 @@ class OptimizationDataset:
 
         for sample in self.samples:
             for key, value in sample.metadata.items():
-
                 # Ignore conflicting names
                 if key in reserved_keys:
                     warnings.warn(
                         f"Metadata key '{key}' conflicts with an exported "
-                        "attribute name and will be ignored.")
+                        "attribute name and will be ignored."
+                    )
                     continue
 
                 # Scalar numeric case
@@ -283,7 +281,6 @@ def sample_func(x_new: np.ndarray, func: Callable) -> tuple[float, float]:
     return output, elapsed_time
 
 
-
 class Evaluator:
     """
     Evaluate the expensive-to-evaluate functions.
@@ -296,10 +293,10 @@ class Evaluator:
         DOE logging directory path.
 
     """
+
     def __init__(self, problem, res_path: str | None = None):
         self.problem = problem
         self.res_path = res_path
-
 
     def sample_func(self, infill: list[np.ndarray | None], state) -> None:
         """
@@ -319,7 +316,6 @@ class Evaluator:
         None
         """
         for lvl, x_lvl in enumerate(infill):
-
             if x_lvl is None:
                 continue
 
@@ -333,12 +329,16 @@ class Evaluator:
 
                     # samples objectives
                     for obj_idx in range(self.problem.num_obj):
-                        obj_values[obj_idx], times[obj_idx] = sample_func(x_new, self.problem.obj_funcs[obj_idx][lvl])
+                        obj_values[obj_idx], times[obj_idx] = sample_func(
+                            x_new, self.problem.obj_funcs[obj_idx][lvl]
+                        )
 
                     # samples constraints
                     for cstr_idx in range(self.problem.num_cstr):
-                        cstr_values[cstr_idx], times[self.problem.num_obj + cstr_idx] = sample_func(x_new,
-                                                                                            self.problem.cstr_funcs[cstr_idx][lvl])
+                        (
+                            cstr_values[cstr_idx],
+                            times[self.problem.num_obj + cstr_idx],
+                        ) = sample_func(x_new, self.problem.cstr_funcs[cstr_idx][lvl])
                     state.budget += state.problem.costs[lvl]
 
                     sample = Sample(
@@ -350,8 +350,10 @@ class Evaluator:
                         metadata={
                             "iter": state.iter,
                             "budget": state.budget,
-                            "rscv": compute_rscv(cstr_values.reshape(1, -1), state.problem.cstr_configs).item()
-                        }
+                            "rscv": compute_rscv(
+                                cstr_values.reshape(1, -1), state.problem.cstr_configs
+                            ).item(),
+                        },
                     )
 
                     # adds sample to dataset
@@ -360,7 +362,6 @@ class Evaluator:
                     # logs the sample to the DOE file if DOE logging is enabled
                     if self.res_path is not None:
                         self.log_sample(sample)
-
 
     def log_sample(self, sample) -> None:
         """
@@ -380,8 +381,12 @@ class Evaluator:
             row = dict()
 
             row["iter"] = sample.metadata.get("iter", np.nan)
-            row["budget"] = sample.metadata.get("budget", np.nan)       # self.compute_used_budget() # self.budget
-            row["fidelity"] = sample.fidelity                               # self.compute_used_budget() # self.budget
+            row["budget"] = sample.metadata.get(
+                "budget", np.nan
+            )  # self.compute_used_budget() # self.budget
+            row["fidelity"] = (
+                sample.fidelity
+            )  # self.compute_used_budget() # self.budget
 
             # save variables
             for i in range(len(sample.x)):
@@ -401,7 +406,7 @@ class Evaluator:
             file_exists = os.path.isfile(path)
 
             # possibly does not work on Windows OS -> to be tested
-            with open(path, 'a') as file:
+            with open(path, "a") as file:
                 writer = csv.DictWriter(file, fieldnames=row.keys())
 
                 if not file_exists:

@@ -1,24 +1,31 @@
 import numpy as np
-from typing import Any, Callable, List, Optional, Union
+from typing import Callable
 
 import smt.design_space as ds
 
-from smt_optim.core import Driver, ObjectiveConfig, ConstraintConfig, DriverConfig, Problem, State
+from smt_optim.core import (
+    Driver,
+    ObjectiveConfig,
+    ConstraintConfig,
+    DriverConfig,
+    Problem,
+    State,
+)
 from smt_optim.surrogate_models.smt import SmtAutoModel, SmtGPX, SmtMFCK
 from smt_optim.acquisition_strategies import MFSEGO, VFPI
 
 
 def minimize(
-        objective: list[Callable],
-        design_space: ds.DesignSpace | np.ndarray,
-        method: str | None = None,
-        costs: list = [1],
-        max_iter: int = 100,
-        max_budget: float = np.inf,
-        constraints: list = [],
-        driver_kwargs: dict = {},
-        strategy_kwargs: dict = {},
-        verbose: bool = True,
+    objective: list[Callable],
+    design_space: ds.DesignSpace | np.ndarray,
+    method: str | None = None,
+    costs: list = [1],
+    max_iter: int = 100,
+    max_budget: float = np.inf,
+    constraints: list = [],
+    driver_kwargs: dict = {},
+    strategy_kwargs: dict = {},
+    verbose: bool = True,
 ) -> State:
     """
     Minimize the objective function with respect to the problem properties.
@@ -62,7 +69,6 @@ def minimize(
     """
 
     if method is None:
-
         strategy = MFSEGO
 
         if isinstance(design_space, ds.DesignSpace):
@@ -109,9 +115,15 @@ def minimize(
         cstr_configs.append(
             ConstraintConfig(
                 c_dict["fun"],
-                equal = c_dict["equal"] if c_dict.get("equal", None) is not None else None,
-                lower = c_dict["lower"] if c_dict.get("lower", None) is not None else None,
-                upper = c_dict["upper"] if c_dict.get("upper", None) is not None else None,
+                equal=c_dict["equal"]
+                if c_dict.get("equal", None) is not None
+                else None,
+                lower=c_dict["lower"]
+                if c_dict.get("lower", None) is not None
+                else None,
+                upper=c_dict["upper"]
+                if c_dict.get("upper", None) is not None
+                else None,
                 surrogate=surrogate,
             )
         )

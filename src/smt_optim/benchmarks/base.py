@@ -1,10 +1,10 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Callable
 
 import numpy as np
 
-class BenchmarkProblem(ABC):
 
+class BenchmarkProblem(ABC):
     name: str = None
     num_dim: int | str = None
     num_obj: int = None

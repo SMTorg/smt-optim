@@ -7,7 +7,6 @@ import smt.design_space as ds
 
 from smt_optim.core import OptimizationDataset
 from smt_optim.core.sample import Sample
-from smt_optim.utils.constraints import compute_rscv
 
 # from smt_optim.core import Problem
 
@@ -67,13 +66,21 @@ class State:
 
         self.obj_models: list = []
         for obj_config in self.problem.obj_configs:
-            kwargs = obj_config.surrogate_kwargs if obj_config.surrogate_kwargs is not None else {}
+            kwargs = (
+                obj_config.surrogate_kwargs
+                if obj_config.surrogate_kwargs is not None
+                else {}
+            )
             kwargs["design_space"] = problem.design_space
             self.obj_models.append(obj_config.surrogate(**kwargs))
 
         self.cstr_models: list = []
         for cstr_config in self.problem.cstr_configs:
-            kwargs = cstr_config.surrogate_kwargs if cstr_config.surrogate_kwargs is not None else {}
+            kwargs = (
+                cstr_config.surrogate_kwargs
+                if cstr_config.surrogate_kwargs is not None
+                else {}
+            )
             kwargs["design_space"] = problem.design_space
             self.cstr_models.append(cstr_config.surrogate(**kwargs))
 
@@ -81,7 +88,6 @@ class State:
         self.scaled_dataset = None
 
         self.iter_log = dict()
-
 
     def scale_dataset(self, unit_std: bool = False):
         """
@@ -106,9 +112,7 @@ class State:
         self.cstr_upper = np.full(self.problem.num_cstr, np.nan)
 
         for lvl in range(self.problem.num_fidelity):
-
             for obj_idx in range(self.problem.num_obj):
-
                 data = self.dataset.export_data(obj_idx, lvl)
 
                 if unit_std:
@@ -126,12 +130,11 @@ class State:
                 qoi_step[lvl][obj_idx] = step
 
             for cstr_idx in range(self.problem.num_cstr):
-
-                qoi_idx = self.problem.num_obj+cstr_idx
+                qoi_idx = self.problem.num_obj + cstr_idx
 
                 c_config = self.problem.cstr_configs[cstr_idx]
 
-                data = self.dataset.export_data(self.problem.num_obj+cstr_idx, lvl)
+                data = self.dataset.export_data(self.problem.num_obj + cstr_idx, lvl)
 
                 if unit_std:
                     factor = np.std(data)
@@ -145,18 +148,22 @@ class State:
 
         # scale the constraint bounds
         for c_idx in range(self.problem.num_cstr):
-
             c_config = self.problem.cstr_configs[c_idx]
             qoi_idx = self.problem.num_obj + c_idx
 
             if c_config.equal is not None:
-                self.cstr_equal[c_idx] = (c_config.equal - qoi_step[-1][qoi_idx]) / qoi_factor[-1][qoi_idx]
+                self.cstr_equal[c_idx] = (
+                    c_config.equal - qoi_step[-1][qoi_idx]
+                ) / qoi_factor[-1][qoi_idx]
             else:
                 if c_config.lower is not None:
-                    self.cstr_lower[c_idx] = (c_config.lower - qoi_step[-1][qoi_idx]) / qoi_factor[-1][qoi_idx]
+                    self.cstr_lower[c_idx] = (
+                        c_config.lower - qoi_step[-1][qoi_idx]
+                    ) / qoi_factor[-1][qoi_idx]
                 if c_config.upper is not None:
-                    self.cstr_upper[c_idx] = (c_config.upper - qoi_step[-1][qoi_idx]) / qoi_factor[-1][qoi_idx]
-
+                    self.cstr_upper[c_idx] = (
+                        c_config.upper - qoi_step[-1][qoi_idx]
+                    ) / qoi_factor[-1][qoi_idx]
 
         self.qoi_factor = qoi_factor
         self.qoi_step = qoi_step
@@ -176,10 +183,11 @@ class State:
                     self.x_factor[idx] = dvar.upper - dvar.lower
         else:
             self.x_step[:] = self.problem.design_space[:, 0]
-            self.x_factor[:] = self.problem.design_space[:, 1] - self.problem.design_space[:, 0]
+            self.x_factor[:] = (
+                self.problem.design_space[:, 1] - self.problem.design_space[:, 0]
+            )
 
         for sample in self.dataset.samples:
-
             scaled_sample = copy.deepcopy(sample)
 
             lvl = scaled_sample.fidelity
@@ -188,14 +196,17 @@ class State:
             scaled_sample.x -= self.x_step
             scaled_sample.x /= self.x_factor
 
-            scaled_sample.obj[:] -= self.qoi_step[lvl][:self.problem.num_obj]
-            scaled_sample.obj[:] /= self.qoi_factor[lvl][:self.problem.num_obj]
+            scaled_sample.obj[:] -= self.qoi_step[lvl][: self.problem.num_obj]
+            scaled_sample.obj[:] /= self.qoi_factor[lvl][: self.problem.num_obj]
 
-            scaled_sample.cstr[:] -= self.qoi_step[lvl][self.problem.num_obj:self.problem.num_obj+self.problem.num_cstr]
-            scaled_sample.cstr[:] /= self.qoi_factor[lvl][self.problem.num_obj:self.problem.num_obj+self.problem.num_cstr]
+            scaled_sample.cstr[:] -= self.qoi_step[lvl][
+                self.problem.num_obj : self.problem.num_obj + self.problem.num_cstr
+            ]
+            scaled_sample.cstr[:] /= self.qoi_factor[lvl][
+                self.problem.num_obj : self.problem.num_obj + self.problem.num_cstr
+            ]
 
             self.scaled_dataset.add(scaled_sample)
-
 
     def build_models(self):
         """
@@ -225,16 +236,30 @@ class State:
 
         for idx in range(self.problem.num_obj):
             yt.append(
-                [all_yt[fidelity_masks[lvl], idx].reshape(-1, 1) for lvl in range(self.problem.num_fidelity)]
+                [
+                    all_yt[fidelity_masks[lvl], idx].reshape(-1, 1)
+                    for lvl in range(self.problem.num_fidelity)
+                ]
             )
-            kwargs = self.problem.obj_configs[idx].surrogate_kwargs if self.problem.obj_configs[idx].surrogate_kwargs is not None else dict()
+            kwargs = (
+                self.problem.obj_configs[idx].surrogate_kwargs
+                if self.problem.obj_configs[idx].surrogate_kwargs is not None
+                else dict()
+            )
             self.obj_models[idx].train(xt, yt[idx], **kwargs)
 
         for idx in range(self.problem.num_cstr):
             ct.append(
-                [all_ct[fidelity_masks[lvl], idx].reshape(-1, 1) for lvl in range(self.problem.num_fidelity)]
+                [
+                    all_ct[fidelity_masks[lvl], idx].reshape(-1, 1)
+                    for lvl in range(self.problem.num_fidelity)
+                ]
             )
-            kwargs = self.problem.cstr_configs[idx].surrogate_kwargs if self.problem.cstr_configs[idx].surrogate_kwargs is not None else dict()
+            kwargs = (
+                self.problem.cstr_configs[idx].surrogate_kwargs
+                if self.problem.cstr_configs[idx].surrogate_kwargs is not None
+                else dict()
+            )
             self.cstr_models[idx].train(xt, ct[idx], **kwargs)
 
         t1 = time.perf_counter()
@@ -244,8 +269,9 @@ class State:
     # def reset_log(self):
     #     self.iter_log.clear()
 
-
-    def get_best_sample(self, ctol: float = 1e-4, fidelity: int = -1, scaled: bool = False) -> Sample:
+    def get_best_sample(
+        self, ctol: float = 1e-4, fidelity: int = -1, scaled: bool = False
+    ) -> Sample:
         """
         Returns the best sample based on the objective function value.
 
@@ -264,7 +290,7 @@ class State:
             The best sample based on the objective function value.
         """
         if fidelity == -1:
-            fidelity = self.problem.num_fidelity-1
+            fidelity = self.problem.num_fidelity - 1
 
         coeff = 1 if self.problem.obj_configs[0].type == "minimize" else -1
 
@@ -302,17 +328,3 @@ class State:
             if inputs[lvl] is not None:
                 inputs[lvl] *= self.x_factor
                 inputs[lvl] += self.x_step
-
-
-
-
-
-
-
-
-
-
-
-
-
-
