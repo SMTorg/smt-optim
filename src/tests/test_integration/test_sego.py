@@ -17,7 +17,6 @@ def rosenbrock(x: np.ndarray) -> np.ndarray:
     if ndim == 1:
         x = x.reshape(1, -1)
 
-    x.shape[1]
     A = 10
 
     def temp(x):

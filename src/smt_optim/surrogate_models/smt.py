@@ -177,7 +177,6 @@ class SmtAutoModel(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        xt[-1].shape[1]
         num_fidelity = len(xt)
 
         n_start = kwargs.pop("n_start", 3)
@@ -242,7 +241,6 @@ class SmtGPX(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-        xt[-1].shape[1]
 
         n_start = kwargs.pop("n_start", 20)
 
@@ -393,7 +391,6 @@ class SmtMFCK(Surrogate):
 
     def train(self, xt: list, yt: list, **kwargs):
 
-        xt[-1].shape[1]
         num_fidelity = len(xt)
 
         self.model = MFCK(
