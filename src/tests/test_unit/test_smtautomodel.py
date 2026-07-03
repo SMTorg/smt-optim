@@ -14,7 +14,6 @@ def rosenbrock(x: np.ndarray) -> np.ndarray:
     if ndim == 1:
         x = x.reshape(1, -1)
 
-
     value = (1 - x[:, 0]) ** 2 + 100 * (x[:, 1] - x[:, 0] ** 2) ** 2
 
     if ndim == 1:

@@ -27,7 +27,6 @@ def variance_update(model, point, x, inv_block=True):
     smt_model = getattr(model, "model", model)
     n_eval = x.shape[0]
 
-
     # Handle Multi-Fidelity (MFK) vs Mono-Fidelity (KRG)
     if hasattr(smt_model, "nlvl"):  # MFK
         sigma2 = smt_model.optimal_par[-1]["sigma2"]

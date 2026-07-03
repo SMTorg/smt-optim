@@ -241,7 +241,6 @@ class SmtGPX(Surrogate):
             yt (list[np.ndarray]): training data values
         """
 
-
         n_start = kwargs.pop("n_start", 20)
 
         model_kwargs = _filter_none_kwargs(
