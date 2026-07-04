@@ -100,17 +100,17 @@ class MFSEGO(AcquisitionStrategy):
         self.acq_func = kwargs.pop("acq_func", log_ei)                          # expected_improvement, log_ei
         self.fmin_crit = kwargs.pop("fmin_crit", "min_rscv")                    # broken -> to be removed (min_rscv, fmin, mean_rscv)
         # self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
-        self.n_start = kwargs.pop("n_start", None)                              # optimizer multistart
-        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")            # obj-only, average, optimistic, pessimistic
-        self.select_fidelity = kwargs.pop("select_fidelity", True)              # if set to False, will always sample (LF+HF)
-        self.min_rscv_first = kwargs.pop("min_rscv_first", False)               # broken -> to be fixed!
-        self.filter_rscv = kwargs.pop("filter_rscv", False)                     # broken -> to be fixed!
-        self.optimize_best = kwargs.pop("optimize_best", False)                 # broken -> to be fixed!
-        self.relax_constraints = kwargs.pop("relax_constraints", False)         # broken -> to be fixed!
-        self.cr_override = kwargs.pop("cr_override", None)                      # override optimizer Cost Ratio
-        self.sp_method = kwargs.pop("sp_method", "SLSQP")                       # SciPy optimizer method
-        self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))        # SciPy optimizer tolerance
-        self.var_red_corr = kwargs.pop("var_red_corr", None)                    # Variance reduction correction scheme
+        self.n_start = kwargs.pop("n_start", None)  # optimizer multistart
+        self.fidelity_crit = kwargs.pop("fidelity_crit", "obj-only")  # obj-only, average, optimistic, pessimistic
+        self.select_fidelity = kwargs.pop("select_fidelity", True)  # if set to False, will always sample (LF+HF)
+        self.min_rscv_first = kwargs.pop("min_rscv_first", False)
+        self.filter_rscv = kwargs.pop("filter_rscv", False)
+        self.optimize_best = kwargs.pop("optimize_best", False)
+        self.relax_constraints = kwargs.pop("relax_constraints", False)
+        self.cr_override = kwargs.pop("cr_override", None)  # override optimizer Cost Ratio
+        self.sp_method = kwargs.pop("sp_method", "SLSQP")  # SciPy optimizer method
+        self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))  # SciPy optimizer tolerance
+        self.var_red_corr = kwargs.pop("var_red_corr", None)  # Variance reduction correction scheme
 
         self.seed = kwargs.pop("seed", None)
 
@@ -258,7 +258,7 @@ class MFSEGO(AcquisitionStrategy):
         return scipy_acq_func
 
     def build_scipy_constraints(self, state: State) -> list[dict]:
-        return build_scipy_constraints(state)
+        return build_scipy_constraints(state, self.relax_constraints)
 
 
     def get_fidelity(self, next_x: np.ndarray, state: State) -> list[int]:
@@ -512,7 +512,7 @@ def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: 
     return s2_red_norm
 
 
-def build_scipy_constraints(state: State) -> list[dict]:
+def build_scipy_constraints(state: State, relax: bool = False) -> list[dict]:
 
     scipy_cstr = []
 
@@ -524,34 +524,39 @@ def build_scipy_constraints(state: State) -> list[dict]:
             }
         )
 
-    def sp_constraint(x, model):
-        x = x.reshape(1, -1)
-        mu = model.predict_values(x)
-        return mu.item()
-
     for c_id, c_config in enumerate(state.problem.cstr_configs):
         if c_config.equal is not None:
 
             def func(
                 x,
-                f=sp_constraint,
                 value=state.cstr_equal[c_id],
                 m=state.cstr_models[c_id],
+                r=relax,
             ):
-                return f(x, m) - value
+                x = x.reshape(1, -1)
+                mu = m.predict_values(x).item()
+                if r:
+                    s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                    return -np.abs(mu - value) + 3 * s
+                return mu - value
 
-            append_sp_cstr(func, "eq")
+            append_sp_cstr(func, "ineq" if relax else "eq")
 
         else:
             if c_config.lower is not None:
 
                 def func(
                     x,
-                    f=sp_constraint,
                     value=state.cstr_lower[c_id],
                     m=state.cstr_models[c_id],
+                    r=relax,
                 ):
-                    return -value + f(x, m)
+                    x = x.reshape(1, -1)
+                    mu = m.predict_values(x).item()
+                    if r:
+                        s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                        return (mu + 3 * s) - value
+                    return mu - value
 
                 append_sp_cstr(func, "ineq")
 
@@ -559,11 +564,16 @@ def build_scipy_constraints(state: State) -> list[dict]:
 
                 def func(
                     x,
-                    f=sp_constraint,
                     value=state.cstr_upper[c_id],
                     m=state.cstr_models[c_id],
+                    r=relax,
                 ):
-                    return -f(x, m) + value
+                    x = x.reshape(1, -1)
+                    mu = m.predict_values(x).item()
+                    if r:
+                        s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                        return value - (mu - 3 * s)
+                    return value - mu
 
                 append_sp_cstr(func, "ineq")
 
