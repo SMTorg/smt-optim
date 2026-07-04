@@ -7,6 +7,7 @@ import smt.design_space as ds
 
 from smt_optim.core import OptimizationDataset
 from smt_optim.core.sample import Sample
+from smt_optim.utils.multi_obj import get_pareto_mask
 
 # from smt_optim.core import Problem
 
@@ -286,8 +287,8 @@ class State:
 
         Returns
         -------
-        sample : Sample
-            The best sample based on the objective function value.
+        sample : Sample | list[Sample]
+            The best sample (mono-objective) or a list of samples forming the Pareto front (multi-objective).
         """
         if fidelity == -1:
             fidelity = self.problem.num_fidelity - 1
@@ -305,20 +306,33 @@ class State:
         rscv = data["rscv"]
         fid_feas_mask = fidelity_mask & (rscv <= ctol)
 
-        yt = data["obj"][:, 0]
+        yt = data["obj"]
 
-        # selects sample with lowest objective value
+        # selects sample with lowest objective value (or Pareto front for MO)
         if np.any(fid_feas_mask):
-            # mono-objective only
-            filtered_yt = np.where(fid_feas_mask, yt * coeff, np.inf)
-            idx = np.argmin(filtered_yt)
+            if self.problem.num_obj == 1:
+                filtered_yt = np.where(fid_feas_mask, yt[:, 0] * coeff, np.inf)
+                idx = np.argmin(filtered_yt)
+                best_sample = dataset.samples[idx]
+            else:
+                from smt_optim.utils.multi_obj import get_pareto_mask
+                # Multi-objective: get non-dominated points among feasible ones
+                feasible_yt = yt[fid_feas_mask]
+                pareto_mask_feasible = get_pareto_mask(feasible_yt)
+                
+                # Map back to original indices
+                feasible_indices = np.where(fid_feas_mask)[0]
+                pareto_indices = feasible_indices[pareto_mask_feasible]
+                
+                best_sample = [dataset.samples[i] for i in pareto_indices]
 
         # if no sample is feasible, selects sample with lowest RSCV
         else:
             filtered_rscv = np.where(fidelity_mask, rscv, np.inf)
             idx = np.argmin(filtered_rscv)
-
-        best_sample = dataset.samples[idx]
+            best_sample = dataset.samples[idx]
+            if self.problem.num_obj > 1:
+                best_sample = [best_sample]
 
         return best_sample
 
