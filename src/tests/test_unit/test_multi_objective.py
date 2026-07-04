@@ -1,7 +1,10 @@
 import unittest
 import numpy as np
 
-
+from smt_optim.acquisition_strategies.biego import (
+    SingleObjectiveProduct,
+    SingleObjectiveNormalized,
+)
 from smt_optim.acquisition_functions.multi_obj import init_mpi
 
 
@@ -43,6 +46,42 @@ class MockState:
 
 
 class TestMultiObjectiveFixes(unittest.TestCase):
+    def test_vectorization_single_objective_product(self):
+        # Shape: (2,)
+        x_1d = np.array([0.5, 0.3])
+        r = np.array([1.0, 1.0])
+        # r - x = [0.5, 0.7] => max(0)^2 = [0.25, 0.49] => prod = 0.1225 => return -0.1225
+        val_1d = SingleObjectiveProduct(x_1d, r)
+        self.assertAlmostEqual(val_1d, -0.1225)
+
+        # Shape: (N, M, 2)
+        x_3d = np.array([
+            [[0.5, 0.3], [1.2, 0.9]],
+            [[1.1, 1.1], [0.8, 0.2]]
+        ])
+        val_3d = SingleObjectiveProduct(x_3d, r)
+        expected = np.array([
+            [-0.1225, 0.0],
+            [0.0, -0.0256] # [0.8, 0.2] => [0.2, 0.8] => 0.04 * 0.64 = 0.0256
+        ])
+        np.testing.assert_allclose(val_3d, expected)
+
+    def test_vectorization_single_objective_normalized(self):
+        # Shape: (2,)
+        x_1d = np.array([0.5, 0.3])
+        r = np.array([0.1, 0.1])
+        w = np.array([2.0, 1.0])
+
+        val_1d = SingleObjectiveNormalized(x_1d, r, w)
+        # max((0.5-0.1)/2, (0.3-0.1)/1) = max(0.2, 0.2) = 0.2
+        self.assertAlmostEqual(val_1d, 0.2)
+
+        # Shape: (N, 2)
+        x_2d = np.array([[0.5, 0.3], [0.2, 0.9]])
+        val_2d = SingleObjectiveNormalized(x_2d, r, w)
+        # row2: max((0.2-0.1)/2, (0.9-0.1)/1) = max(0.05, 0.8) = 0.8
+        expected = np.array([0.2, 0.8])
+        np.testing.assert_allclose(val_2d, expected)
     def test_mpi_zero_variance(self):
         state = MockState()
         # Initialize MPI
