@@ -43,8 +43,6 @@ class MockState:
 
 
 class TestMultiObjectiveFixes(unittest.TestCase):
-
-
     def test_mpi_zero_variance(self):
         state = MockState()
         # Initialize MPI
@@ -57,6 +55,7 @@ class TestMultiObjectiveFixes(unittest.TestCase):
 
     def test_ei_cf_constraint_filtering(self):
         from smt_optim.acquisition_functions.multi_obj import init_bi_obj_ei_cf
+
         state = MockState()
         # Create a mock dataset with one feasible and one infeasible point
         # [0.2, 0.2] has rscv = 1.0 (infeasible)
@@ -67,22 +66,22 @@ class TestMultiObjectiveFixes(unittest.TestCase):
             "fidelity": np.array([0, 0]),
             "x": np.array([[0.1], [0.9]]),
         }
-        
+
         # phi is just sum of objectives
         def mock_phi(y):
             return np.sum(y, axis=-1)
-            
+
         kwargs = {"phi": mock_phi, "n_accuracy": 10}
-        
+
         # init_bi_obj_ei_cf should find f_min = mock_phi([0.8, 0.8]) = 1.6
         # rather than mock_phi([0.2, 0.2]) = 0.4
-        
+
         # Since I can't easily extract f_min from the closure without calling it,
         # I'll call it with a point. If f_min = 1.6, and predictions are 0.1, 0.1
         # Then phi(y) = 0.2. max(f_min - phi(y), 0) = max(1.6 - 0.2, 0) = 1.4
         # If f_min was 0.4, max(0.4 - 0.2, 0) = 0.2
         ei_cf_func = init_bi_obj_ei_cf(state, kwargs)
-        
+
         val = ei_cf_func(np.array([[0.5]]))
         self.assertAlmostEqual(val[0][0], 1.4)
 

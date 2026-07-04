@@ -5,7 +5,7 @@ import numpy as np
 
 import scipy.stats as stats
 
-from smt_optim.utils.multi_obj import get_pf_from_dataset, get_pareto_front
+from smt_optim.utils.multi_obj import get_pf_from_dataset
 
 
 def init_mpi(state) -> Callable:
