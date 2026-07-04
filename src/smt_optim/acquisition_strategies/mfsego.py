@@ -258,53 +258,7 @@ class MFSEGO(AcquisitionStrategy):
         return scipy_acq_func
 
     def build_scipy_constraints(self, state: State) -> list[dict]:
-
-        scipy_cstr = []
-
-        def append_sp_cstr(func: Callable, type: str) -> None:
-            scipy_cstr.append({
-                "fun": func,
-                "type": type,
-            })
-
-        # TODO: re-implement constraint relaxation
-        # def sp_constraint(x):
-        #     x = x.reshape(1, -1)
-        #     mu = mu_func(x).item()
-        #
-        #     if relax:
-        #         s = np.sqrt(s2_func(x).item())
-        #         if type == "ineq":
-        #             return -(mu - 3 * s)
-        #         elif type == "eq":
-        #             return -(np.abs(mu) - 3 * s)
-        #
-        #     return -mu
-        #
-        # return sp_constraint
-
-        def sp_constraint(x, model):
-            x = x.reshape(1, -1)
-            mu = model.predict_values(x)
-            return mu.item()
-
-
-        for c_id, c_config in enumerate(state.problem.cstr_configs):
-
-            if c_config.equal is not None:
-                func = lambda x, f=sp_constraint, value=state.cstr_equal[c_id], m=state.cstr_models[c_id]: f(x, m) - value
-                append_sp_cstr(func, "eq")
-
-            else:
-                if c_config.lower is not None:
-                    func = lambda x, f=sp_constraint, value=state.cstr_lower[c_id], m=state.cstr_models[c_id]: - value + f(x, m)
-                    append_sp_cstr(func, "ineq")
-
-                if c_config.upper is not None:
-                    func = lambda x, f=sp_constraint, value=state.cstr_upper[c_id], m=state.cstr_models[c_id]: - f(x, m) + value
-                    append_sp_cstr(func, "ineq")
-
-        return scipy_cstr
+        return build_scipy_constraints(state)
 
 
     def get_fidelity(self, next_x: np.ndarray, state: State) -> list[int]:
@@ -558,8 +512,71 @@ def compute_all_s2_red_norm(x_pred: np.ndarray, costs: list[float], surrogates: 
     return s2_red_norm
 
 
-def select_fidelity_level(x_pred: np.ndarray, costs: list[float], all_surrogates: list[Surrogate],
-                          criterion: str = "pessimistic", corr_method=None) -> tuple[np.ndarray, np.ndarray]:
+def build_scipy_constraints(state: State) -> list[dict]:
+
+    scipy_cstr = []
+
+    def append_sp_cstr(func: Callable, type: str) -> None:
+        scipy_cstr.append(
+            {
+                "fun": func,
+                "type": type,
+            }
+        )
+
+    def sp_constraint(x, model):
+        x = x.reshape(1, -1)
+        mu = model.predict_values(x)
+        return mu.item()
+
+    for c_id, c_config in enumerate(state.problem.cstr_configs):
+        if c_config.equal is not None:
+
+            def func(
+                x,
+                f=sp_constraint,
+                value=state.cstr_equal[c_id],
+                m=state.cstr_models[c_id],
+            ):
+                return f(x, m) - value
+
+            append_sp_cstr(func, "eq")
+
+        else:
+            if c_config.lower is not None:
+
+                def func(
+                    x,
+                    f=sp_constraint,
+                    value=state.cstr_lower[c_id],
+                    m=state.cstr_models[c_id],
+                ):
+                    return -value + f(x, m)
+
+                append_sp_cstr(func, "ineq")
+
+            if c_config.upper is not None:
+
+                def func(
+                    x,
+                    f=sp_constraint,
+                    value=state.cstr_upper[c_id],
+                    m=state.cstr_models[c_id],
+                ):
+                    return -f(x, m) + value
+
+                append_sp_cstr(func, "ineq")
+
+    return scipy_cstr
+
+
+def select_fidelity_level(
+    x_pred: np.ndarray,
+    costs: list[float],
+    all_surrogates: list[Surrogate],
+    criterion: str = "pessimistic",
+    corr_method=None,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Select the highest fidelity level to sample based on the `criterion`.
 

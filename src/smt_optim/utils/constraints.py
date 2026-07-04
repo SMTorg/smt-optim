@@ -91,10 +91,11 @@ def compute_rscv_sp(x: np.ndarray, cstr_list: list[dict]) -> float:
     for c_id, c_dict in enumerate(cstr_list):
 
         c_type = c_dict["type"]
+        val = float(c_dict["fun"](x))
         if c_type == "ineq":
-            scv[c_id] = min(0, c_dict["fun"](x))**2
+            scv[c_id] = min(0.0, val) ** 2
         elif c_type == "eq":
-            scv[c_id] = c_dict["fun"](x)**2
+            scv[c_id] = val ** 2
 
     return np.sqrt(np.sum(scv))
 
