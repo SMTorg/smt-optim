@@ -76,6 +76,7 @@ class BiEGO(AcquisitionStrategy):
         self.sp_method = kwargs.pop("sp_method", "Cobyla")
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))
         self.soformulation = kwargs.pop("so_formulation", "Product")
+        self.relax_constraints = kwargs.pop("relax_constraints", False)
         self.current_calls = 0
         self.current_subcalls = 0
         self.n_init = kwargs.pop("n_init", self.n_multi_start)
@@ -204,7 +205,7 @@ class BiEGO(AcquisitionStrategy):
                 x = x.reshape(1, -1)
             return -ac_func(x)
 
-        scipy_cstr = build_scipy_constraints(state)
+        scipy_cstr = build_scipy_constraints(state, self.relax_constraints)
 
         mix_var = False
         for dv in state.problem.design_space.design_variables:
