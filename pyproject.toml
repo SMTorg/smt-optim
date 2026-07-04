@@ -21,6 +21,8 @@ dependencies = [
     "numpy>=2.4.0",
     "scipy>=1.17.0",
     "smt[gpx]>=2.14.1",
+    "moocore",
+    "pymoo",
 ]
 
 license = "Apache-2.0"
