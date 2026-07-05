@@ -344,6 +344,10 @@ def init_bi_obj_ei_cf(state, kwargs=None):
     obj_vals = data["obj"][valid_mask, :]
     f_min = np.min(phi(obj_vals))
 
+    # Pre-sample standard normal variables for Monte Carlo integration
+    # This makes the acquisition function deterministic during optimization
+    Z_fixed = np.random.randn(1, n_expectancy, 2)
+
     def ei_cf(x_pred: np.ndarray) -> np.ndarray:
         s0_sq = models[0].predict_variances(x_pred)
         s1_sq = models[1].predict_variances(x_pred)
@@ -355,9 +359,7 @@ def init_bi_obj_ei_cf(state, kwargs=None):
         y1 = models[1].predict_values(x_pred)
         mu = np.hstack([y0, y1])
 
-        N = mu.shape[0]
-        Z = np.random.randn(N, n_expectancy, 2)
-        samples = mu[:, None, :] + s[:, None, :] * Z
+        samples = mu[:, None, :] + s[:, None, :] * Z_fixed
         phi_vals = phi(samples)
         ei = np.mean(np.maximum(f_min - phi_vals, 0.0), axis=1)
         return ei.reshape(-1, 1)
