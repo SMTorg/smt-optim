@@ -203,7 +203,10 @@ class BiEGO(AcquisitionStrategy):
         def sp_wrapper(x):
             if x.ndim == 1:
                 x = x.reshape(1, -1)
-            return -ac_func(x)
+            val = -ac_func(x)
+            if isinstance(val, np.ndarray):
+                return val.item()
+            return val
 
         scipy_cstr = build_scipy_constraints(state, self.relax_constraints)
 
