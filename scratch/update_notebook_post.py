@@ -32,52 +32,78 @@ state_biego = driver_biego.optimize()
 # Extracting the history of adaptive nadir points (r)
 r_history = driver_biego.strategy.r_history
 
-# Visualizing the trajectory step by step
+# Visualizing the trajectory with an interactive animation
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from IPython.display import HTML
+from smt_optim.utils.multi_obj import get_pareto_mask
 
 y_all = state_biego.dataset.export_as_dict()["obj"]
 y_init = y_all[:nt_init]
 y_infills = y_all[nt_init:]
 
-# We plot the last 4 infills of the bi-objective phase to show the tracking
-for i in range(len(y_infills)):
-    if i < 4: continue # skip single objective phases
-    
-    fig, ax = plt.subplots(figsize=(6, 4))
-    
-    # True PF
-    x1 = np.linspace(0, 1, 100)
-    ax.plot(x1, 1 - np.sqrt(x1), "k-", label="Ref PF", linewidth=2)
-    
-    # Initial DoE & Previous Infills
-    from smt_optim.utils.multi_obj import get_pareto_mask
+fig, ax = plt.subplots(figsize=(6, 4))
+
+x1 = np.linspace(0, 1, 100)
+line_true_pf, = ax.plot(x1, 1 - np.sqrt(x1), "k-", label="Ref PF", linewidth=2)
+scatter_pareto, = ax.plot([], [], "o", color="darkorange", label="Pareto Optimal", alpha=0.9)
+scatter_dom, = ax.plot([], [], "bo", label="Dominated", alpha=0.4)
+scatter_new, = ax.plot([], [], "r*", markersize=12, label="New Infill")
+
+nadir_marker, = ax.plot([], [], "mX", markersize=10, label="Adaptive Nadir (r)")
+nadir_hline = ax.axhline(0, color="m", linestyle="--", alpha=0.5)
+nadir_vline = ax.axvline(0, color="m", linestyle="--", alpha=0.5)
+
+ax.set_xlabel("$f_1$")
+ax.set_ylabel("$f_2$")
+ax.grid(True, linestyle="--", alpha=0.6)
+ax.legend(loc="upper right")
+
+def init():
+    scatter_pareto.set_data([], [])
+    scatter_dom.set_data([], [])
+    scatter_new.set_data([], [])
+    nadir_marker.set_data([], [])
+    nadir_hline.set_visible(False)
+    nadir_vline.set_visible(False)
+    return scatter_pareto, scatter_dom, scatter_new, nadir_marker, nadir_hline, nadir_vline
+
+def update(frame):
+    # Only show bi-objective phase (skip first 4 if min_max_calls=2)
+    i = frame + 4
+    if i >= len(y_infills):
+        return
+        
     all_past_pts = np.vstack((y_init, y_infills[:i]))
     if len(all_past_pts) > 0:
         p_mask = get_pareto_mask(all_past_pts)
         pareto_pts = all_past_pts[p_mask]
         dom_pts = all_past_pts[~p_mask]
         
-        if len(pareto_pts) > 0:
-            ax.plot(pareto_pts[:, 0], pareto_pts[:, 1], "o", color="darkorange", label="Pareto Optimal", alpha=0.9)
-        if len(dom_pts) > 0:
-            ax.plot(dom_pts[:, 0], dom_pts[:, 1], "bo", label="Dominated", alpha=0.4)
+        scatter_pareto.set_data(pareto_pts[:, 0], pareto_pts[:, 1])
+        scatter_dom.set_data(dom_pts[:, 0], dom_pts[:, 1])
         
-    # Plot the new infill
-    ax.plot(y_infills[i, 0], y_infills[i, 1], "r*", markersize=12, label="New Infill")
+    scatter_new.set_data([y_infills[i, 0]], [y_infills[i, 1]])
     
-    # Adaptive Nadir
     if i < len(r_history) and r_history[i] is not None:
         r_unscaled = r_history[i]
-        ax.plot(r_unscaled[0], r_unscaled[1], "mX", markersize=10, label="Adaptive Nadir (r)")
-        ax.axhline(r_unscaled[1], color="m", linestyle="--", alpha=0.5)
-        ax.axvline(r_unscaled[0], color="m", linestyle="--", alpha=0.5)
+        nadir_marker.set_data([r_unscaled[0]], [r_unscaled[1]])
+        nadir_hline.set_ydata([r_unscaled[1], r_unscaled[1]])
+        nadir_vline.set_xdata([r_unscaled[0], r_unscaled[0]])
+        nadir_hline.set_visible(True)
+        nadir_vline.set_visible(True)
         
-    ax.set_xlabel("$f_1$")
-    ax.set_ylabel("$f_2$")
     ax.set_title(f"BiEGO Bi-objective Phase: Infill {i+1}")
-    ax.legend(loc="upper right")
-    ax.grid(True, linestyle="--", alpha=0.6)
-    plt.show()
+    ax.relim()
+    ax.autoscale_view()
+    return scatter_pareto, scatter_dom, scatter_new, nadir_marker, nadir_hline, nadir_vline
+
+# Frames equal to number of bi-objective infills
+n_frames = max(0, len(y_infills) - 4)
+ani = FuncAnimation(fig, update, frames=n_frames, init_func=init, blit=False, repeat=False)
+plt.close(fig) # Prevent static plot display
+
+HTML(ani.to_jshtml())
 '''
         cell["source"] = [line + "\n" for line in new_source.split("\n")]
         # Also clear outputs so it generates them freshly if run

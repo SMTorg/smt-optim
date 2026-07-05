@@ -407,3 +407,35 @@ def plot_pareto_front(
 
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()
+
+
+def plot_hypervolume_convergence(
+    hv_history: list[float],
+    filename: str = "hypervolume_convergence.png",
+    title: str = "Hypervolume Convergence",
+):
+    """
+    Plots the hypervolume evolution over iterations.
+    
+    Parameters
+    ----------
+    hv_history : list of float
+        Hypervolume value at each iteration.
+    filename : str
+        The output image file name.
+    title : str
+        The title of the plot.
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    iterations = np.arange(len(hv_history))
+    ax.plot(iterations, hv_history, "b-o", linewidth=2, markersize=6)
+    
+    ax.set_xlabel("Iterations")
+    ax.set_ylabel("Hypervolume")
+    ax.set_title(title)
+    ax.grid(True, linestyle="--", alpha=0.6)
+    
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    plt.close()

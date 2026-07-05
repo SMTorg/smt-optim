@@ -24,7 +24,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
         problem = Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
 
-        opt_config = DriverConfig(max_iter=25, nt_init=25, seed=42)
+        opt_config = DriverConfig(max_iter=25, nt_init=10, seed=42)
 
         driver = Driver(problem=problem, config=opt_config, strategy=MOSEGO)
 
@@ -72,13 +72,13 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         problem = Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
 
         # Decrease min_max_calls to quickly enter the bi-objective phase
-        opt_config = DriverConfig(max_iter=25, nt_init=25, seed=42)
+        opt_config = DriverConfig(max_iter=25, nt_init=10, seed=42)
 
         driver = Driver(
             problem=problem,
             config=opt_config,
             strategy=BiEGO,
-            strategy_kwargs={"min_max_calls": 2, "n_multi_start": 50},
+            strategy_kwargs={"min_max_calls": 3, "n_multi_start": 15},
         )
 
         # Initial DoE hypervolume
@@ -118,55 +118,29 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         )
 
         import matplotlib.pyplot as plt
-        # Step by step plotting
-        r_history = driver.strategy.r_history
-        # The bi-objective phase starts after 2*min_max_calls = 4 iterations.
-        # So infills from index 4 onwards are bi-objective infills.
-        # But wait! If min_max_calls=2, then iterations 1,2 are min f1, 3,4 are min f2.
-        # Iteration 5 is bi-objective, producing infill 5.
-        
+        from smt_optim.utils.multi_obj import plot_hypervolume_convergence, get_pareto_front
+
         y_all = state.dataset.export_as_dict()["obj"]
-        y_init = y_all[:opt_config.nt_init]
-        y_infills = y_all[opt_config.nt_init:]
         
-        # We start plotting from the first bi-objective iteration
-        # r_history now matches the length of y_infills exactly!
-        for i in range(len(y_infills)):
-            step_dataset = state.dataset.__class__()
-            for j in range(opt_config.nt_init + i + 1):
-                step_dataset.add(state.dataset.samples[j])
-                
-            fig, ax = plt.subplots(figsize=(8, 6))
-            ax.plot(x1, 1 - np.sqrt(x1), "k-", label="Ref PF", linewidth=2)
-            from smt_optim.utils.multi_obj import get_pareto_mask
-            all_past_pts = np.vstack((y_init, y_infills[:i]))
-            if len(all_past_pts) > 0:
-                p_mask = get_pareto_mask(all_past_pts)
-                pareto_pts = all_past_pts[p_mask]
-                dom_pts = all_past_pts[~p_mask]
-                
-                if len(pareto_pts) > 0:
-                    ax.plot(pareto_pts[:, 0], pareto_pts[:, 1], "o", color="darkorange", label="Pareto Optimal", alpha=0.9)
-                if len(dom_pts) > 0:
-                    ax.plot(dom_pts[:, 0], dom_pts[:, 1], "bo", label="Dominated", alpha=0.4)
-                
-            # Plot the new infill
-            ax.plot(y_infills[i, 0], y_infills[i, 1], "r*", markersize=12, label="New Infill")
+        hv_history = []
+        for i in range(opt_config.nt_init, len(y_all) + 1):
+            current_pts = y_all[:i]
+            current_pf = get_pareto_front(current_pts)
             
-            # Plot current Nadir if available for this step
-            if i < len(r_history) and r_history[i] is not None:
-                r_unscaled = r_history[i]
-                ax.plot(r_unscaled[0], r_unscaled[1], "mX", markersize=10, label="Adaptive Nadir (r)")
-                ax.axhline(r_unscaled[1], color="m", linestyle="--", alpha=0.5)
-                ax.axvline(r_unscaled[0], color="m", linestyle="--", alpha=0.5)
+            # Compute Area under PF w.r.t (0,0) (which decays as PF converges to the origin)
+            sorted_pf = current_pf[np.argsort(current_pf[:, 0])]
+            area = 0.0
+            prev_f1 = 0.0
+            for k in range(sorted_pf.shape[0]):
+                area += (sorted_pf[k, 0] - prev_f1) * sorted_pf[k, 1]
+                prev_f1 = sorted_pf[k, 0]
+            hv_history.append(area)
             
-            ax.set_xlabel("$f_1$")
-            ax.set_ylabel("$f_2$")
-            ax.set_title(f"BiEGO Step {i+1}")
-            ax.legend()
-            ax.grid(True, linestyle="--", alpha=0.6)
-            plt.savefig(f"zdt1_biego_step_{i+1}.png", dpi=150, bbox_inches="tight")
-            plt.close()
+        plot_hypervolume_convergence(
+            hv_history, 
+            filename="zdt1_hypervolume_decay.png",
+            title="Hypervolume (Area under PF) Decay over Iterations"
+        )
 
 
 
