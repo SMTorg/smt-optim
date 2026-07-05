@@ -364,6 +364,7 @@ def init_bi_obj_ei_cf(state, kwargs=None):
 
     return ei_cf
 
+
 def init_bi_obj_ei_naive(state, kwargs=None):
     """
     Initialize the Expected Improvement using a Naive approach for Composite Functions.
@@ -389,8 +390,10 @@ def init_bi_obj_ei_naive(state, kwargs=None):
     kwargs_surrogate = state.problem.obj_configs[0].surrogate_kwargs
     if kwargs_surrogate is None:
         kwargs_surrogate = {}
-        
-    model = state.obj_models[0].__class__(design_space=state.problem.design_space, **kwargs_surrogate)
+
+    model = state.obj_models[0].__class__(
+        design_space=state.problem.design_space, **kwargs_surrogate
+    )
     model.train(xt_list, y_phi_list)
 
     valid_mask = data["rscv"] <= 0.0
@@ -400,9 +403,7 @@ def init_bi_obj_ei_naive(state, kwargs=None):
 
     def ei_naive(x_pred: np.ndarray) -> np.ndarray:
         return log_ei(
-            model.predict_values(x_pred),
-            model.predict_variances(x_pred),
-            f_min
+            model.predict_values(x_pred), model.predict_variances(x_pred), f_min
         )
 
     return ei_naive

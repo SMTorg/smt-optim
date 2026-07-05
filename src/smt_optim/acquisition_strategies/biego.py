@@ -69,13 +69,14 @@ class BiEGO(AcquisitionStrategy):
             "acq_func", log_ei
         )  # Acquisition function for min(f2) (same for f2)
         self.naive = kwargs.pop("naive", False)
-        
+
         if self.naive:
             from smt_optim.acquisition_functions.multi_obj import init_bi_obj_ei_naive
+
             self.acq_func_gen3 = kwargs.get("acq_func_bi", init_bi_obj_ei_naive)
         else:
             self.acq_func_gen3 = kwargs.get("acq_func_bi", init_bi_obj_ei_cf)
-            
+
         self.n_multi_start = kwargs.pop("n_multi_start", 5)
         self.n_accuracy = kwargs.pop("n_accuracy", 1000)
         self.sp_method = kwargs.pop("sp_method", "Cobyla")
