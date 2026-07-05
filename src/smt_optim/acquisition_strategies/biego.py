@@ -138,7 +138,25 @@ class BiEGO(AcquisitionStrategy):
 
     def get_pareto_front(self):
         D, Y = self.get_scaled_DoE()
-        self.X = ParetoFront(D, Y)
+        data = self.state.scaled_dataset.export_as_dict()
+        
+        valid_mask = (data["rscv"] <= 0.0).ravel()
+        mask_lvl0 = (data["fidelity"] == 0).ravel()
+        mask = valid_mask & mask_lvl0
+        
+        if not np.any(mask):
+            mask = mask_lvl0
+            if not np.any(mask):
+                mask = np.ones(len(Y), dtype=bool)
+                
+        valid_indices = np.where(mask)[0]
+        Y_valid = Y[valid_indices]
+        
+        p_mask = get_pareto_mask(Y_valid)
+        p_indices = valid_indices[p_mask]
+        
+        sorted_indices = p_indices[np.argsort(Y[p_indices, 0])]
+        self.X = sorted_indices.tolist()
 
     def select_reference_point(self):
         self.get_pareto_front()
