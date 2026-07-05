@@ -70,6 +70,8 @@ class PymooWrapper(PymooProblem):
         for i in range(self.n_obj):
             if isinstance(self.benchmark.objective, list):
                 obj_func = self.benchmark.objective[i]
+                if isinstance(obj_func, list):
+                    obj_func = obj_func[-1]
             else:
                 obj_func = self.benchmark.objective
             # Some benchmark objective functions return 1D arrays for multiple points
@@ -81,5 +83,7 @@ class PymooWrapper(PymooProblem):
             out["G"] = np.full((num_pt, self.n_ieq_constr), np.nan)
             for i in range(self.n_ieq_constr):
                 cstr_func = self.benchmark.constraints[i]
+                if isinstance(cstr_func, list):
+                    cstr_func = cstr_func[-1]
                 val = cstr_func(x)
                 out["G"][:, i] = np.atleast_1d(val).ravel()
