@@ -24,7 +24,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         driver = Driver(problem=problem, config=opt_config, strategy=MOSEGO)
         
         # Initial DoE hypervolume
-        driver.setup()
+        driver.start_optim()
         initial_dataset = driver.state.scaled_dataset
         initial_pf = get_pf_from_dataset(initial_dataset)
         ref_point = np.array([2.0, 2.0])
@@ -65,7 +65,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         driver = Driver(problem=problem, config=opt_config, strategy=BiEGO)
         
         # Initial DoE hypervolume
-        driver.setup()
+        driver.start_optim()
         initial_dataset = driver.state.scaled_dataset
         initial_pf = get_pf_from_dataset(initial_dataset)
         ref_point = np.array([2.0, 2.0])
