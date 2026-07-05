@@ -99,13 +99,7 @@ def minimize(
         if multi_fidelity:
             expected_costs_len = len(objective[0]) if is_multi_obj else len(objective)
             if len(costs) != expected_costs_len:
-<<<<<<< HEAD
-                raise Exception(
-                    "Error: len(costs) does not match the number of fidelity levels in objective"
-                )
-=======
                 raise Exception("Error: len(costs) does not match the number of fidelity levels in objective")
->>>>>>> upstream/main
 
     else:
         methods = {
