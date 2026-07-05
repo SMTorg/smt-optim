@@ -8,6 +8,7 @@ from smt_optim.utils.multi_obj import get_pf_from_dataset, hypervolume_2d
 from smt_optim.acquisition_strategies.biego import BiEGO
 from smt_optim.acquisition_strategies.mosego import MOSEGO
 
+
 class TestMultiObjectiveConvergence(unittest.TestCase):
     def test_zdt1_mosego_hypervolume_growth(self):
         """Test that MOSEGO improves the hypervolume of the Pareto front on ZDT1."""
@@ -22,7 +23,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         opt_config = DriverConfig(max_iter=5, nt_init=5, seed=42)
 
         driver = Driver(problem=problem, config=opt_config, strategy=MOSEGO)
-        
+
         # Initial DoE hypervolume
         driver.start_optim()
         initial_dataset = driver.state.dataset
@@ -36,10 +37,11 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         final_hv = hypervolume_2d(final_pf, ref_point)
 
         from pymoo.indicators.igd_plus import IGDPlus
+
         x1 = np.linspace(0, 1, 100)
         true_pf = np.array([x1, 1 - np.sqrt(x1)]).T
         igd = IGDPlus(true_pf)
-        
+
         initial_igd = igd.do(initial_pf)
         final_igd = igd.do(final_pf)
 
@@ -63,7 +65,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         opt_config = DriverConfig(max_iter=15, nt_init=5, seed=42)
 
         driver = Driver(problem=problem, config=opt_config, strategy=BiEGO)
-        
+
         # Initial DoE hypervolume
         driver.start_optim()
         initial_dataset = driver.state.dataset
@@ -77,13 +79,13 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         final_hv = hypervolume_2d(final_pf, ref_point)
 
         from pymoo.indicators.igd_plus import IGDPlus
-        from smt_optim.utils.multi_obj import get_pareto_front
+
         # We need a true pareto front or a reference front for IGD+.
         # We'll just generate the true ZDT1 front analytically.
         x1 = np.linspace(0, 1, 100)
         true_pf = np.array([x1, 1 - np.sqrt(x1)]).T
         igd = IGDPlus(true_pf)
-        
+
         initial_igd = igd.do(initial_pf)
         final_igd = igd.do(final_pf)
 
@@ -92,5 +94,6 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         # IGD+ should decrease or remain the same
         self.assertLessEqual(final_igd, initial_igd)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

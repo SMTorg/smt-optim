@@ -40,7 +40,7 @@ def SingleObjectiveNormalized(y, r, s=None):
 def SingleObjectiveProduct(y, r):
     # Returns a single objective product formulation of the problem
     pos_part = np.maximum(r - y, 0)
-    return -np.prod(pos_part ** 2, axis=-1)
+    return -np.prod(pos_part**2, axis=-1)
 
 
 def Norm(p):

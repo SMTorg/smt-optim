@@ -55,15 +55,14 @@ class TestMultiObjectiveFixes(unittest.TestCase):
         self.assertAlmostEqual(val_1d, -0.1225)
 
         # Shape: (N, M, 2)
-        x_3d = np.array([
-            [[0.5, 0.3], [1.2, 0.9]],
-            [[1.1, 1.1], [0.8, 0.2]]
-        ])
+        x_3d = np.array([[[0.5, 0.3], [1.2, 0.9]], [[1.1, 1.1], [0.8, 0.2]]])
         val_3d = SingleObjectiveProduct(x_3d, r)
-        expected = np.array([
-            [-0.1225, 0.0],
-            [0.0, -0.0256] # [0.8, 0.2] => [0.2, 0.8] => 0.04 * 0.64 = 0.0256
-        ])
+        expected = np.array(
+            [
+                [-0.1225, 0.0],
+                [0.0, -0.0256],  # [0.8, 0.2] => [0.2, 0.8] => 0.04 * 0.64 = 0.0256
+            ]
+        )
         np.testing.assert_allclose(val_3d, expected)
 
     def test_vectorization_single_objective_normalized(self):
@@ -82,6 +81,7 @@ class TestMultiObjectiveFixes(unittest.TestCase):
         # row2: max((0.2-0.1)/2, (0.9-0.1)/1) = max(0.05, 0.8) = 0.8
         expected = np.array([0.2, 0.8])
         np.testing.assert_allclose(val_2d, expected)
+
     def test_mpi_zero_variance(self):
         state = MockState()
         # Initialize MPI

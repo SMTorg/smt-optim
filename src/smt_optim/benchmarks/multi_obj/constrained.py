@@ -126,7 +126,12 @@ class TNK(BenchmarkProblem):
         ndim = x.ndim
         if ndim == 1:
             x = x.reshape(1, -1)
-        val = -(x[:, 0] ** 2) - x[:, 1] ** 2 + 1.0 + 0.1 * np.cos(16.0 * np.arctan2(x[:, 0], x[:, 1]))
+        val = (
+            -(x[:, 0] ** 2)
+            - x[:, 1] ** 2
+            + 1.0
+            + 0.1 * np.cos(16.0 * np.arctan2(x[:, 0], x[:, 1]))
+        )
         if ndim == 1:
             return val.item()
         return val
@@ -200,7 +205,7 @@ class OSY(BenchmarkProblem):
         ndim = x.ndim
         if ndim == 1:
             x = x.reshape(1, -1)
-        val = np.sum(x ** 2, axis=1)
+        val = np.sum(x**2, axis=1)
         if ndim == 1:
             return val.item()
         return val

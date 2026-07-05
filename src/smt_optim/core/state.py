@@ -7,7 +7,6 @@ import smt.design_space as ds
 
 from smt_optim.core import OptimizationDataset
 from smt_optim.core.sample import Sample
-from smt_optim.utils.multi_obj import get_pareto_mask
 
 # from smt_optim.core import Problem
 
@@ -316,14 +315,15 @@ class State:
                 best_sample = dataset.samples[idx]
             else:
                 from smt_optim.utils.multi_obj import get_pareto_mask
+
                 # Multi-objective: get non-dominated points among feasible ones
                 feasible_yt = yt[fid_feas_mask]
                 pareto_mask_feasible = get_pareto_mask(feasible_yt)
-                
+
                 # Map back to original indices
                 feasible_indices = np.where(fid_feas_mask)[0]
                 pareto_indices = feasible_indices[pareto_mask_feasible]
-                
+
                 best_sample = [dataset.samples[i] for i in pareto_indices]
 
         # if no sample is feasible, selects sample with lowest RSCV
