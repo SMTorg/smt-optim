@@ -114,9 +114,7 @@ class MFSEGO(AcquisitionStrategy):
         self.optimize_best = kwargs.pop(
             "optimize_best", False
         )  # broken -> to be fixed!
-        self.relax_constraints = kwargs.pop(
-            "relax_constraints", False
-        )
+        self.relax_constraints = kwargs.pop("relax_constraints", False)
         self.cr_override = kwargs.pop(
             "cr_override", None
         )  # override optimizer Cost Ratio

@@ -7,7 +7,6 @@ import smt.design_space as ds
 
 from smt_optim.core import OptimizationDataset
 from smt_optim.core.sample import Sample
-from smt_optim.utils.multi_obj import get_pareto_mask
 
 # from smt_optim.core import Problem
 
@@ -316,6 +315,7 @@ class State:
                 best_sample = dataset.samples[idx]
             else:
                 from smt_optim.utils.multi_obj import get_pareto_mask
+
                 # Multi-objective: get non-dominated points among feasible ones
                 feasible_yt = yt[fid_feas_mask]
                 pareto_mask_feasible = get_pareto_mask(feasible_yt)

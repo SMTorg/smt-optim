@@ -4,7 +4,11 @@ import numpy as np
 from smt_optim.core import Problem, ObjectiveConfig, DriverConfig, Driver
 from smt_optim.surrogate_models.smt import SmtAutoModel
 from smt_optim.benchmarks.multi_obj.zdt import ZDT1
-from smt_optim.utils.multi_obj import get_pf_from_dataset, hypervolume_2d, plot_pareto_front
+from smt_optim.utils.multi_obj import (
+    get_pf_from_dataset,
+    hypervolume_2d,
+    plot_pareto_front,
+)
 from smt_optim.acquisition_strategies.biego import BiEGO
 from smt_optim.acquisition_strategies.mosego import MOSEGO
 
@@ -50,7 +54,12 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         # IGD+ should decrease or remain the same
         self.assertLessEqual(final_igd, initial_igd)
 
-        plot_pareto_front(initial_dataset, state.dataset, filename="zdt1_pareto_front_mosego.png", title="Pareto Front of ZDT1 (2D) obtained with MOSEGO")
+        plot_pareto_front(
+            initial_dataset,
+            state.dataset,
+            filename="zdt1_pareto_front_mosego.png",
+            title="Pareto Front of ZDT1 (2D) obtained with MOSEGO",
+        )
 
     def test_zdt1_biego_hypervolume_growth(self):
         """Test that BiEGO improves the hypervolume of the Pareto front on ZDT1."""
@@ -96,7 +105,12 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         # IGD+ should decrease or remain the same
         self.assertLessEqual(final_igd, initial_igd)
 
-        plot_pareto_front(initial_dataset, state.dataset, filename="zdt1_pareto_front_biego.png", title="Pareto Front of ZDT1 (2D) obtained with BiEGO")
+        plot_pareto_front(
+            initial_dataset,
+            state.dataset,
+            filename="zdt1_pareto_front_biego.png",
+            title="Pareto Front of ZDT1 (2D) obtained with BiEGO",
+        )
 
 
 if __name__ == "__main__":
