@@ -10,7 +10,7 @@ from smt_optim.core.state import State
 
 from smt_optim.subsolvers import multistart_minimize, mixvar_multistart_minimize
 
-from smt_optim.acquisition_functions.multi_obj import init_bi_obj_ei_cf
+from smt_optim.acquisition_functions.multi_obj import init_bi_obj_ei_cf, init_bi_obj_ei_naive
 from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints
 
 
@@ -88,18 +88,27 @@ class BiEGO(AcquisitionStrategy):
         self.n_init = kwargs.pop("n_init", self.n_multi_start)
         self.single_obj_max_calls = kwargs.pop("single_obj_max_calls", self.n_init)
         self.min_max_calls = kwargs.pop("min_max_calls", self.n_init)
+        def _get_fmin(state, obj_idx):
+            data = state.scaled_dataset.export_as_dict()
+            mask_lvl0 = (data["fidelity"] == 0).ravel()
+            valid_mask = (data["rscv"] <= 0.0).ravel()
+            mask = mask_lvl0 & valid_mask
+            if not np.any(mask):
+                mask = mask_lvl0
+            return np.min(data["obj"][mask, obj_idx])
+
         self.acq_func_gen1 = lambda state, kwargs: (
             lambda x: self.acq_func1(
                 state.obj_models[0].predict_values(x),
                 state.obj_models[0].predict_variances(x),
-                min(state.scaled_dataset.export_data([0], 0)),
+                _get_fmin(state, 0),
             )[0][0]
         )
         self.acq_func_gen2 = lambda state, kwargs: (
             lambda x: self.acq_func2(
                 state.obj_models[1].predict_values(x),
                 state.obj_models[1].predict_variances(x),
-                min(state.scaled_dataset.export_data([1], 0)),
+                _get_fmin(state, 1),
             )[0][0]
         )
 
