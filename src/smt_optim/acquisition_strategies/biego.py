@@ -13,7 +13,7 @@ from smt_optim.subsolvers import multistart_minimize, mixvar_multistart_minimize
 from smt_optim.acquisition_functions.multi_obj import (
     init_bi_obj_ei_cf,
 )
-from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints
+from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints, select_fidelity_level
 
 
 from smt_optim.utils.multi_obj import get_pareto_mask
@@ -236,8 +236,8 @@ class BiEGO(AcquisitionStrategy):
             ):
                 print("The Pareto front is of length", len(self.X))
                 self.current_subcalls = 0
-                r = self.select_reference_point()
-                if r is None:
+                r_scaled = self.select_reference_point()
+                if r_scaled is None:
                     self.current_subcalls += 1
                     self.current_calls += 1
                     self.W.append(0)
@@ -246,18 +246,30 @@ class BiEGO(AcquisitionStrategy):
                         return self.get_infill_custom(state, self.acq_func_gen1)
                     else:
                         return self.get_infill_custom(state, self.acq_func_gen2)
-                print("Bi-objective phase with r =", r)
-                self.r = r
-                if self.soformulation == "Normalized":
-                    self.phi = lambda y: SingleObjectiveNormalized(y, r)
-                elif self.soformulation == "Product":
-                    self.phi = lambda y: SingleObjectiveProduct(y, r)
-                else:
-                    raise ValueError("Unknown single-objective formulation")
+                
+                # Unscale the selected reference point and lock it in the physical space
+                qoi_factor = state.qoi_factor[0][:2]
+                qoi_step = state.qoi_step[0][:2]
+                self.r_unscaled = r_scaled * qoi_factor + qoi_step
+                print("Bi-objective phase with unscaled r =", self.r_unscaled)
+
+            # Dynamically rescale the locked physical reference point to match the 
+            # shifting surrogate scale of the current iteration
+            qoi_factor = state.qoi_factor[0][:2]
+            qoi_step = state.qoi_step[0][:2]
+            self.r = (self.r_unscaled - qoi_step) / qoi_factor
+
+            if self.soformulation == "Normalized":
+                self.phi = lambda y: SingleObjectiveNormalized(y, self.r)
+            elif self.soformulation == "Product":
+                self.phi = lambda y: SingleObjectiveProduct(y, self.r)
+            else:
+                raise ValueError("Unknown single-objective formulation")
+                
             self.current_subcalls += 1
             self.current_calls += 1
             self.W.append(0)
-            self.r_history.append(self.r)
+            self.r_history.append(self.r_unscaled)
             return self.get_infill_custom(
                 state, self.acq_func_gen3, phi=self.phi, n_accuracy=self.n_accuracy
             )

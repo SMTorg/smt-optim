@@ -57,7 +57,10 @@ def generate_initial_design(state: State, evaluator, config) -> None:
         else:
             nt_init = config.nt_init
 
-        doe = sampler(nt_init)
+        if state.problem.num_fidelity > 1 and isinstance(nt_init, list):
+            doe = sampler(nt_init[-1])
+        else:
+            doe = sampler(nt_init)
 
         # quick fix for the seed parameter issue
         if state.problem.num_fidelity == 1 and isinstance(design_space, ds.DesignSpace):

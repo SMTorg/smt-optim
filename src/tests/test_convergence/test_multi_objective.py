@@ -24,7 +24,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
         problem = Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
 
-        opt_config = DriverConfig(max_iter=10, nt_init=25, seed=42)
+        opt_config = DriverConfig(max_iter=25, nt_init=25, seed=42)
 
         driver = Driver(problem=problem, config=opt_config, strategy=MOSEGO)
 
@@ -72,7 +72,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         problem = Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
 
         # Decrease min_max_calls to quickly enter the bi-objective phase
-        opt_config = DriverConfig(max_iter=10, nt_init=25, seed=42)
+        opt_config = DriverConfig(max_iter=25, nt_init=25, seed=42)
 
         driver = Driver(
             problem=problem, 
@@ -172,3 +172,33 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_mf_biego_constrained():
+    from smt_optim.core.driver import DriverConfig, Driver
+    from smt_optim.benchmarks.multi_obj.zdt_mf import DTLZ5
+    from smt_optim.core.problem import Problem
+    from smt_optim.core import ObjectiveConfig, ConstraintConfig
+    from smt_optim.surrogate_models.smt import SmtAutoModel
+    from smt_optim.acquisition_strategies.biego import BiEGO
+
+    dtlz5 = DTLZ5()
+    dtlz5.set_dim(2)
+
+    obj1 = ObjectiveConfig(objective=dtlz5.objective[0], surrogate=SmtAutoModel)
+    obj2 = ObjectiveConfig(objective=dtlz5.objective[1], surrogate=SmtAutoModel)
+    cstr1 = ConstraintConfig(constraint=dtlz5.constraints[0], surrogate=SmtAutoModel, upper=0.0)
+
+    problem = Problem(
+        obj_configs=[obj1, obj2],
+        cstr_configs=[cstr1],
+        design_space=dtlz5.bounds,
+        costs=[1.0, 10.0]
+    )
+
+    opt_config = DriverConfig(max_iter=10, nt_init=[10, 5], seed=42)
+    driver = Driver(problem=problem, config=opt_config, strategy=BiEGO, strategy_kwargs={'min_max_calls': 2})
+    driver.start_optim()
+    while driver.state.iter < opt_config.max_iter:
+        driver.iteration(driver.state)
+        
+    assert len(driver.state.dataset.export_as_dict()['x']) == 25
