@@ -155,9 +155,12 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
             # We assume that after 4 single-objective infills, we are in bi-objective.
             if i >= 4 and r_idx < len(r_history):
                 r = r_history[r_idx]
-                ax.plot(r[0], r[1], "mX", markersize=10, label="Adaptive Nadir (r)")
-                ax.axhline(r[1], color="m", linestyle="--", alpha=0.5)
-                ax.axvline(r[0], color="m", linestyle="--", alpha=0.5)
+                qoi_factor = state.qoi_factor[0][:2]
+                qoi_step = state.qoi_step[0][:2]
+                r_unscaled = r * qoi_factor + qoi_step
+                ax.plot(r_unscaled[0], r_unscaled[1], "mX", markersize=10, label="Adaptive Nadir (r)")
+                ax.axhline(r_unscaled[1], color="m", linestyle="--", alpha=0.5)
+                ax.axvline(r_unscaled[0], color="m", linestyle="--", alpha=0.5)
                 r_idx += 1
             
             ax.set_xlabel("$f_1$")
