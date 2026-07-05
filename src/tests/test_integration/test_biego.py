@@ -148,3 +148,62 @@ class TestBiEGO(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_mf_biego_2d_1c(self):
+        def f1_lf(x: np.ndarray) -> np.ndarray:
+            return f1(x) * 1.1 + 0.1
+
+        def f2_lf(x: np.ndarray) -> np.ndarray:
+            return f2(x) * 1.1 + 0.1
+
+        def cstr_lf(x: np.ndarray) -> np.ndarray:
+            return cstr(x) * 0.9
+
+        bounds = np.array([[-2.0, 2.0], [-2.0, 2.0]])
+
+        obj_config1 = ObjectiveConfig(
+            objective=[f1, f1_lf],
+            surrogate=SmtAutoModel,
+            surrogate_kwargs={"name": "MFK"},
+        )
+
+        obj_config2 = ObjectiveConfig(
+            objective=[f2, f2_lf],
+            surrogate=SmtAutoModel,
+            surrogate_kwargs={"name": "MFK"},
+        )
+
+        cstr_config = ConstraintConfig(
+            constraint=[cstr, cstr_lf],
+            upper=0.0,
+            surrogate=SmtAutoModel,
+            surrogate_kwargs={"name": "MFK"},
+        )
+
+        problem = Problem(
+            obj_configs=[obj_config1, obj_config2],
+            cstr_configs=[cstr_config],
+            design_space=bounds,
+            costs=[100.0, 1.0]
+        )
+
+        opt_config = DriverConfig(
+            max_iter=3,
+            seed=42,
+        )
+
+        optimizer = Driver(
+            problem=problem,
+            config=opt_config,
+            strategy=BiEGO,
+            strategy_kwargs={"sp_method": "SLSQP"}
+        )
+
+        state = optimizer.optimize()
+
+        y_data = np.empty((len(state.dataset.samples), 2))
+        for i, sample in enumerate(state.dataset.samples):
+            y_data[i, 0] = sample.obj[0]
+            y_data[i, 1] = sample.obj[1]
+
+        self.assertGreater(len(y_data), 3)
