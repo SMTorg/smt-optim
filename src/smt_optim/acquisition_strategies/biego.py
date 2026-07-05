@@ -10,7 +10,9 @@ from smt_optim.core.state import State
 
 from smt_optim.subsolvers import multistart_minimize, mixvar_multistart_minimize
 
-from smt_optim.acquisition_functions.multi_obj import init_bi_obj_ei_cf, init_bi_obj_ei_naive
+from smt_optim.acquisition_functions.multi_obj import (
+    init_bi_obj_ei_cf,
+)
 from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints
 
 
@@ -83,11 +85,14 @@ class BiEGO(AcquisitionStrategy):
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))
         self.soformulation = kwargs.pop("so_formulation", "Product")
         self.relax_constraints = kwargs.pop("relax_constraints", False)
+        self.select_fidelity = kwargs.pop("select_fidelity", True)
+        self.cr_override = kwargs.pop("cr_override", None)
         self.current_calls = 0
         self.current_subcalls = 0
         self.n_init = kwargs.pop("n_init", self.n_multi_start)
         self.single_obj_max_calls = kwargs.pop("single_obj_max_calls", self.n_init)
         self.min_max_calls = kwargs.pop("min_max_calls", self.n_init)
+
         def _get_fmin(state, obj_idx):
             data = state.scaled_dataset.export_as_dict()
             mask_lvl0 = (data["fidelity"] == 0).ravel()
@@ -157,6 +162,29 @@ class BiEGO(AcquisitionStrategy):
             raise ValueError("The Pareto Front is empty")
         self.W[X[j]] += 1
         return r
+
+
+    def get_fidelity(self, next_x: np.ndarray, state: 'State') -> list[int]:
+        num_points = next_x.shape[0]
+
+        if state.problem.num_fidelity > 1 and self.select_fidelity:
+            all_surrogates = []
+            for o_surrogate in state.obj_models:
+                all_surrogates.append(o_surrogate)
+            for c_surrogate in state.cstr_models:
+                all_surrogates.append(c_surrogate)
+
+            if self.cr_override is not None:
+                costs = self.cr_override
+            else:
+                costs = state.problem.costs
+
+            levels, s2_red_norm = select_fidelity_level(
+                next_x, costs, all_surrogates, "pessimistic"
+            )
+        else:
+            levels = [(state.problem.num_fidelity - 1) for _ in range(num_points)]
+        return levels
 
     def get_infill(self, state):
         old_pareto_front = self.X
@@ -258,6 +286,13 @@ class BiEGO(AcquisitionStrategy):
             )
 
         next_x = res.x
-        infill = [next_x.reshape(1, -1)]
+        level = self.get_fidelity(next_x.reshape(1, -1), state)[0]
 
-        return infill
+        infills = []
+        for lvl in range(state.problem.num_fidelity):
+            if lvl <= level:
+                infills.append(next_x.copy().reshape(1, -1))
+            else:
+                infills.append(None)
+        
+        return infills
