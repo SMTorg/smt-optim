@@ -142,8 +142,79 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
             title="Hypervolume (Area under PF) Decay over Iterations"
         )
 
+    def test_zdt1_algorithms_comparison(self):
+        from smt_optim.core.driver import DriverConfig, Driver
+        from smt_optim.benchmarks.multi_obj.zdt import ZDT1
+        from smt_optim.core.problem import Problem
+        from smt_optim.core import ObjectiveConfig
+        from smt_optim.surrogate_models.smt import SmtAutoModel
+        from smt_optim.acquisition_strategies.biego import BiEGO
+        from smt_optim.acquisition_strategies.mosego import MOSEGO
+        from smt_optim.utils.multi_obj import get_pareto_front
+        import matplotlib.pyplot as plt
+        import numpy as np
 
+        zdt1 = ZDT1()
+        zdt1.set_dim(2)
 
+        def setup_problem():
+            obj1 = ObjectiveConfig(objective=[zdt1.f1], surrogate=SmtAutoModel)
+            obj2 = ObjectiveConfig(objective=[zdt1.f2], surrogate=SmtAutoModel)
+            return Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
+
+        opt_config = DriverConfig(max_iter=10, nt_init=5, seed=42)
+
+        def get_area_history(state):
+            y_all = state.dataset.export_as_dict()["obj"]
+            hv_history = []
+            for i in range(opt_config.nt_init, len(y_all) + 1):
+                current_pts = y_all[:i]
+                current_pf = get_pareto_front(current_pts)
+                sorted_pf = current_pf[np.argsort(current_pf[:, 0])]
+                area = 0.0
+                prev_f1 = 0.0
+                for k in range(sorted_pf.shape[0]):
+                    area += (sorted_pf[k, 0] - prev_f1) * sorted_pf[k, 1]
+                    prev_f1 = sorted_pf[k, 0]
+                hv_history.append(area)
+            return hv_history
+
+        # BiEGO Composite
+        driver_comp = Driver(
+            problem=setup_problem(), config=opt_config, strategy=BiEGO,
+            strategy_kwargs={"min_max_calls": 1, "n_multi_start": 20},
+        )
+        state_comp = driver_comp.optimize()
+        hv_comp = get_area_history(state_comp)
+
+        # BiEGO Naive
+        driver_naive = Driver(
+            problem=setup_problem(), config=opt_config, strategy=BiEGO,
+            strategy_kwargs={"min_max_calls": 1, "n_multi_start": 20, "naive": True},
+        )
+        state_naive = driver_naive.optimize()
+        hv_naive = get_area_history(state_naive)
+
+        # MOSEGO
+        driver_mosego = Driver(
+            problem=setup_problem(), config=opt_config, strategy=MOSEGO,
+        )
+        state_mosego = driver_mosego.optimize()
+        hv_mosego = get_area_history(state_mosego)
+
+        iterations = list(range(1, len(hv_comp) + 1))
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(iterations, hv_comp, 'b-o', label='BiEGO (Composite)', alpha=0.8)
+        ax.plot(iterations, hv_naive, 'r-s', label='BiEGO (Naive)', alpha=0.8)
+        ax.plot(iterations, hv_mosego, 'g-^', label='MOSEGO (MPI)', alpha=0.8)
+        ax.set_xlabel('Infill Iterations')
+        ax.set_ylabel('Hypervolume (Area bounded by PF)')
+        ax.set_title('Decay Comparison: Naive BiEGO vs Composite BiEGO vs MOSEGO MPI')
+        ax.legend()
+        ax.grid(True, linestyle='--', alpha=0.6)
+        plt.savefig("zdt1_algorithms_hypervolume_decay_comparison.png", dpi=300, bbox_inches="tight")
+        plt.close(fig)
 if __name__ == "__main__":
     unittest.main()
 
