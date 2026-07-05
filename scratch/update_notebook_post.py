@@ -24,7 +24,7 @@ driver_biego = Driver(
     problem=prob_definition, 
     config=opt_config_biego, 
     strategy=BiEGO,
-    strategy_kwargs={"min_max_calls": 2}
+    strategy_kwargs={"min_max_calls": 2, "n_multi_start": 50},
 )
 
 state_biego = driver_biego.optimize()

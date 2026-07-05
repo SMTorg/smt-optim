@@ -75,10 +75,10 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         opt_config = DriverConfig(max_iter=25, nt_init=25, seed=42)
 
         driver = Driver(
-            problem=problem, 
-            config=opt_config, 
+            problem=problem,
+            config=opt_config,
             strategy=BiEGO,
-            strategy_kwargs={"min_max_calls": 2}
+            strategy_kwargs={"min_max_calls": 2, "n_multi_start": 50},
         )
 
         # Initial DoE hypervolume
@@ -196,7 +196,7 @@ def test_mf_biego_constrained():
     )
 
     opt_config = DriverConfig(max_iter=10, nt_init=[10, 5], seed=42)
-    driver = Driver(problem=problem, config=opt_config, strategy=BiEGO, strategy_kwargs={'min_max_calls': 2})
+    driver = Driver(problem=problem, config=opt_config, strategy=BiEGO, strategy_kwargs={'min_max_calls': 2, 'n_multi_start': 50})
     driver.start_optim()
     while driver.state.iter < opt_config.max_iter:
         driver.iteration(driver.state)
