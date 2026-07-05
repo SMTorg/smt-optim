@@ -68,8 +68,10 @@ class MOSEGO(AcquisitionStrategy):
         def scipy_obj(x):
 
             x = x.reshape(1, -1)
-
-            return -acq_func(x)
+            val = acq_func(x)
+            if isinstance(val, np.ndarray):
+                return -float(val.item())
+            return -float(val)
 
         scipy_cstr: list = build_scipy_constraints(state)
 

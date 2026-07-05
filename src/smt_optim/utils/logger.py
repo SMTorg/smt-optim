@@ -51,13 +51,20 @@ class ConsoleLogger:
 
         sample = state.get_best_sample(ctol=1e-4)
 
+        if isinstance(sample, list):
+            fmin = np.nan
+            rscv = sample[0].metadata["rscv"] if len(sample) > 0 else np.nan
+        else:
+            fmin = sample.obj[0]
+            rscv = sample.metadata["rscv"]
+
         iter_log = getattr(state, "iter_log", {}) or {}
 
         data = {
             "iter": state.iter,
             "budget": state.budget,
-            "fmin": sample.obj[0],
-            "rscv": sample.metadata["rscv"],
+            "fmin": fmin,
+            "rscv": rscv,
             "fidelity": iter_log.get("fidelity", np.nan),
             "gp_time": iter_log.get("gp_training_time", np.nan),
             "acq_time": iter_log.get("acq_opt_time", np.nan),
