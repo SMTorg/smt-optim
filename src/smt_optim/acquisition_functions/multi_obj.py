@@ -363,3 +363,46 @@ def init_bi_obj_ei_cf(state, kwargs=None):
         return ei.reshape(-1, 1)
 
     return ei_cf
+
+def init_bi_obj_ei_naive(state, kwargs=None):
+    """
+    Initialize the Expected Improvement using a Naive approach for Composite Functions.
+    This trains a new surrogate model directly on the evaluated composite function values.
+    """
+    from smt_optim.acquisition_functions import log_ei
+    import numpy as np
+
+    phi = kwargs["phi"]
+    data = state.scaled_dataset.export_as_dict()
+    xt = data["x"]
+    yt = data["obj"]
+    y_phi = phi(yt).reshape(-1, 1)
+
+    fidelity = data["fidelity"]
+    xt_list = []
+    y_phi_list = []
+    for lvl in range(state.problem.num_fidelity):
+        mask = (fidelity == lvl).ravel()
+        xt_list.append(xt[mask, :])
+        y_phi_list.append(y_phi[mask].reshape(-1, 1))
+
+    kwargs_surrogate = state.problem.obj_configs[0].surrogate_kwargs
+    if kwargs_surrogate is None:
+        kwargs_surrogate = {}
+        
+    model = state.obj_models[0].__class__(design_space=state.problem.design_space, **kwargs_surrogate)
+    model.train(xt_list, y_phi_list)
+
+    valid_mask = data["rscv"] <= 0.0
+    if not np.any(valid_mask):
+        valid_mask = data["rscv"] == np.min(data["rscv"])
+    f_min = np.min(y_phi[valid_mask])
+
+    def ei_naive(x_pred: np.ndarray) -> np.ndarray:
+        return log_ei(
+            model.predict_values(x_pred),
+            model.predict_variances(x_pred),
+            f_min
+        )
+
+    return ei_naive
