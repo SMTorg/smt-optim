@@ -35,8 +35,18 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         final_pf = get_pf_from_dataset(state.scaled_dataset)
         final_hv = hypervolume_2d(final_pf, ref_point)
 
+        from pymoo.indicators.igd_plus import IGDPlus
+        x1 = np.linspace(0, 1, 100)
+        true_pf = np.array([x1, 1 - np.sqrt(x1)]).T
+        igd = IGDPlus(true_pf)
+        
+        initial_igd = igd.do(initial_pf)
+        final_igd = igd.do(final_pf)
+
         # Hypervolume should increase or remain the same
         self.assertGreaterEqual(final_hv, initial_hv)
+        # IGD+ should decrease or remain the same
+        self.assertLessEqual(final_igd, initial_igd)
 
     def test_zdt1_biego_hypervolume_growth(self):
         """Test that BiEGO improves the hypervolume of the Pareto front on ZDT1."""
@@ -66,8 +76,21 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         final_pf = get_pf_from_dataset(state.scaled_dataset)
         final_hv = hypervolume_2d(final_pf, ref_point)
 
+        from pymoo.indicators.igd_plus import IGDPlus
+        from smt_optim.utils.multi_obj import get_pareto_front
+        # We need a true pareto front or a reference front for IGD+.
+        # We'll just generate the true ZDT1 front analytically.
+        x1 = np.linspace(0, 1, 100)
+        true_pf = np.array([x1, 1 - np.sqrt(x1)]).T
+        igd = IGDPlus(true_pf)
+        
+        initial_igd = igd.do(initial_pf)
+        final_igd = igd.do(final_pf)
+
         # Hypervolume should increase or remain the same
         self.assertGreaterEqual(final_hv, initial_hv)
+        # IGD+ should decrease or remain the same
+        self.assertLessEqual(final_igd, initial_igd)
 
 if __name__ == '__main__':
     unittest.main()
