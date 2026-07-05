@@ -25,14 +25,14 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         
         # Initial DoE hypervolume
         driver.start_optim()
-        initial_dataset = driver.state.scaled_dataset
+        initial_dataset = driver.state.dataset
         initial_pf = get_pf_from_dataset(initial_dataset)
         ref_point = np.array([2.0, 2.0])
         initial_hv = hypervolume_2d(initial_pf, ref_point)
 
         # Optimize for a few iterations
         state = driver.optimize()
-        final_pf = get_pf_from_dataset(state.scaled_dataset)
+        final_pf = get_pf_from_dataset(state.dataset)
         final_hv = hypervolume_2d(final_pf, ref_point)
 
         from pymoo.indicators.igd_plus import IGDPlus
@@ -66,14 +66,14 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         
         # Initial DoE hypervolume
         driver.start_optim()
-        initial_dataset = driver.state.scaled_dataset
+        initial_dataset = driver.state.dataset
         initial_pf = get_pf_from_dataset(initial_dataset)
         ref_point = np.array([2.0, 2.0])
         initial_hv = hypervolume_2d(initial_pf, ref_point)
 
         # Optimize
         state = driver.optimize()
-        final_pf = get_pf_from_dataset(state.scaled_dataset)
+        final_pf = get_pf_from_dataset(state.dataset)
         final_hv = hypervolume_2d(final_pf, ref_point)
 
         from pymoo.indicators.igd_plus import IGDPlus
