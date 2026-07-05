@@ -345,13 +345,24 @@ def plot_pareto_front(
     all_obj = np.vstack([f1_final_all, f2_final_all]).T
     pareto_mask = get_pareto_mask(all_obj)
 
-    # Dominated final points
-    f1_dominated = all_obj[~pareto_mask, 0]
-    f2_dominated = all_obj[~pareto_mask, 1]
+    n_init = len(f1_init)
+    
+    # Infills
+    f1_infill = f1_final_all[n_init:]
+    f2_infill = f2_final_all[n_init:]
+    infill_obj = np.vstack([f1_infill, f2_infill]).T
+    
+    # We want PF of all final points
+    # But we want to distinguish dominated and non-dominated INFILLS
+    infill_pareto_mask = pareto_mask[n_init:]
 
-    # PF infills (non-dominated points)
-    f1_pf = all_obj[pareto_mask, 0]
-    f2_pf = all_obj[pareto_mask, 1]
+    # Dominated infills
+    f1_dominated = infill_obj[~infill_pareto_mask, 0]
+    f2_dominated = infill_obj[~infill_pareto_mask, 1]
+
+    # PF infills (non-dominated infills)
+    f1_pf = infill_obj[infill_pareto_mask, 0]
+    f2_pf = infill_obj[infill_pareto_mask, 1]
 
     # Sort them for plotting a connected line
     idx = np.argsort(f1_pf)
