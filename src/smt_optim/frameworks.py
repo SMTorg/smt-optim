@@ -13,18 +13,19 @@ from smt_optim.core import (
 )
 from smt_optim.surrogate_models.smt import SmtAutoModel, SmtGPX, SmtMFCK
 from smt_optim.acquisition_strategies import MFSEGO, VFPI
+from smt_optim.acquisition_strategies.biego import BiEGO
 
 
 def minimize(
-    objective: list[Callable],
+    objective: list[Callable] | list[list[Callable]],
     design_space: ds.DesignSpace | np.ndarray,
     method: str | None = None,
-    costs: list = [1],
+    costs: list | None = None,
     max_iter: int = 100,
     max_budget: float = np.inf,
-    constraints: list = [],
-    driver_kwargs: dict = {},
-    strategy_kwargs: dict = {},
+    constraints: list | None = None,
+    driver_kwargs: dict | None = None,
+    strategy_kwargs: dict | None = None,
     verbose: bool = True,
 ) -> State:
     """
@@ -37,9 +38,9 @@ def minimize(
 
     Parameters
     ----------
-    objective: list[Callable]
-        List of objective function callables ordered by increasing fidelity. For mono-fidelity problems,
-        the function callable must still be provided as a single-element list.
+    objective: list[Callable] | list[list[Callable]]
+        List of objective function callables ordered by increasing fidelity. For multi-objective
+        optimization, provide a list of lists (one list of fidelity functions per objective).
     design_space: ds.DesignSpace | np.ndarray
         Problem design space. If a np.ndarray is provided, the problem will be treated as fully continuous.
     method: str {"ego", "sego", "mfsego", "vfpi"} or None, optional
@@ -76,18 +77,29 @@ def minimize(
         else:
             mix_var = False
 
-        if len(objective) > 1:
-            multi_fidelity = True
+        # Check if objective is a list of lists (Multi-Objective)
+        if len(objective) > 0 and isinstance(objective[0], list):
+            is_multi_obj = True
+            if len(objective[0]) > 1:
+                multi_fidelity = True
+            else:
+                multi_fidelity = False
         else:
-            multi_fidelity = False
+            is_multi_obj = False
+            if len(objective) > 1:
+                multi_fidelity = True
+            else:
+                multi_fidelity = False
 
         if not mix_var and not multi_fidelity:
             surrogate = SmtGPX
         else:
             surrogate = SmtAutoModel
 
-        if multi_fidelity and len(costs) != len(objective):
-            raise Exception("Error: len(costs) != len(objective)")
+        if multi_fidelity:
+            expected_costs_len = len(objective[0]) if is_multi_obj else len(objective)
+            if len(costs) != expected_costs_len:
+                raise Exception("Error: len(costs) does not match the number of fidelity levels in objective")
 
     else:
         methods = {
@@ -100,14 +112,35 @@ def minimize(
         config = methods[method]
         surrogate = config["surrogate"]
         strategy = config["strategy"]
-        costs = costs or config["costs", [1]]
+        costs = costs or config.get("costs", [1])
+
+        if constraints is None:
+            constraints = []
+        if driver_kwargs is None:
+            driver_kwargs = {}
+        if strategy_kwargs is None:
+            strategy_kwargs = {}
 
     # ------- setup objective configuration -------
-    obj_config = ObjectiveConfig(
-        objective,
-        type="minimize",
-        surrogate=surrogate,
-    )
+    obj_configs = []
+    # If it's a list of lists, it's multi-objective
+    if len(objective) > 0 and isinstance(objective[0], list):
+        for obj_list in objective:
+            obj_configs.append(
+                ObjectiveConfig(
+                    obj_list,
+                    type="minimize",
+                    surrogate=surrogate,
+                )
+            )
+    else:
+        obj_configs.append(
+            ObjectiveConfig(
+                objective,
+                type="minimize",
+                surrogate=surrogate,
+            )
+        )
 
     # ------- setup constraint configurations -------
     cstr_configs = []
@@ -130,7 +163,7 @@ def minimize(
 
     # ------- problem configuration -------
     problem = Problem(
-        obj_configs=[obj_config],
+        obj_configs=obj_configs,
         design_space=design_space,
         costs=costs,  # Set the cost of sampling each level
         cstr_configs=cstr_configs,
@@ -152,6 +185,9 @@ def minimize(
     )
 
     # ------- start driver -------
+    if strategy_kwargs is None:
+        strategy_kwargs = {}
+        
     driver = Driver(problem, driver_config, strategy, strategy_kwargs=strategy_kwargs)
     state = driver.optimize()
     return state
