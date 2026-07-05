@@ -98,6 +98,7 @@ class BiEGO(AcquisitionStrategy):
         )
 
         self.r = None
+        self.r_history = []
         self.state = state
         self.X = None
         self.W = None
@@ -182,6 +183,7 @@ class BiEGO(AcquisitionStrategy):
                     else:
                         return self.get_infill_custom(state, self.acq_func_gen2)
                 print("Bi-objective phase with r =", r)
+                self.r_history.append(r)
                 if self.soformulation == "Normalized":
                     self.phi = lambda y: SingleObjectiveNormalized(y, r)
                 elif self.soformulation == "Product":
