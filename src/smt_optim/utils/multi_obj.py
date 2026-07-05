@@ -316,3 +316,61 @@ def gamma_spread(pf: np.ndarray) -> float:
     if len(distances) == 0:
         return np.nan
     return float(np.max(distances))
+
+def plot_pareto_front(initial_dataset, final_dataset, filename="pareto_front.png", title="Pareto Front of ZDT1 (2D) obtained with SMT-optim"):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    # 1. True Pareto Front (ZDT1 specific)
+    f1_true = np.linspace(0, 1, 100)
+    f2_true = 1 - np.sqrt(f1_true)
+
+    # 2. Extract objectives
+    initial_dict = initial_dataset.export_as_dict()
+    final_dict = final_dataset.export_as_dict()
+
+    f1_init = initial_dict["obj"][:, 0]
+    f2_init = initial_dict["obj"][:, 1]
+    
+    f1_final_all = final_dict["obj"][:, 0]
+    f2_final_all = final_dict["obj"][:, 1]
+    
+    # Get pareto front of all final points
+    all_obj = np.vstack([f1_final_all, f2_final_all]).T
+    pareto_mask = get_pareto_mask(all_obj)
+    
+    # Dominated final points
+    f1_dominated = all_obj[~pareto_mask, 0]
+    f2_dominated = all_obj[~pareto_mask, 1]
+    
+    # PF infills (non-dominated points)
+    f1_pf = all_obj[pareto_mask, 0]
+    f2_pf = all_obj[pareto_mask, 1]
+    
+    # Sort them for plotting a connected line
+    idx = np.argsort(f1_pf)
+    f1_pf = f1_pf[idx]
+    f2_pf = f2_pf[idx]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Plot True PF
+    ax.plot(f1_true, f2_true, 'k-', label='Ref PF', linewidth=2)
+
+    # Plot Initial DoE
+    ax.plot(f1_init, f2_init, 'go', label='Initial DoE', markersize=5, linestyle='None', alpha=0.7)
+
+    # Plot Final DoE (dominated)
+    ax.plot(f1_dominated, f2_dominated, 'bo', label='Final DoE', markersize=5, linestyle='None', alpha=0.7)
+
+    # Plot PF infills
+    ax.plot(f1_pf, f2_pf, 'r:d', label='PF infills', markersize=8)
+
+    ax.set_xlabel('$f_1$')
+    ax.set_ylabel('$f_2$')
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True, linestyle='--', alpha=0.6)
+
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
