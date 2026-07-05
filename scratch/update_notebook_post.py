@@ -50,19 +50,24 @@ for i in range(len(y_infills)):
     ax.plot(x1, 1 - np.sqrt(x1), "k-", label="Ref PF", linewidth=2)
     
     # Initial DoE & Previous Infills
-    ax.plot(y_init[:, 0], y_init[:, 1], "go", label="Initial DoE", alpha=0.7)
-    if i > 0:
-        ax.plot(y_infills[:i, 0], y_infills[:i, 1], "bo", label="Previous Infills", alpha=0.7)
+    from smt_optim.utils.multi_obj import get_pareto_mask
+    all_past_pts = np.vstack((y_init, y_infills[:i]))
+    if len(all_past_pts) > 0:
+        p_mask = get_pareto_mask(all_past_pts)
+        pareto_pts = all_past_pts[p_mask]
+        dom_pts = all_past_pts[~p_mask]
         
-    # New Infill
+        if len(pareto_pts) > 0:
+            ax.plot(pareto_pts[:, 0], pareto_pts[:, 1], "o", color="darkorange", label="Pareto Optimal", alpha=0.9)
+        if len(dom_pts) > 0:
+            ax.plot(dom_pts[:, 0], dom_pts[:, 1], "bo", label="Dominated", alpha=0.4)
+        
+    # Plot the new infill
     ax.plot(y_infills[i, 0], y_infills[i, 1], "r*", markersize=12, label="New Infill")
     
     # Adaptive Nadir
     if i < len(r_history) and r_history[i] is not None:
-        r = r_history[i]
-        qoi_factor = state_biego.qoi_factor[0][:2]
-        qoi_step = state_biego.qoi_step[0][:2]
-        r_unscaled = r * qoi_factor + qoi_step
+        r_unscaled = r_history[i]
         ax.plot(r_unscaled[0], r_unscaled[1], "mX", markersize=10, label="Adaptive Nadir (r)")
         ax.axhline(r_unscaled[1], color="m", linestyle="--", alpha=0.5)
         ax.axvline(r_unscaled[0], color="m", linestyle="--", alpha=0.5)
