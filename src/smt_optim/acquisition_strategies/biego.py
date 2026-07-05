@@ -216,12 +216,14 @@ class BiEGO(AcquisitionStrategy):
         if self.current_calls < self.min_max_calls:
             self.current_calls += 1
             self.W.append(0)
+            self.r_history.append(None)
             return self.get_infill_custom(state, self.acq_func_gen1)
         elif self.current_calls < 2 * self.min_max_calls:
             if self.current_calls == self.min_max_calls:
                 print("Min(f2) phase")
             self.current_calls += 1
             self.W.append(0)
+            self.r_history.append(None)
             return self.get_infill_custom(state, self.acq_func_gen2)
 
         # Main loop
@@ -239,12 +241,13 @@ class BiEGO(AcquisitionStrategy):
                     self.current_subcalls += 1
                     self.current_calls += 1
                     self.W.append(0)
+                    self.r_history.append(None)
                     if self.current_calls % 2:
                         return self.get_infill_custom(state, self.acq_func_gen1)
                     else:
                         return self.get_infill_custom(state, self.acq_func_gen2)
                 print("Bi-objective phase with r =", r)
-                self.r_history.append(r)
+                self.r = r
                 if self.soformulation == "Normalized":
                     self.phi = lambda y: SingleObjectiveNormalized(y, r)
                 elif self.soformulation == "Product":
@@ -254,6 +257,7 @@ class BiEGO(AcquisitionStrategy):
             self.current_subcalls += 1
             self.current_calls += 1
             self.W.append(0)
+            self.r_history.append(self.r)
             return self.get_infill_custom(
                 state, self.acq_func_gen3, phi=self.phi, n_accuracy=self.n_accuracy
             )

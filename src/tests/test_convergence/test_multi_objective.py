@@ -24,7 +24,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
         problem = Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
 
-        opt_config = DriverConfig(max_iter=10, nt_init=5, seed=42)
+        opt_config = DriverConfig(max_iter=10, nt_init=25, seed=42)
 
         driver = Driver(problem=problem, config=opt_config, strategy=MOSEGO)
 
@@ -72,7 +72,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         problem = Problem(obj_configs=[obj1, obj2], design_space=zdt1.bounds)
 
         # Decrease min_max_calls to quickly enter the bi-objective phase
-        opt_config = DriverConfig(max_iter=25, nt_init=5, seed=42)
+        opt_config = DriverConfig(max_iter=10, nt_init=25, seed=42)
 
         driver = Driver(
             problem=problem, 
@@ -130,11 +130,7 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         y_infills = y_all[opt_config.nt_init:]
         
         # We start plotting from the first bi-objective iteration
-        # which corresponds to the first element in r_history.
-        # Wait, not every step has a new r_history element if r is None (empty pareto front).
-        # But for ZDT1 with 5 initial points, PF is not empty.
-        
-        r_idx = 0
+        # r_history now matches the length of y_infills exactly!
         for i in range(len(y_infills)):
             step_dataset = state.dataset.__class__()
             for j in range(opt_config.nt_init + i + 1):
@@ -151,17 +147,15 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
             # Plot the new infill
             ax.plot(y_infills[i, 0], y_infills[i, 1], "r*", markersize=12, label="New Infill")
             
-            # Plot current Nadir if in bi-objective phase
-            # We assume that after 4 single-objective infills, we are in bi-objective.
-            if i >= 4 and r_idx < len(r_history):
-                r = r_history[r_idx]
+            # Plot current Nadir if available for this step
+            if i < len(r_history) and r_history[i] is not None:
+                r = r_history[i]
                 qoi_factor = state.qoi_factor[0][:2]
                 qoi_step = state.qoi_step[0][:2]
                 r_unscaled = r * qoi_factor + qoi_step
                 ax.plot(r_unscaled[0], r_unscaled[1], "mX", markersize=10, label="Adaptive Nadir (r)")
                 ax.axhline(r_unscaled[1], color="m", linestyle="--", alpha=0.5)
                 ax.axvline(r_unscaled[0], color="m", linestyle="--", alpha=0.5)
-                r_idx += 1
             
             ax.set_xlabel("$f_1$")
             ax.set_ylabel("$f_2$")

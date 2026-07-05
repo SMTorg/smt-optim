@@ -39,7 +39,6 @@ y_all = state_biego.dataset.export_as_dict()["obj"]
 y_init = y_all[:nt_init]
 y_infills = y_all[nt_init:]
 
-r_idx = 0
 # We plot the last 4 infills of the bi-objective phase to show the tracking
 for i in range(len(y_infills)):
     if i < 4: continue # skip single objective phases
@@ -59,15 +58,14 @@ for i in range(len(y_infills)):
     ax.plot(y_infills[i, 0], y_infills[i, 1], "r*", markersize=12, label="New Infill")
     
     # Adaptive Nadir
-    if r_idx < len(r_history):
-        r = r_history[r_idx]
+    if i < len(r_history) and r_history[i] is not None:
+        r = r_history[i]
         qoi_factor = state_biego.qoi_factor[0][:2]
         qoi_step = state_biego.qoi_step[0][:2]
         r_unscaled = r * qoi_factor + qoi_step
         ax.plot(r_unscaled[0], r_unscaled[1], "mX", markersize=10, label="Adaptive Nadir (r)")
         ax.axhline(r_unscaled[1], color="m", linestyle="--", alpha=0.5)
         ax.axvline(r_unscaled[0], color="m", linestyle="--", alpha=0.5)
-        r_idx += 1
         
     ax.set_xlabel("$f_1$")
     ax.set_ylabel("$f_2$")
