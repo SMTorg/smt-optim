@@ -21,14 +21,11 @@ from .misc import misc2
 from .misc import weldedbeam_variants
 
 
-available = {}
-
-
 from .multi_obj import constrained as mo_constrained
 from .multi_obj import zdt_mf
 from .multi_obj import zdt
 
-
+available = {}
 def _register_from_module(module):
     for name, obj in inspect.getmembers(module, inspect.isclass):
         if issubclass(obj, BenchmarkProblem) and obj is not BenchmarkProblem:
