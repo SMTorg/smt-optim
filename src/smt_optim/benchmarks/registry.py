@@ -24,6 +24,11 @@ from .misc import weldedbeam_variants
 available = {}
 
 
+from .multi_obj import constrained as mo_constrained
+from .multi_obj import zdt_mf
+from .multi_obj import zdt
+
+
 def _register_from_module(module):
     for name, obj in inspect.getmembers(module, inspect.isclass):
         if issubclass(obj, BenchmarkProblem) and obj is not BenchmarkProblem:
@@ -47,9 +52,6 @@ _register_from_module(mf_borehole)
 _register_from_module(misc2)
 _register_from_module(weldedbeam_variants)
 
-from .multi_obj import zdt
-from .multi_obj import zdt_mf
-from .multi_obj import constrained as mo_constrained
 
 _register_from_module(zdt)
 _register_from_module(zdt_mf)
