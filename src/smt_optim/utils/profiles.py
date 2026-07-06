@@ -1,4 +1,4 @@
-﻿import os
+import os
 import numpy as np
 from warnings import warn
 
@@ -6,22 +6,19 @@ from warnings import warn
 <--- WORK IN PROGRESS --->
 """
 
-def read_instances(algos: list[str], metric: str ="iter", fmin: str ="fmin") -> dict:
+
+def read_instances(algos: list[str], metric: str = "iter", fmin: str = "fmin") -> dict:
 
     data = {}
 
     for algo in algos:
-
         data[algo] = {}
 
         for root, _, filenames in os.walk(algo):
-
             for filename in filenames:
-
                 full_path = os.path.join(root, filename)
 
-                with open(full_path, 'r') as file:
-
+                with open(full_path, "r") as file:
                     # get instance name
                     instance_name, ext = os.path.splitext(filename)
 
@@ -31,7 +28,7 @@ def read_instances(algos: list[str], metric: str ="iter", fmin: str ="fmin") -> 
                     fmin_index = headers.index(fmin)
 
                     # get instance data
-                    inst_data = np.loadtxt(file, delimiter=',', skiprows=0)
+                    inst_data = np.loadtxt(file, delimiter=",", skiprows=0)
 
                     # extract metric and fmin columns
                     data[algo][instance_name] = np.empty((inst_data.shape[0], 2))
@@ -50,14 +47,14 @@ def get_f0_fstar(data: dict) -> tuple[dict, dict]:
     fstar = {}
 
     for inst in instances:
-
         f0[inst] = data[algos[0]][inst][0, 1]
         fstar[inst] = np.inf
 
         for algo in algos:
-
             if f0[inst] != data[algo][inst][0, 1]:
-                raise Exception(f"instance = {inst}: f0 is not identical for all algorithms.")
+                raise Exception(
+                    f"instance = {inst}: f0 is not identical for all algorithms."
+                )
 
             fstar[inst] = min(fstar[inst], data[algo][inst][-1, 1])
 
@@ -71,7 +68,9 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
 
     if dim is None:
         if type == "data":
-            warn("Data profiles require the problem's dimensions to be given. n is set to 0 for all instances (n+1 = 1).")
+            warn(
+                "Data profiles require the problem's dimensions to be given. n is set to 0 for all instances (n+1 = 1)."
+            )
         dim = {}
         for inst in instances:
             dim[inst] = 0
@@ -81,14 +80,12 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
     criteria = {}
     min_metric = {}
     for inst in instances:
-        criteria[inst] = f0[inst] - (1-tau)*(f0[inst]-fstar[inst])
+        criteria[inst] = f0[inst] - (1 - tau) * (f0[inst] - fstar[inst])
         min_metric[inst] = np.inf
-
 
     perf = {}
 
     for algo in algos:
-
         perf[algo] = {}
         perf[algo]["metric"] = []
         perf[algo]["portion"] = []
@@ -96,7 +93,6 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
         portion = 0
 
         for inst in instances:
-
             tau_solved = np.where(data[algo][inst][:, 1] <= criteria[inst], 1, 0)
 
             if np.any(tau_solved == 1):
@@ -104,17 +100,17 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
                 metric = data[algo][inst][index, 0]
 
                 if type == "data":
-                    metric /= (dim[inst] + 1)
+                    metric /= dim[inst] + 1
 
                 min_metric[inst] = min(min_metric[inst], metric)
 
-                perf[algo]["metric"].append( metric )
+                perf[algo]["metric"].append(metric)
                 portion += 1
-                perf[algo]["portion"].append( portion )
+                perf[algo]["portion"].append(portion)
 
             else:
-                perf[algo]["metric"].append( np.nan )
-                perf[algo]["portion"].append( portion )
+                perf[algo]["metric"].append(np.nan)
+                perf[algo]["portion"].append(portion)
 
         perf[algo]["metric"] = np.array(perf[algo]["metric"])
         perf[algo]["portion"] = np.array(perf[algo]["portion"], dtype=float)
@@ -123,7 +119,6 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
 
     for algo in algos:
         for i, inst in enumerate(instances):
-
             if type == "perf":
                 perf[algo]["metric"][i] /= min_metric[inst]
 
@@ -139,11 +134,9 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
     max_metric *= 1.1
 
     if type == "perf":
-
         one_sum = 0
 
         for algo in algos:
-
             perf[algo]["metric"] = np.insert(perf[algo]["metric"], 0, 1)
             perf[algo]["portion"] = np.insert(perf[algo]["portion"], 0, 0)
 
@@ -161,10 +154,12 @@ def profile(data: dict, tau: float = 0.1, type: str = "perf", dim: dict = None):
 
     for algo in algos:
         perf[algo]["metric"] = np.append(perf[algo]["metric"], max_metric)
-        perf[algo]["portion"] = np.append(perf[algo]["portion"], perf[algo]["portion"][-1])
-
+        perf[algo]["portion"] = np.append(
+            perf[algo]["portion"], perf[algo]["portion"][-1]
+        )
 
     return perf
+
 
 def convergence_profile(instances: dict):
 
@@ -186,7 +181,7 @@ def convergence_profile(instances: dict):
         e_metric = inst_data[:, 0]
         e_value = inst_data[:, 1]
 
-        indices = np.searchsorted(e_metric, metric, side='right') - 1
+        indices = np.searchsorted(e_metric, metric, side="right") - 1
 
         # ensure the indices are within bounds (>= 0)
         indices = np.clip(indices, 0, len(e_metric) - 1)
@@ -195,30 +190,6 @@ def convergence_profile(instances: dict):
         counter += 1
 
     return metric, all_fmin
-
-def accuracy_profile(data: dict):
-
-    algos = list(data.keys())
-    instances = data[algos[0]].keys()
-
-    f0, fstar = get_f0_fstar(data)
-
-    r_a = {}
-
-    for algo in algos:
-
-        r_a[algo] = dict()
-
-        for inst in instances:
-
-            last_f = data[algo][inst][-1, 1]
-
-            r_a[algo].append(
-                (last_f - f0)/(fstar - f0)
-            )
-
-        r_a[algo] = np.array(r_a[algo]).sort()
-
 
 def accuracy_profile(data: dict):
 
@@ -233,7 +204,6 @@ def accuracy_profile(data: dict):
     max_acc = 0
 
     for algo in algos:
-
         accuracies[algo] = []
         portions[algo] = []
 
@@ -241,7 +211,7 @@ def accuracy_profile(data: dict):
 
         for i, inst in enumerate(instances):
             last_f = data[algo][inst][-1, 1]
-            acc = (last_f - f0[inst])/(fstar[inst] - f0[inst])
+            acc = (last_f - f0[inst]) / (fstar[inst] - f0[inst])
             if acc != 1:
                 accuracies[algo].append(acc)
                 portions[algo].append(counter)
