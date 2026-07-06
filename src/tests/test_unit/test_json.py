@@ -1,14 +1,12 @@
 import unittest
 import numpy as np
 import warnings
-import json
 
 # Adjust this import to your actual module
 from smt_optim.utils.json import json_safe
 
 
 class TestJsonSafe(unittest.TestCase):
-
     # test primitives
     def test_none(self):
         self.assertIsNone(json_safe(None))
@@ -18,7 +16,6 @@ class TestJsonSafe(unittest.TestCase):
         self.assertEqual(json_safe(5), 5)
         self.assertEqual(json_safe(3.14), 3.14)
         self.assertEqual(json_safe("hello"), "hello")
-
 
     # numpy scalars
     def test_numpy_integer(self):
@@ -33,12 +30,10 @@ class TestJsonSafe(unittest.TestCase):
         self.assertEqual(result, 2.5)
         self.assertIsInstance(result, float)
 
-
     # numpy array
     def test_numpy_array(self):
         arr = np.array([1, 2, 3])
         self.assertEqual(json_safe(arr), [1, 2, 3])
-
 
     # dictionary
     def test_dict_simple(self):
@@ -60,7 +55,6 @@ class TestJsonSafe(unittest.TestCase):
         result = json_safe(d)
         self.assertEqual(result, {"a": None})
 
-
     # list and tuple
     def test_list(self):
         data = [1, np.int64(2), np.array([3, 4])]
@@ -80,13 +74,11 @@ class TestJsonSafe(unittest.TestCase):
         result = json_safe(data)
         self.assertEqual(result, [1, None])
 
-
     # already JSON serializable
     def test_json_serializable_object(self):
         data = {"x": 1, "y": [1, 2]}
         result = json_safe(data)
         self.assertEqual(result, data)
-
 
     # outer exception handling
     def test_outer_exception_returns_none_and_warns(self):

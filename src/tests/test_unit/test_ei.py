@@ -1,11 +1,13 @@
 import unittest
 import numpy as np
 
-from smt_optim.acquisition_functions import expected_improvement, vec_expected_improvement
+from smt_optim.acquisition_functions import (
+    expected_improvement,
+    vec_expected_improvement,
+)
 
 
 class TestExpectedImprovement(unittest.TestCase):
-
     def test_expected_improvement(self):
 
         mu = 1.0
@@ -20,10 +22,8 @@ class TestExpectedImprovement(unittest.TestCase):
 
     def test_vec_expected_improvement(self):
 
-        mu = np.array([[1.0],
-                      [1.0]])
-        s2 = np.array([[1.0],
-                      [0.0]])
+        mu = np.array([[1.0], [1.0]])
+        s2 = np.array([[1.0], [0.0]])
         f_min = 0.5
 
         vec_ei = vec_expected_improvement(mu, s2, f_min)

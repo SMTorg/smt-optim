@@ -24,6 +24,7 @@ interpreted as follows:
 - f_i: function value (in increasing order of fidelity)
 - d_i: absolute difference with original validation data (-GNU)
 """
+
 from functools import partial
 import warnings
 
@@ -33,7 +34,6 @@ from smt_optim.benchmarks.base import BenchmarkProblem
 
 
 class Alos1(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -41,9 +41,11 @@ class Alos1(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.num_obj = 1
-        self.bounds = np.array([
-            [0, 1],
-        ])
+        self.bounds = np.array(
+            [
+                [0, 1],
+            ]
+        )
 
         # self.costs = [0.15/9, 1]
 
@@ -60,13 +62,15 @@ class Alos1(BenchmarkProblem):
 
     def f(self, x, fid=1):
         if fid == 1:
-            return np.sin(30.0 * (x - 0.9) ** 4) * np.cos(2.0 * (x - 0.9)) + (x - 0.9) / 2.0
+            return (
+                np.sin(30.0 * (x - 0.9) ** 4) * np.cos(2.0 * (x - 0.9))
+                + (x - 0.9) / 2.0
+            )
         else:
             return (self.f(x) - 1.0 + x) / (1.0 + 0.25 * x)
 
 
 class Alos(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -75,10 +79,12 @@ class Alos(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.num_obj = 1
-        self.bounds = np.array([
-            [0, 1],
-            [0, 1],
-        ])
+        self.bounds = np.array(
+            [
+                [0, 1],
+                [0, 1],
+            ]
+        )
 
         # self.costs = [0.15/9, 1]
 
@@ -94,10 +100,8 @@ class Alos(BenchmarkProblem):
             "n_variable",
         ]
 
-
     def set_dim(self, dim: int):
         if "n_variable" in self.tags:
-
             if dim < 2 or dim > 3:
                 warnings.warn("Alos is either a 2D or 3D benchmark problem.")
 
@@ -105,45 +109,44 @@ class Alos(BenchmarkProblem):
             self.bounds = self.bounds[-1, :].reshape(1, 2)
             self.bounds = self.bounds.repeat(dim, axis=0)
 
-
     def f(self, x, fid=1):
         if fid == 1:
-
-            val = np.sin(21*(x[0] - 0.9)**4) * np.cos(2*(x[0] - 0.9)) + (x[0] - 0.7)/2
+            val = (
+                np.sin(21 * (x[0] - 0.9) ** 4) * np.cos(2 * (x[0] - 0.9))
+                + (x[0] - 0.7) / 2
+            )
 
             for i in range(1, self.num_dim):
-                prod = np.prod(x[:i+1])
-                val += (i+1) * x[i]**(i+1) * np.sin(prod)
+                prod = np.prod(x[: i + 1])
+                val += (i + 1) * x[i] ** (i + 1) * np.sin(prod)
 
             return val
 
         else:
-
             val = self.f(x, fid=1)
 
             num = val - 2 + np.sum(x)
 
-            term1 = 0.
+            term1 = 0.0
             for i in range(0, 2):
-                term1 += (i+1)*x[i]
+                term1 += (i + 1) * x[i]
             term1 *= 0.25
 
-            term2 = 0.
+            term2 = 0.0
             for i in range(2, self.num_dim):
-                term2 += (i+1)*x[i]
+                term2 += (i + 1) * x[i]
             term2 *= 0.25
 
-            denom = 5. + term1 - term2
+            denom = 5.0 + term1 - term2
 
-            return num/denom
+            return num / denom
 
 
 class MFRosenbrock(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
-        self.num_dim = 2        # could be variable with d -> [4, 7]
+        self.num_dim = 2  # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 3
         self.num_obj = 1
@@ -166,21 +169,21 @@ class MFRosenbrock(BenchmarkProblem):
 
     def f(self, x, fid=2):
 
-        val = 0.
+        val = 0.0
 
         if fid == 2:
-            for i in range(self.num_dim-1):
-                val += 100*(x[i+1] - x[i]**2)**2 + (1 - x[i])**2
+            for i in range(self.num_dim - 1):
+                val += 100 * (x[i + 1] - x[i] ** 2) ** 2 + (1 - x[i]) ** 2
 
         elif fid == 1:
-            for i in range(self.num_dim-1):
-                val += 50*(x[i+1] - x[i]**2)**2 + (-2 - x[i])**2
+            for i in range(self.num_dim - 1):
+                val += 50 * (x[i + 1] - x[i] ** 2) ** 2 + (-2 - x[i]) ** 2
 
-            val -= 0.5*np.sum(x)
+            val -= 0.5 * np.sum(x)
 
         elif fid == 0:
             sum_x = np.sum(x)
-            val = (self.f(x, fid=2) - 4. - 0.5*sum_x)/(10 + 0.25*sum_x)
+            val = (self.f(x, fid=2) - 4.0 - 0.5 * sum_x) / (10 + 0.25 * sum_x)
 
         else:
             raise ValueError()
@@ -189,11 +192,10 @@ class MFRosenbrock(BenchmarkProblem):
 
 
 class MFRastrigin(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
-        self.num_dim = 2        # could be variable with d -> [4, 7]
+        self.num_dim = 2  # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 3
         self.num_obj = 1
@@ -216,11 +218,9 @@ class MFRastrigin(BenchmarkProblem):
 
         self.xStar = np.full(self.num_dim, 0.1)
         self.theta = 0.2
-        self.Rmat = self.rotation_matrix(self.num_dim,
-                                         np.zeros((self.num_dim, self.num_dim-1)),
-                                         self.theta)
-
-
+        self.Rmat = self.rotation_matrix(
+            self.num_dim, np.zeros((self.num_dim, self.num_dim - 1)), self.theta
+        )
 
     def set_dim(self, dim: int):
         if "n_variable" in self.tags:
@@ -229,27 +229,24 @@ class MFRastrigin(BenchmarkProblem):
             self.bounds = self.bounds.repeat(dim, axis=0)
 
             self.xStar = np.full(self.num_dim, 0.1)
-            self.Rmat = self.rotation_matrix(self.num_dim,
-                                             np.zeros((self.num_dim, self.num_dim-1)),
-                                             self.theta)
-
+            self.Rmat = self.rotation_matrix(
+                self.num_dim, np.zeros((self.num_dim, self.num_dim - 1)), self.theta
+            )
 
     def f1(self, z):
-        return np.sum(z**2 + 1 - np.cos(10*np.pi*z))
-
+        return np.sum(z**2 + 1 - np.cos(10 * np.pi * z))
 
     def z(self, x):
         return self.Rmat @ (x - self.xStar)
 
-
     def resolution_error(self, z: np.ndarray, phi: float):
 
-        omega = 1 - phi/10_000
+        omega = 1 - phi / 10_000
         a = omega
-        w = 10*np.pi*omega
-        b = 0.5*np.pi*omega
+        w = 10 * np.pi * omega
+        b = 0.5 * np.pi * omega
 
-        return np.sum(a * np.cos(w*z + b + np.pi)**2)
+        return np.sum(a * np.cos(w * z + b + np.pi) ** 2)
 
     def rotation_matrix(self, n, v, theta):
         """
@@ -317,11 +314,10 @@ class MFRastrigin(BenchmarkProblem):
 
 
 class Forrester(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
-        self.num_dim = 1        # could be variable with d -> [4, 7]
+        self.num_dim = 1  # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 4
         self.num_obj = 1
@@ -357,11 +353,10 @@ class Forrester(BenchmarkProblem):
 
 
 class DiscForrester(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
-        self.num_dim = 1        # could be variable with d -> [4, 7]
+        self.num_dim = 1  # could be variable with d -> [4, 7]
         self.num_cstr = 0
         self.num_fidelity = 2
         self.num_obj = 1
@@ -426,7 +421,6 @@ def rk4(y0, t0, tf, h, m, k):
 
 
 class MFSpring(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -434,9 +428,9 @@ class MFSpring(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.num_obj = 1
-        self.bounds = np.array([[1., 4.]] * self.num_dim)
+        self.bounds = np.array([[1.0, 4.0]] * self.num_dim)
 
-        self.costs = [1/60, 1.]
+        self.costs = [1 / 60, 1.0]
 
         self.objective = [
             partial(self.func, dt=0.6),
@@ -457,7 +451,6 @@ class MFSpring(BenchmarkProblem):
 
 
 class MFMass(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -465,9 +458,9 @@ class MFMass(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.num_obj = 1
-        self.bounds = np.array([[1., 4.]] * self.num_dim)
+        self.bounds = np.array([[1.0, 4.0]] * self.num_dim)
 
-        self.costs = [1/60, 1.]
+        self.costs = [1 / 60, 1.0]
 
         self.objective = [
             partial(self.func, dt=0.6),
@@ -488,7 +481,6 @@ class MFMass(BenchmarkProblem):
 
 
 class MFSpringMass(BenchmarkProblem):
-
     def __init__(self):
         super().__init__()
 
@@ -496,9 +488,9 @@ class MFSpringMass(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.num_obj = 1
-        self.bounds = np.array([[1., 4.]] * self.num_dim)
+        self.bounds = np.array([[1.0, 4.0]] * self.num_dim)
 
-        self.costs = [1/60, 1.]
+        self.costs = [1 / 60, 1.0]
 
         self.objective = [
             partial(self.func, dt=0.6),
@@ -520,7 +512,6 @@ class MFSpringMass(BenchmarkProblem):
 
 
 if __name__ == "__main__":
-
     from smt_optim.benchmarks.registry import get_problem
     from smt_optim.subsolvers.multistart import multistart_minimize
 
@@ -552,10 +543,6 @@ if __name__ == "__main__":
         else:
             num_dim = prob.num_dim
 
-
-
-
-
     for setup in prob_setups:
         local_name = setup[0]
         # ref_name = setup[1]
@@ -573,26 +560,25 @@ if __name__ == "__main__":
         data = np.loadtxt(f"data_smt-optim/{local_name}_d{num_dim}.txt")
 
         x = data[:, :num_dim]
-        obj_ref = data[:, num_dim:num_dim + prob.num_fidelity]
+        obj_ref = data[:, num_dim : num_dim + prob.num_fidelity]
 
         obj_exp = np.empty_like(obj_ref)
 
         for i in range(x.shape[0]):
             for lvl in range(prob.num_fidelity):
                 tmp_val = prob.objective[lvl](x[i, :])
-                obj_exp[i, lvl] = tmp_val.item() if isinstance(tmp_val, np.ndarray) else tmp_val
+                obj_exp[i, lvl] = (
+                    tmp_val.item() if isinstance(tmp_val, np.ndarray) else tmp_val
+                )
 
         delta = np.abs(obj_exp - obj_ref)
         max_error = np.max(delta)
         print(f"Max delta with data = {max_error:.4e}")
 
-
         def sp_objective(x):
             val = prob.objective[-1](x)
             return val.item() if isinstance(val, np.ndarray) else val
 
-
         res = multistart_minimize(sp_objective, prob.bounds)
 
         print(f"Solution: f = {res.fun:.3e} | x = {res.x}")
-

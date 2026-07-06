@@ -5,12 +5,14 @@ from .problem import Problem
 from .driver import ObjectiveConfig, ConstraintConfig, DriverConfig, Driver
 
 
-__all__ = ["ObjectiveConfig",
-           "ConstraintConfig",
-           "DriverConfig",
-           "Driver",
-           "Problem",
-           "Sample",
-           "OptimizationDataset",
-           "Evaluator",
-           "State",]
+__all__ = [
+    "ObjectiveConfig",
+    "ConstraintConfig",
+    "DriverConfig",
+    "Driver",
+    "Problem",
+    "Sample",
+    "OptimizationDataset",
+    "Evaluator",
+    "State",
+]

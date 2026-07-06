@@ -6,21 +6,22 @@ from smt_optim.frameworks import minimize
 MAX_ITER = 2
 N_START = 1
 
-class TestMinimizeAPI(unittest.TestCase):
 
+class TestMinimizeAPI(unittest.TestCase):
     def test_ego(self):
 
         problem = get_problem("Branin1")
 
-        state = minimize(
+        minimize(
             [problem.objective[0]],
             design_space=problem.bounds,
             method="ego",
             max_iter=MAX_ITER,
             verbose=False,
-            strategy_kwargs={"n_start": N_START, }
+            strategy_kwargs={
+                "n_start": N_START,
+            },
         )
-
 
     def test_sego(self):
 
@@ -38,20 +39,20 @@ class TestMinimizeAPI(unittest.TestCase):
             {
                 "fun": [cstr2],
                 "equal": 0.0,
-            }
+            },
         ]
 
-        state = minimize(
+        minimize(
             [problem.objective[0]],
             design_space=problem.bounds,
             method="sego",
             constraints=constraint,
             max_iter=MAX_ITER,
             verbose=False,
-            strategy_kwargs={"n_start": N_START, }
+            strategy_kwargs={
+                "n_start": N_START,
+            },
         )
-
-
 
     def test_mfsego(self):
 
@@ -60,21 +61,22 @@ class TestMinimizeAPI(unittest.TestCase):
         constraint = [
             {
                 "fun": problem.constraints[0],
-                "upper": 0.,
+                "upper": 0.0,
             }
         ]
 
-        state = minimize(
+        minimize(
             problem.objective,
             design_space=problem.bounds,
             method="mfsego",
-            costs=[0.2, 1.],
+            costs=[0.2, 1.0],
             constraints=constraint,
             max_iter=MAX_ITER,
             verbose=False,
-            strategy_kwargs={"n_start": N_START, }
+            strategy_kwargs={
+                "n_start": N_START,
+            },
         )
-
 
     def test_vfpi(self):
 
@@ -83,21 +85,23 @@ class TestMinimizeAPI(unittest.TestCase):
         constraint = [
             {
                 "fun": problem.constraints[0],
-                "upper": 0.,
+                "upper": 0.0,
             }
         ]
 
-        state = minimize(
+        minimize(
             problem.objective,
             design_space=problem.bounds,
             method="vfpi",
-            costs=[0.2, 1.],
+            costs=[0.2, 1.0],
             constraints=constraint,
             max_iter=MAX_ITER,
             verbose=False,
-            strategy_kwargs={"n_start": N_START,}
+            strategy_kwargs={
+                "n_start": N_START,
+            },
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -17,13 +17,18 @@ Help in improving SMT-optim is greatly appreciated. Here are some guidelines for
 4. Make your changes  
    Implement your feature or bug fix. Ensure that new methods and classes are properly documented. Docstrings should follow the Numpydoc format. Add corresponding unit tests.
 
-5. Run tests  
+5. Run Ruff checks  
+   Ensure that the code passes Ruff linting and formatting checks by running:
+   `ruff check .`
+   `ruff format . --check`
+
+6. Run tests  
    Ensure that the code passes all tests.
 
-6. Commit and push  
+7. Commit and push  
    Use the Conventional Commits format such as `feat`, `fix`, `docs`, `refactor`, or `test` (e.g. `feat: add multi-objective optimization`).
 
-7. Create a pull request  
+8. Create a pull request  
    Navigate to your GitHub fork and click **Compare & pull request**. Provide a clear description of your changes and reference related issues.
 
 ## Guidelines

@@ -1,6 +1,9 @@
 import numpy as np
 
-def fidelity_correlation(covariance: np.ndarray, li_var: np.ndarray, lj_var: np.ndarray) -> np.ndarray:
+
+def fidelity_correlation(
+    covariance: np.ndarray, li_var: np.ndarray, lj_var: np.ndarray
+) -> np.ndarray:
     """
     Compute the posterior correlation between two fidelity levels.
 
@@ -25,4 +28,4 @@ def fidelity_correlation(covariance: np.ndarray, li_var: np.ndarray, lj_var: np.
         Absolute value of the correlation coefficient between fidelity
         levels :math:`i` and :math:`j`, clipped to the interval [0, 1].
     """
-    return np.clip(np.abs(covariance/np.sqrt(li_var * lj_var)), 0, 1)
+    return np.clip(np.abs(covariance / np.sqrt(li_var * lj_var)), 0, 1)

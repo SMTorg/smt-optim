@@ -1,5 +1,4 @@
 import os
-import json
 import unittest
 import tempfile
 from unittest.mock import patch
@@ -8,10 +7,7 @@ from unittest.mock import patch
 # --- Dummy state ---
 class DummyState:
     def __init__(self):
-        self.iter_log = {
-            "a": 1,
-            "b": 2.5
-        }
+        self.iter_log = {"a": 1, "b": 2.5}
 
 
 class DummyConfig:
@@ -21,7 +17,6 @@ class DummyConfig:
 
 # --- Tests ---
 class TestJsonLogger(unittest.TestCase):
-
     def setUp(self):
         from smt_optim.utils.logger import JsonLogger
 

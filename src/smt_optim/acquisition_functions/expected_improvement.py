@@ -25,12 +25,15 @@ def expected_improvement(mu: float, s2: float, f_min: float) -> float:
 
     if s2 > 0:
         s = np.sqrt(s2)
-        z = (f_min - mu)/s
+        z = (f_min - mu) / s
         return (f_min - mu) * stats.norm.cdf(z) + s * stats.norm.pdf(z)
     else:
         return 0
 
-def vec_expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+
+def vec_expected_improvement(
+    mu: np.ndarray, s2: np.ndarray, f_min: float
+) -> np.ndarray:
     """
     Vectorized Expected Improvement acquisition function.
 
@@ -56,15 +59,14 @@ def vec_expected_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np
         return np.full_like(mu, 0)
     else:
         s = np.sqrt(s2[mask_s])
-        z = (f_min - mu[mask_s])/s
-        ei[mask_s] = (f_min - mu[mask_s])*stats.norm.cdf(z) + s*stats.norm.pdf(z)
+        z = (f_min - mu[mask_s]) / s
+        ei[mask_s] = (f_min - mu[mask_s]) * stats.norm.cdf(z) + s * stats.norm.pdf(z)
 
     return ei
 
 
-
-c1 = np.log(2*np.pi)/2
-c2 = np.log(np.pi/2)/2
+c1 = np.log(2 * np.pi) / 2
+c2 = np.log(np.pi / 2) / 2
 epsilon = np.finfo(np.float64).eps
 sqrt2 = np.sqrt(2)
 
@@ -94,16 +96,16 @@ def log_ei(mu: float, s2: float, f_min: float) -> float:
         return -np.inf
 
     s = np.sqrt(s2)
-    z = (f_min - mu)/s
+    z = (f_min - mu) / s
 
     if z > -1:
         log_h = np.log(stats.norm.pdf(z) + z * stats.norm.cdf(z))
 
-    elif (-1/np.sqrt(epsilon) < z) & (z <= -1):
-        log_h = -z ** 2 / 2 - c1 + log1mexp(np.log(erfcx(-z / sqrt2) * np.abs(z)) + c2)
+    elif (-1 / np.sqrt(epsilon) < z) & (z <= -1):
+        log_h = -(z**2) / 2 - c1 + log1mexp(np.log(erfcx(-z / sqrt2) * np.abs(z)) + c2)
 
-    elif z <= -1/np.sqrt(epsilon):
-        log_h = -z**2/2 - c1 - 2*np.log(np.abs(z))
+    elif z <= -1 / np.sqrt(epsilon):
+        log_h = -(z**2) / 2 - c1 - 2 * np.log(np.abs(z))
 
     else:
         raise Exception("Error computing LogEI")
@@ -111,6 +113,7 @@ def log_ei(mu: float, s2: float, f_min: float) -> float:
     val = log_h + np.log(s)
 
     return val
+
 
 def log1mexp(z: float) -> float:
     if z > -np.log(2):
@@ -143,8 +146,8 @@ def vec_log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     """
     s = np.sqrt(s2)
 
-    c1 = np.log(2*np.pi)/2
-    c2 = np.log(np.pi/2)/2
+    c1 = np.log(2 * np.pi) / 2
+    c2 = np.log(np.pi / 2) / 2
     epsilon = np.finfo(np.float64).eps
 
     z = np.zeros_like(mu)
@@ -156,14 +159,20 @@ def vec_log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
     z[not_mask_s] = np.nan
 
     mask1 = (z > -1).ravel()
-    mask2 = ((-1/np.sqrt(epsilon) < z) & (z <= -1)).ravel()
-    mask3 = (z <= -1/np.sqrt(epsilon)).ravel()
+    mask2 = ((-1 / np.sqrt(epsilon) < z) & (z <= -1)).ravel()
+    mask3 = (z <= -1 / np.sqrt(epsilon)).ravel()
 
     log_h = np.empty_like(z)
 
-    log_h[mask1] = np.log(stats.norm.pdf(z[mask1]) + z[mask1] * stats.norm.cdf(z[mask1]))
-    log_h[mask2] = -z[mask2]**2/2 - c1 + vec_log1mexp(np.log(erfcx(-z[mask2]/np.sqrt(2))*np.abs(z[mask2])) + c2)
-    log_h[mask3] = -z[mask3]**2/2 - c1 - 2*np.log(np.abs(z[mask3]))
+    log_h[mask1] = np.log(
+        stats.norm.pdf(z[mask1]) + z[mask1] * stats.norm.cdf(z[mask1])
+    )
+    log_h[mask2] = (
+        -(z[mask2] ** 2) / 2
+        - c1
+        + vec_log1mexp(np.log(erfcx(-z[mask2] / np.sqrt(2)) * np.abs(z[mask2])) + c2)
+    )
+    log_h[mask3] = -(z[mask3] ** 2) / 2 - c1 - 2 * np.log(np.abs(z[mask3]))
 
     log_ei = copy.deepcopy(log_h)
     log_ei[mask_s] = log_h[mask_s] + np.log(s[mask_s])
@@ -176,7 +185,7 @@ def vec_log_ei(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
 
 def vec_log1mexp(z: np.ndarray) -> np.ndarray:
     # review how mask1 is computed -> see not regular implementation
-    mask1 = (-2*np.log(2) < z).ravel()
+    mask1 = (-2 * np.log(2) < z).ravel()
     mask2 = ~mask1
 
     log1mexp_arr = np.empty_like(z)
@@ -185,11 +194,3 @@ def vec_log1mexp(z: np.ndarray) -> np.ndarray:
     log1mexp_arr[mask2] = np.log1p(-np.exp(z[mask2]))
 
     return log1mexp_arr
-
-
-
-
-
-
-
-

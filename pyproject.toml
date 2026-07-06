@@ -29,3 +29,13 @@ license-files = ["LICEN[CS]E*"]
 [project.urls]
 Homepage = "https://github.com/SMTorg/smt-optim"
 Issues = "https://github.com/SMTorg/smt-optim/issues"
+
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "coverage",
+]
+
+[tool.ruff]
+exclude = ["*.ipynb"]

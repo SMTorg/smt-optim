@@ -32,7 +32,6 @@ class DummyConfig:
 
 # --- Tests ---
 class TestConsoleLogger(unittest.TestCase):
-
     def setUp(self):
         from smt_optim.utils.logger import ConsoleLogger
 
@@ -89,11 +88,11 @@ class TestConsoleLogger(unittest.TestCase):
         row = output[1]
 
         # Check formatted values (string-level assertions)
-        self.assertIn("0", row)              # iter
-        self.assertIn("1.000", row)          # budget (.3f)
-        self.assertIn("1.23450e+00", row)    # fmin (.5e)
-        self.assertIn("1.000e-05", row)    # fmin (.5e)
-        self.assertIn("2", row)              # fidelity
+        self.assertIn("0", row)  # iter
+        self.assertIn("1.000", row)  # budget (.3f)
+        self.assertIn("1.23450e+00", row)  # fmin (.5e)
+        self.assertIn("1.000e-05", row)  # fmin (.5e)
+        self.assertIn("2", row)  # fidelity
 
     def test_iteration_counter_increments(self):
         self.assertEqual(self.logger.iter, 0)

@@ -1,7 +1,4 @@
-
-
 from functools import partial
-import warnings
 
 import numpy as np
 
@@ -86,6 +83,7 @@ class MFConstraintRosenbrock(BenchmarkProblem):
     """
     Fischer, C. C. (2021). Bayesian Inspired Multi-Fidelity Optimization with Aerodynamic Design.
     """
+
     def __init__(self):
         super().__init__()
 
@@ -93,9 +91,12 @@ class MFConstraintRosenbrock(BenchmarkProblem):
         self.num_cstr = 1
         self.num_fidelity = 2
         self.num_obj = 1
-        self.bounds = np.array([
-            [-2, 2],
-        ] * self.num_dim)
+        self.bounds = np.array(
+            [
+                [-2, 2],
+            ]
+            * self.num_dim
+        )
 
         self.ref_problem = MFRosenbrock()
 
@@ -104,37 +105,29 @@ class MFConstraintRosenbrock(BenchmarkProblem):
             partial(self.ref_problem.f, fid=2),
         ]
 
-        self.constraints = [
-            [self.g1_lf, self.g1]
-        ]
+        self.constraints = [[self.g1_lf, self.g1]]
 
-        self.tags = [
-            "n_variable"
-        ]
+        self.tags = ["n_variable"]
 
     def set_dim(self, dim):
         self.ref_problem.set_dim(dim)
         self.num_dim = dim
-        self.bounds = np.array([
-            [-2, 2]
-        ] * dim)
+        self.bounds = np.array([[-2, 2]] * dim)
 
     def g1(self, x):
-        return x[0]**2 + np.sum(x[1:] - 1)/2
+        return x[0] ** 2 + np.sum(x[1:] - 1) / 2
 
     def g1_lf(self, x):
-        return   self.g1(x) + 0.1*np.sin(10*x[0] + np.sum(5*x[1:]))
+        return self.g1(x) + 0.1 * np.sin(10 * x[0] + np.sum(5 * x[1:]))
 
 
 if __name__ == "__main__":
-
-    import scipy.optimize as so
     from smt_optim.subsolvers.multistart import multistart_minimize
 
     prob = MFConstraintRosenbrock()
     prob.set_dim(2)
 
-    constraints= [
+    constraints = [
         {
             "fun": lambda x, f=prob.g1: -f(x),
             "type": "ineq",
@@ -150,7 +143,9 @@ if __name__ == "__main__":
     ]
 
     # res = so.minimize(prob.objective[-1], x0=np.array([0., 0.]), bounds=prob.bounds, constraints=constraints)
-    res = multistart_minimize(prob.objective[-1], bounds=prob.bounds, constraints=constraints)
+    res = multistart_minimize(
+        prob.objective[-1], bounds=prob.bounds, constraints=constraints
+    )
 
     print(res.x)
     print(res.fun)
@@ -166,4 +161,3 @@ if __name__ == "__main__":
     # fig, ax = plt.subplots()
     # ax.contourf(XX, YY, np.where(ZZ<=0, np.nan, ZZ))
     # plt.show()
-

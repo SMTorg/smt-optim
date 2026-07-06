@@ -1,6 +1,5 @@
 import unittest
 
-import warnings
 import numpy as np
 import scipy.stats as stats
 
@@ -12,9 +11,7 @@ from smt_optim.benchmarks.registry import list_problems, get_problem
 
 
 class TestBenchmarkProblems(unittest.TestCase):
-
     def test_all_benchmark_attributes(self):
-
 
         required_attributes = [
             "name",
@@ -27,7 +24,6 @@ class TestBenchmarkProblems(unittest.TestCase):
             # "constraints",
         ]
 
-
         problems = list_problems(
             num_dim=None,
             num_obj=None,
@@ -35,20 +31,16 @@ class TestBenchmarkProblems(unittest.TestCase):
             num_fidelity=None,
         )
 
-
         for prob in problems:
-
             with self.subTest(problem=prob.__class__.__name__):
-
                 # test that prob has all the required attributes -> .num_dim, num_cstr, num_obj, etc.
                 for attr in required_attributes:
                     value = getattr(prob, attr)
 
                     self.assertIsNotNone(
                         value,
-                        msg=f"{prob.__class__.__name__}: '{attr}' was not implemented"
+                        msg=f"{prob.__class__.__name__}: '{attr}' was not implemented",
                     )
-
 
                 # test that it has the corresponding number of objective, constraints and fidelities.
 
@@ -64,12 +56,11 @@ class TestBenchmarkProblems(unittest.TestCase):
 
                 # test bounds
                 if prob.bounds is not None:
-
                     self.assertEqual(
                         prob.bounds.shape,
                         (prob.num_dim, 2),
                         msg=f"{prob.name}: bounds should have shape "
-                            f"({prob.num_dim}, 2)",
+                        f"({prob.num_dim}, 2)",
                     )
 
                     lower = prob.bounds[:, 0]
@@ -82,7 +73,6 @@ class TestBenchmarkProblems(unittest.TestCase):
 
                 else:
                     self.assertIsInstance(prob.design_space, ds.DesignSpace)
-
 
                 # test num_obj
                 # single objective
@@ -101,7 +91,6 @@ class TestBenchmarkProblems(unittest.TestCase):
                 else:
                     raise ValueError()
 
-
                 # test_num_cstr
                 if prob.num_cstr > 0:
                     self.assertEqual(len(prob.constraints), prob.num_cstr)
@@ -119,7 +108,9 @@ class TestBenchmarkProblems(unittest.TestCase):
                         self.assertEqual(len(objective[obj_idx]), prob.num_fidelity)
 
                     for cstr_idx in range(prob.num_cstr):
-                        self.assertEqual(len(prob.constraints[cstr_idx]), prob.num_fidelity)
+                        self.assertEqual(
+                            len(prob.constraints[cstr_idx]), prob.num_fidelity
+                        )
 
                 # test that all objectives and constraints are callables and respect their domain.
                 num_sample = 3
@@ -135,14 +126,15 @@ class TestBenchmarkProblems(unittest.TestCase):
                     #               seed=0)
                     # doe = sampler(num_sample)
 
-                    sampler = MixedIntegerSamplingMethod(LHS, prob.design_space, criterion="ese", seed=0)
+                    sampler = MixedIntegerSamplingMethod(
+                        LHS, prob.design_space, criterion="ese", seed=0
+                    )
                     doe = sampler(10)
 
                 else:
                     raise TypeError()
 
                 for idx in range(doe.shape[0]):
-
                     for lvl in range(prob.num_fidelity):
                         for obj_idx in range(prob.num_obj):
                             if prob.num_fidelity == 1:
@@ -151,9 +143,8 @@ class TestBenchmarkProblems(unittest.TestCase):
                                 val = objective[obj_idx][lvl](doe[idx, :])
 
                             is_scalar = isinstance(val, float)
-                            is_np_1d = (isinstance(val, np.ndarray) and val.ndim == 1)
+                            is_np_1d = isinstance(val, np.ndarray) and val.ndim == 1
                             self.assertTrue(is_scalar or is_np_1d)
-
 
                         for cstr_idx in range(prob.num_cstr):
                             if prob.num_fidelity == 1:
@@ -162,9 +153,8 @@ class TestBenchmarkProblems(unittest.TestCase):
                                 val = prob.constraints[cstr_idx][lvl](doe[idx, :])
 
                             is_scalar = isinstance(val, float)
-                            is_np_1d = (isinstance(val, np.ndarray) and val.ndim == 1)
+                            is_np_1d = isinstance(val, np.ndarray) and val.ndim == 1
                             self.assertTrue(is_scalar or is_np_1d)
-
 
     def test_get_problem_returns_independent_instances(self):
         prob1 = get_problem("Alos")
@@ -184,7 +174,6 @@ class TestBenchmarkProblems(unittest.TestCase):
         prob1.tags.append("new_tag")
         self.assertNotIn("new_tag", prob2.tags)
 
-
     def test_list_problems_returns_independent_instances(self):
         probs1 = list_problems()
         probs2 = list_problems()
@@ -199,5 +188,3 @@ class TestBenchmarkProblems(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

@@ -15,24 +15,17 @@ def func_1d(x):
 
 
 class TwoConstraints:
-
     def __init__(self):
 
         self.num_dim = 2
         self.num_cstr = 2
         self.num_fidelity = 1
-        self.bounds = np.array([
-            [1, 4],
-            [1, 4]
-        ])
+        self.bounds = np.array([[1, 4], [1, 4]])
 
         self.costs = [1]
 
         self.objective = [self.func]
-        self.constraints = [
-            [self.cstr1],
-            [self.cstr2]
-        ]
+        self.constraints = [[self.cstr1], [self.cstr2]]
 
     def func(self, x):
         if x.ndim == 1:
@@ -42,16 +35,15 @@ class TwoConstraints:
     def cstr1(self, x):
         if x.ndim == 1:
             x = x.reshape(1, -1)
-        return (0.15*(x[:,0]-4)**2 + 0.1*(x[:,1]-4)**2 -1).item()
+        return (0.15 * (x[:, 0] - 4) ** 2 + 0.1 * (x[:, 1] - 4) ** 2 - 1).item()
 
     def cstr2(self, x):
         if x.ndim == 1:
             x = x.reshape(1, -1)
         return (x[:, 0] - 0.8 * x[:, 1]).item()
 
+
 class TestOptimization(unittest.TestCase):
-
-
     def test_scaling(self):
 
         two_cstrs = TwoConstraints()
@@ -67,7 +59,7 @@ class TestOptimization(unittest.TestCase):
             surrogate=SmtAutoModel,
         )
 
-        cstr1_config = ConstraintConfig(
+        ConstraintConfig(
             constraint=two_cstrs.constraints[1],
             upper=0.0,
             surrogate=SmtAutoModel,
@@ -154,8 +146,6 @@ class TestOptimization(unittest.TestCase):
             doe_1[i] = sample.x[0]
 
         # DOE should be identical
-        mse = np.mean(doe_0 - doe_1)**2
+        mse = np.mean(doe_0 - doe_1) ** 2
 
         self.assertAlmostEqual(mse, 0)
-
-

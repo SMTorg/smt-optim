@@ -24,11 +24,13 @@ def probability_of_improvement(mu: float, s2: float, f_min: float) -> float:
     if s2 <= 0:
         return 0
 
-    pi = stats.norm.cdf((f_min - mu)/np.sqrt(s2))
+    pi = stats.norm.cdf((f_min - mu) / np.sqrt(s2))
     return pi
 
 
-def vec_probability_of_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float) -> np.ndarray:
+def vec_probability_of_improvement(
+    mu: np.ndarray, s2: np.ndarray, f_min: float
+) -> np.ndarray:
     """
     Probability of Improvement (PI) acquisition function.
 
@@ -48,8 +50,8 @@ def vec_probability_of_improvement(mu: np.ndarray, s2: np.ndarray, f_min: float)
     """
     pi = np.zeros_like(mu)
 
-    mask_s = (s2 > 0)
-    pi[mask_s] = stats.norm.cdf((f_min - mu[mask_s])/np.sqrt(s2[mask_s]))
+    mask_s = s2 > 0
+    pi[mask_s] = stats.norm.cdf((f_min - mu[mask_s]) / np.sqrt(s2[mask_s]))
     return pi
 
 
@@ -77,9 +79,9 @@ def log_pi(mu: float, s2: float, f_min: float) -> float:
     if s2 <= 0:
         return -np.inf
 
-    z = (f_min - mu)/np.sqrt(s2)
+    z = (f_min - mu) / np.sqrt(s2)
 
-    return logerfc(-1/np.sqrt(2) * z) - np.log(2)
+    return logerfc(-1 / np.sqrt(2) * z) - np.log(2)
 
 
 def logerfc(x: float) -> float:
@@ -87,5 +89,3 @@ def logerfc(x: float) -> float:
         return np.log(erfc(x))
     else:
         return np.log(erfcx(x)) - x**2
-
-
