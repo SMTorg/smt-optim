@@ -346,12 +346,12 @@ def plot_pareto_front(
     pareto_mask = get_pareto_mask(all_obj)
 
     n_init = len(f1_init)
-    
+
     # Infills
     f1_infill = f1_final_all[n_init:]
     f2_infill = f2_final_all[n_init:]
     infill_obj = np.vstack([f1_infill, f2_infill]).T
-    
+
     # We want PF of all final points
     # But we want to distinguish dominated and non-dominated INFILLS
     infill_pareto_mask = pareto_mask[n_init:]
@@ -416,7 +416,7 @@ def plot_hypervolume_convergence(
 ):
     """
     Plots the hypervolume evolution over iterations.
-    
+
     Parameters
     ----------
     hv_history : list of float
@@ -431,11 +431,11 @@ def plot_hypervolume_convergence(
     fig, ax = plt.subplots(figsize=(8, 6))
     iterations = np.arange(len(hv_history))
     ax.plot(iterations, hv_history, "b-o", linewidth=2, markersize=6)
-    
+
     ax.set_xlabel("Iterations")
     ax.set_ylabel("Hypervolume")
     ax.set_title(title)
     ax.grid(True, linestyle="--", alpha=0.6)
-    
+
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()

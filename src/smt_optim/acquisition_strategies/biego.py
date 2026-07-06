@@ -13,7 +13,10 @@ from smt_optim.subsolvers import multistart_minimize, mixvar_multistart_minimize
 from smt_optim.acquisition_functions.multi_obj import (
     init_bi_obj_ei_cf,
 )
-from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints, select_fidelity_level
+from smt_optim.acquisition_strategies.mfsego import (
+    build_scipy_constraints,
+    select_fidelity_level,
+)
 
 
 from smt_optim.utils.multi_obj import get_pareto_mask
@@ -139,22 +142,22 @@ class BiEGO(AcquisitionStrategy):
     def get_pareto_front(self):
         D, Y = self.get_scaled_DoE()
         data = self.state.scaled_dataset.export_as_dict()
-        
+
         valid_mask = (data["rscv"] <= 0.0).ravel()
         mask_lvl0 = (data["fidelity"] == 0).ravel()
         mask = valid_mask & mask_lvl0
-        
+
         if not np.any(mask):
             mask = mask_lvl0
             if not np.any(mask):
                 mask = np.ones(len(Y), dtype=bool)
-                
+
         valid_indices = np.where(mask)[0]
         Y_valid = Y[valid_indices]
-        
+
         p_mask = get_pareto_mask(Y_valid)
         p_indices = valid_indices[p_mask]
-        
+
         sorted_indices = p_indices[np.argsort(Y[p_indices, 0])]
         self.X = sorted_indices.tolist()
 
@@ -181,8 +184,7 @@ class BiEGO(AcquisitionStrategy):
         self.W[X[j]] += 1
         return r
 
-
-    def get_fidelity(self, next_x: np.ndarray, state: 'State') -> list[int]:
+    def get_fidelity(self, next_x: np.ndarray, state: "State") -> list[int]:
         num_points = next_x.shape[0]
 
         if state.problem.num_fidelity > 1 and self.select_fidelity:
@@ -246,14 +248,14 @@ class BiEGO(AcquisitionStrategy):
                         return self.get_infill_custom(state, self.acq_func_gen1)
                     else:
                         return self.get_infill_custom(state, self.acq_func_gen2)
-                
+
                 # Unscale the selected reference point and lock it in the physical space
                 qoi_factor = state.qoi_factor[0][:2]
                 qoi_step = state.qoi_step[0][:2]
                 self.r_unscaled = r_scaled * qoi_factor + qoi_step
                 print("Bi-objective phase with unscaled r =", self.r_unscaled)
 
-            # Dynamically rescale the locked physical reference point to match the 
+            # Dynamically rescale the locked physical reference point to match the
             # shifting surrogate scale of the current iteration
             qoi_factor = state.qoi_factor[0][:2]
             qoi_step = state.qoi_step[0][:2]
@@ -265,7 +267,7 @@ class BiEGO(AcquisitionStrategy):
                 self.phi = lambda y: SingleObjectiveProduct(y, self.r)
             else:
                 raise ValueError("Unknown single-objective formulation")
-                
+
             self.current_subcalls += 1
             self.current_calls += 1
             self.W.append(0)
@@ -328,5 +330,5 @@ class BiEGO(AcquisitionStrategy):
                 infills.append(next_x.copy().reshape(1, -1))
             else:
                 infills.append(None)
-        
+
         return infills

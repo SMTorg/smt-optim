@@ -26,6 +26,8 @@ from .multi_obj import zdt_mf
 from .multi_obj import zdt
 
 available = {}
+
+
 def _register_from_module(module):
     for name, obj in inspect.getmembers(module, inspect.isclass):
         if issubclass(obj, BenchmarkProblem) and obj is not BenchmarkProblem:

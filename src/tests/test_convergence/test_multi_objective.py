@@ -109,7 +109,6 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         # IGD+ should decrease or remain the same
         self.assertLessEqual(final_igd, initial_igd)
 
-
         plot_pareto_front(
             initial_dataset,
             state.dataset,
@@ -117,16 +116,18 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
             title="Pareto Front of ZDT1 (2D) obtained with BiEGO",
         )
 
-        import matplotlib.pyplot as plt
-        from smt_optim.utils.multi_obj import plot_hypervolume_convergence, get_pareto_front
+        from smt_optim.utils.multi_obj import (
+            plot_hypervolume_convergence,
+            get_pareto_front,
+        )
 
         y_all = state.dataset.export_as_dict()["obj"]
-        
+
         hv_history = []
         for i in range(opt_config.nt_init, len(y_all) + 1):
             current_pts = y_all[:i]
             current_pf = get_pareto_front(current_pts)
-            
+
             # Compute Area under PF w.r.t (0,0) (which decays as PF converges to the origin)
             sorted_pf = current_pf[np.argsort(current_pf[:, 0])]
             area = 0.0
@@ -135,11 +136,11 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
                 area += (sorted_pf[k, 0] - prev_f1) * sorted_pf[k, 1]
                 prev_f1 = sorted_pf[k, 0]
             hv_history.append(area)
-            
+
         plot_hypervolume_convergence(
-            hv_history, 
+            hv_history,
             filename="zdt1_hypervolume_decay.png",
-            title="Hypervolume (Area under PF) Decay over Iterations"
+            title="Hypervolume (Area under PF) Decay over Iterations",
         )
 
     def test_zdt1_algorithms_comparison(self):
@@ -181,7 +182,9 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
         # BiEGO Composite
         driver_comp = Driver(
-            problem=setup_problem(), config=opt_config, strategy=BiEGO,
+            problem=setup_problem(),
+            config=opt_config,
+            strategy=BiEGO,
             strategy_kwargs={"min_max_calls": 1, "n_multi_start": 20},
         )
         state_comp = driver_comp.optimize()
@@ -189,7 +192,9 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
         # BiEGO Naive
         driver_naive = Driver(
-            problem=setup_problem(), config=opt_config, strategy=BiEGO,
+            problem=setup_problem(),
+            config=opt_config,
+            strategy=BiEGO,
             strategy_kwargs={"min_max_calls": 1, "n_multi_start": 20, "naive": True},
         )
         state_naive = driver_naive.optimize()
@@ -197,26 +202,35 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
 
         # MOSEGO
         driver_mosego = Driver(
-            problem=setup_problem(), config=opt_config, strategy=MOSEGO,
+            problem=setup_problem(),
+            config=opt_config,
+            strategy=MOSEGO,
         )
         state_mosego = driver_mosego.optimize()
         hv_mosego = get_area_history(state_mosego)
 
         iterations = list(range(1, len(hv_comp) + 1))
-        
+
         fig, ax = plt.subplots(figsize=(8, 6))
-        ax.plot(iterations, hv_comp, 'b-o', label='BiEGO (Composite)', alpha=0.8)
-        ax.plot(iterations, hv_naive, 'r-s', label='BiEGO (Naive)', alpha=0.8)
-        ax.plot(iterations, hv_mosego, 'g-^', label='MOSEGO (MPI)', alpha=0.8)
-        ax.set_xlabel('Infill Iterations')
-        ax.set_ylabel('Hypervolume (Area bounded by PF)')
-        ax.set_title('Decay Comparison: Naive BiEGO vs Composite BiEGO vs MOSEGO MPI')
+        ax.plot(iterations, hv_comp, "b-o", label="BiEGO (Composite)", alpha=0.8)
+        ax.plot(iterations, hv_naive, "r-s", label="BiEGO (Naive)", alpha=0.8)
+        ax.plot(iterations, hv_mosego, "g-^", label="MOSEGO (MPI)", alpha=0.8)
+        ax.set_xlabel("Infill Iterations")
+        ax.set_ylabel("Hypervolume (Area bounded by PF)")
+        ax.set_title("Decay Comparison: Naive BiEGO vs Composite BiEGO vs MOSEGO MPI")
         ax.legend()
-        ax.grid(True, linestyle='--', alpha=0.6)
-        plt.savefig("zdt1_algorithms_hypervolume_decay_comparison.png", dpi=300, bbox_inches="tight")
+        ax.grid(True, linestyle="--", alpha=0.6)
+        plt.savefig(
+            "zdt1_algorithms_hypervolume_decay_comparison.png",
+            dpi=300,
+            bbox_inches="tight",
+        )
         plt.close(fig)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 def test_mf_biego_constrained():
     from smt_optim.core.driver import DriverConfig, Driver
@@ -231,19 +245,26 @@ def test_mf_biego_constrained():
 
     obj1 = ObjectiveConfig(objective=dtlz5.objective[0], surrogate=SmtAutoModel)
     obj2 = ObjectiveConfig(objective=dtlz5.objective[1], surrogate=SmtAutoModel)
-    cstr1 = ConstraintConfig(constraint=dtlz5.constraints[0], surrogate=SmtAutoModel, upper=0.0)
+    cstr1 = ConstraintConfig(
+        constraint=dtlz5.constraints[0], surrogate=SmtAutoModel, upper=0.0
+    )
 
     problem = Problem(
         obj_configs=[obj1, obj2],
         cstr_configs=[cstr1],
         design_space=dtlz5.bounds,
-        costs=[1.0, 10.0]
+        costs=[1.0, 10.0],
     )
 
     opt_config = DriverConfig(max_iter=10, nt_init=[10, 5], seed=42)
-    driver = Driver(problem=problem, config=opt_config, strategy=BiEGO, strategy_kwargs={'min_max_calls': 2, 'n_multi_start': 50})
+    driver = Driver(
+        problem=problem,
+        config=opt_config,
+        strategy=BiEGO,
+        strategy_kwargs={"min_max_calls": 2, "n_multi_start": 50},
+    )
     driver.start_optim()
     while driver.state.iter < opt_config.max_iter:
         driver.iteration(driver.state)
-        
-    assert len(driver.state.dataset.export_as_dict()['x']) == 25
+
+    assert len(driver.state.dataset.export_as_dict()["x"]) == 25

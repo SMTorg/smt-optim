@@ -191,6 +191,7 @@ def convergence_profile(instances: dict):
 
     return metric, all_fmin
 
+
 def accuracy_profile(data: dict):
 
     algos = list(data.keys())

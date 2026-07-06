@@ -184,7 +184,7 @@ if __name__ == "__main__":
             obj_configs=[obj_config1, obj_config2],
             cstr_configs=[cstr_config],
             design_space=bounds,
-            costs=[100.0, 1.0]
+            costs=[100.0, 1.0],
         )
 
         opt_config = DriverConfig(
@@ -196,7 +196,7 @@ if __name__ == "__main__":
             problem=problem,
             config=opt_config,
             strategy=BiEGO,
-            strategy_kwargs={"sp_method": "SLSQP"}
+            strategy_kwargs={"sp_method": "SLSQP"},
         )
 
         state = optimizer.optimize()
