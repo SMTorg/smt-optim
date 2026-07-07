@@ -20,15 +20,13 @@ from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 from pymoo.indicators.igd_plus import IGDPlus
-from pymoo.core.callback import Callback
 from pymoo.indicators.hv import HV
 from pymoo.core.evaluator import Evaluator
 from pymoo.core.population import Population
 
-from tests.test_bisego.naivebisego import NaiveBiEGO, InjectData, SimpleEGO
+from smt_optim.bisego_utils.naivebisego import NaiveBiEGO, InjectData, SimpleEGO
 from smt.sampling_methods import LHS
 import smt.design_space as ds
-import random
 
 from datetime import datetime
 import pickle

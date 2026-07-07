@@ -11,7 +11,7 @@ from smt_optim.core import Sample
 from smt_optim.core import ObjectiveConfig, DriverConfig
 from smt_optim.utils.constraints import compute_rscv
 
-from tests.test_bisego.custom_driver import CustomStopDriver
+from smt_optim.bisego_utils.custom_driver import CustomStopDriver
 
 
 def Dominates(p,q):
