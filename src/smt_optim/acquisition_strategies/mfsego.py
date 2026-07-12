@@ -64,6 +64,9 @@ class MFSEGO(AcquisitionStrategy):
         Optimization method passed to SciPy (e.g., "SLSQP", "COBYLA"). Default = "SLSQP".
     sp_tol: float, optional
         Tolerance for the SciPy optimizer. Default = sqrt(machine epsilon).
+    relax_constraints: float, optional
+        Margin multiplier to relax the constraints using the variance predicted by the surrogate models (relax * sigma).
+        Default is 0.0 (no relaxation).
 
     Notes
     -----
@@ -110,7 +113,7 @@ class MFSEGO(AcquisitionStrategy):
         self.min_rscv_first = kwargs.pop("min_rscv_first", False)
         self.filter_rscv = kwargs.pop("filter_rscv", False)
         self.optimize_best = kwargs.pop("optimize_best", False)
-        self.relax_constraints = kwargs.pop("relax_constraints", False)
+        self.relax_constraints = kwargs.pop("relax_constraints", 0.0)
         self.cr_override = kwargs.pop(
             "cr_override", None
         )  # override optimizer Cost Ratio
@@ -532,7 +535,7 @@ def compute_all_s2_red_norm(
     return s2_red_norm
 
 
-def build_scipy_constraints(state: State, relax: bool = False) -> list[dict]:
+def build_scipy_constraints(state: State, relax: float = 0.0) -> list[dict]:
 
     scipy_cstr = []
 
@@ -555,12 +558,12 @@ def build_scipy_constraints(state: State, relax: bool = False) -> list[dict]:
             ):
                 x = x.reshape(1, -1)
                 mu = m.predict_values(x).item()
-                if r:
+                if r > 0:
                     s = np.sqrt(max(0.0, m.predict_variances(x).item()))
-                    return -np.abs(mu - value) + 3 * s
+                    return -np.abs(mu - value) + r * s
                 return mu - value
 
-            append_sp_cstr(func, "ineq" if relax else "eq")
+            append_sp_cstr(func, "ineq" if relax > 0 else "eq")
 
         else:
             if c_config.lower is not None:
@@ -573,10 +576,8 @@ def build_scipy_constraints(state: State, relax: bool = False) -> list[dict]:
                 ):
                     x = x.reshape(1, -1)
                     mu = m.predict_values(x).item()
-                    if r:
-                        s = np.sqrt(max(0.0, m.predict_variances(x).item()))
-                        return (mu + 3 * s) - value
-                    return mu - value
+                    s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                    return (mu + r * s) - value
 
                 append_sp_cstr(func, "ineq")
 
@@ -590,10 +591,8 @@ def build_scipy_constraints(state: State, relax: bool = False) -> list[dict]:
                 ):
                     x = x.reshape(1, -1)
                     mu = m.predict_values(x).item()
-                    if r:
-                        s = np.sqrt(max(0.0, m.predict_variances(x).item()))
-                        return value - (mu - 3 * s)
-                    return value - mu
+                    s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                    return value - (mu - r * s)
 
                 append_sp_cstr(func, "ineq")
 
