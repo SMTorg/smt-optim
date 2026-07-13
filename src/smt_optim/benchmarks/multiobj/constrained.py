@@ -90,7 +90,7 @@ class TNK(BenchmarkProblem):
         return x[1]
 
     def g1(self, x):
-        return -(x[0] ** 2) - x[1] ** 2 + 1 + 0.1 * np.cos(16 * np.arctan(x[0] / x[1]))
+        return -(x[0] ** 2) - x[1] ** 2 + 1 + 0.1 * np.cos(16 * np.arctan2(x[0], x[1]))
 
     def g2(self, x):
         return (x[0] - 0.5) ** 2 + (x[1] - 0.5) ** 2 - 0.5
