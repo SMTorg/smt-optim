@@ -576,8 +576,10 @@ def build_scipy_constraints(state: State, relax: float = 0.0) -> list[dict]:
                 ):
                     x = x.reshape(1, -1)
                     mu = m.predict_values(x).item()
-                    s = np.sqrt(max(0.0, m.predict_variances(x).item()))
-                    return (mu + r * s) - value
+                    if r > 0:
+                        s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                        return (mu + r * s) - value
+                    return mu - value
 
                 append_sp_cstr(func, "ineq")
 
@@ -591,8 +593,10 @@ def build_scipy_constraints(state: State, relax: float = 0.0) -> list[dict]:
                 ):
                     x = x.reshape(1, -1)
                     mu = m.predict_values(x).item()
-                    s = np.sqrt(max(0.0, m.predict_variances(x).item()))
-                    return value - (mu - r * s)
+                    if r > 0:
+                        s = np.sqrt(max(0.0, m.predict_variances(x).item()))
+                        return value - (mu - r * s)
+                    return value - mu
 
                 append_sp_cstr(func, "ineq")
 

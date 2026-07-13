@@ -144,10 +144,7 @@ def init_ehvi_2o(state) -> Callable:
             mu[i] = models[i].predict_values(x).item()
             s2_obj = models[i].predict_variances(x).item()
 
-            if s2_obj <= 1e-12:
-                return 0.0
-
-            s[i] = np.sqrt(np.maximum(s2_obj, 0.0))
+            s[i] = np.sqrt(np.maximum(s2_obj, 1e-20))
 
         return ehvi_2o(mu, s, Y)
 
