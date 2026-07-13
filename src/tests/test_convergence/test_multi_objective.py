@@ -81,7 +81,6 @@ class TestMultiObjectiveConvergence(unittest.TestCase):
         state = driver.optimize()
 
         # Just verify it finishes without crashing and evaluates valid points
-        import numpy as np
 
         x_evaluated = state.dataset.export_as_dict()["x"]
         self.assertGreater(len(x_evaluated), 10)
