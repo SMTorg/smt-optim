@@ -76,7 +76,11 @@ class TestIMSEConvergence(unittest.TestCase):
 
                 # Multi-start optimization (5 random starts)
                 # Seed depends on run and iteration for deterministic variety
-                starts = LHS(xlimits=xlimits, criterion="ese", seed=run * 100 + i)(5)
+                starts = LHS(
+                    xlimits=xlimits,
+                    criterion="ese",
+                    seed=run * 100 + i,
+                )(5)
                 for x0 in starts:
                     res = minimize(obj, x0=x0, bounds=bounds, method="L-BFGS-B")
                     if res.fun < best_val:

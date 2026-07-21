@@ -121,11 +121,6 @@ class TestBenchmarkProblems(unittest.TestCase):
                     doe = stats.qmc.scale(doe, prob.bounds[:, 0], prob.bounds[:, 1])
 
                 elif isinstance(prob.design_space, ds.DesignSpace):
-                    # sampler = LHS(xlimits=prob.design_space.get_unfolded_num_bounds(),
-                    #               criterion="ese",
-                    #               seed=0)
-                    # doe = sampler(num_sample)
-
                     sampler = MixedIntegerSamplingMethod(
                         LHS, prob.design_space, criterion="ese", seed=0
                     )

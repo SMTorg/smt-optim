@@ -83,6 +83,10 @@ class MOSEGO(AcquisitionStrategy):
     seed : int or None, optional
         Random seed for reproducibility. Default is None.
 
+    relax_constraints : float, optional
+        Margin multiplier to relax the constraints using the variance predicted by the surrogate models (relax * sigma).
+        Default is 0.0 (no relaxation).
+
 
     Notes
     -----
@@ -107,6 +111,7 @@ class MOSEGO(AcquisitionStrategy):
         cr_override: float | None = None,
         var_red_corr: str | None = None,
         seed: int | None = None,
+        relax_constraints: float = 0.0,
     ):
         super().__init__()
 
@@ -121,6 +126,7 @@ class MOSEGO(AcquisitionStrategy):
         self.cr_override = cr_override
         self.var_red_corr = var_red_corr
         self.seed = seed
+        self.relax_constraints = relax_constraints
 
         # TODO: work required to adapt console logging and PymooStateWrapper
         for i, obj_config in enumerate(state.problem.obj_configs):
@@ -146,7 +152,7 @@ class MOSEGO(AcquisitionStrategy):
             x = x.reshape(1, -1)
             return -acq_func(x)
 
-        scipy_cstr: list = build_scipy_constraints(state)
+        scipy_cstr: list = build_scipy_constraints(state, self.relax_constraints)
 
         mix_var = False
         for dv in state.problem.design_space.design_variables:
