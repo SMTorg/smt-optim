@@ -11,7 +11,7 @@ from smt_optim.utils.get_fmin import get_fmin
 
 from smt_optim.subsolvers import multistart_minimize
 
-from smt_optim.acquisition_functions.multi_obj import init_bi_obj_composite_ei
+from smt_optim.acquisition_functions.composite_expected_improvement import init_bi_obj_composite_ei
 
 from scipy.stats import norm
 from smt.surrogate_models import KRG
@@ -34,6 +34,7 @@ def PositivePart(x):
     return max(x,0)
 
 def SingleObjectiveNormalized(y,r,s=None):
+    #Returns a single-objective normalized formulation of the problem
     if s==None:
         s=[1]*len(y)
     return max((y[i]-r[i])/s[i] for i in range(len(y)))
@@ -55,6 +56,67 @@ def DistToNeighbors(p1,p2,p3,w):
     return (Dist(p1,p2)**2+Dist(p2,p3)**2)/(w+1)
 
 class BiSEGO(AcquisitionStrategy):
+    """
+    Bi-objective Scalarized Efficient Global Optimization
+
+    This acquisition strategy can perform bi-objective optimization on unconstrained optimization problems.
+
+    Parameters
+    ----------
+    state : State
+        Optimization state containing the current problem definition,
+        surrogate models, and dataset.
+
+    acq_func : acquisition function, optional
+        Acquisition function used for the Pareto front initialization.
+        Default is 'log_ei'.
+
+    acq_func_bi : acquisition function, optional
+        Acquisition function used for the composite case.
+        Default is 'init_bi_obj_composite_ei'.
+
+    acq_func_naive : acquisition function, optional
+        Acquisition function used for the naive case.
+        Default is 'log_ei'.
+
+    n_multi_start : int, optional
+        Number of starting points used for local acquisition optimization.
+        Default is 10.
+
+    n_accuracy : int, optional
+        Number of Monte-Carlo calls for the composite acquisition function
+        Default is 100
+
+    sp_method : str, optional
+        Local optimization method used for acquisition refinement.
+        Default is "SLSQP".
+
+    sp_tol : float, optional
+        Tolerance for the acquisition function optimizer. Default is
+        `sqrt(np.finfo(float).eps)`.
+
+    so_formulation : str, optional
+        Choice of single-objective formulation. "Product" or "Normalized". The normalized
+        scalarisation is not compatible with the naive approach.
+        Default is "Product".
+    
+    single_obj_max_calls : int, optional
+        Maximum number of calls using the same single-objective formulation
+        Default is 'self.n_multi_start'.
+
+    init_calls : int, optional
+        Number of calls for the initial optimization process of f1 and f2 independently.
+        Default is 'self.n_multi_start'.
+
+    naive : bool, optional
+        Choice of the version of the algorithm. If False, the composite expected improvement function is used. If True, log_ei is used.
+        Default is False.
+
+    verbose : bool, optional
+        If True, prints the different steps of the algorithm as it runs.
+        Default is False
+
+    """
     def __init__(self, state: State, **kwargs):
         super().__init__()
 
@@ -62,20 +124,19 @@ class BiSEGO(AcquisitionStrategy):
         self.acq_func1 = kwargs.get("acq_func", log_ei) #Acquisition function for min(f1) (to be modified to take only f1 as a parameter)
         self.acq_func2 = kwargs.get("acq_func", log_ei) #Acquisition function for min(f2) (same for f2)
         self.acq_func_gen3 = kwargs.get("acq_func_bi", init_bi_obj_composite_ei) #Composite acquisition function for min(f1,f2)
-        self.acq_func_gen_naive = kwargs.get("acq_func_naive", log_ei) #Naive acquisition function for min(phi(f1,f2))
-        self.n_multi_start = kwargs.pop("n_multi_start", 5)
-        self.n_accuracy = kwargs.pop("n_accuracy",1000)
+        self.n_multi_start = kwargs.pop("n_multi_start", 10)
+        self.n_accuracy = kwargs.pop("n_accuracy",100)
         self.sp_method = kwargs.pop("sp_method", "Cobyla")
         self.sp_tol = kwargs.pop("sp_tol", np.sqrt(np.finfo(float).eps))
         self.soformulation=kwargs.pop("so_formulation","Product")
         self.current_calls = 0
         self.current_subcalls = 0
-        self.n_init = kwargs.pop("n_init",self.n_multi_start)
-        self.single_obj_max_calls = kwargs.pop("single_obj_max_calls",self.n_init)
-        self.min_max_calls = kwargs.pop("min_max_calls",self.n_init)
+        self.single_obj_max_calls = kwargs.pop("single_obj_max_calls",self.n_multi_start)
+        self.init_calls = kwargs.pop("init_calls",self.n_multi_start)
         self.acq_func_gen1 = lambda state,kwargs : lambda x : self.acq_func1(state.obj_models[0].predict_values(x),state.obj_models[0].predict_variances(x),min(state.scaled_dataset.export_data([0],0)))[0][0]
         self.acq_func_gen2 = lambda state,kwargs : lambda x : self.acq_func2(state.obj_models[1].predict_values(x),state.obj_models[1].predict_variances(x),min(state.scaled_dataset.export_data([1],0)))[0][0]
         self.naive = kwargs.pop("naive",False)
+        self.verbose = kwargs.pop("verbose",False)
 
         self.r = None
         self.state = state
@@ -125,17 +186,17 @@ class BiSEGO(AcquisitionStrategy):
         self.get_pareto_front()
 
         if self.current_calls == 0:
-            if self.current_calls < self.min_max_calls:
+            if self.current_calls < self.init_calls and self.verbose:
                 print("Min(f1) phase")
             self.W = [0 for x in range(len(self.state.dataset.export_as_dict()["x"]))]
 
         # Pre-treatment phase : find min(f1) and min(f2)
-        if self.current_calls < self.min_max_calls:
+        if self.current_calls < self.init_calls:
             self.current_calls+=1
             self.W.append(0)
             return self.get_infill_custom(state,self.acq_func_gen1)
-        elif self.current_calls < 2*self.min_max_calls:
-            if self.current_calls==self.min_max_calls:
+        elif self.current_calls < 2*self.init_calls:
+            if self.current_calls==self.init_calls and self.verbose:
                 print("Min(f2) phase")
             self.current_calls+=1
             self.W.append(0)
@@ -143,8 +204,9 @@ class BiSEGO(AcquisitionStrategy):
 
         # Main loop
         else:
-            if self.current_calls == 2*self.min_max_calls or self.current_subcalls == 0 or self.current_subcalls == self.single_obj_max_calls or old_pareto_front!=self.X :
-                print("The Pareto front is of length", len(self.X))
+            if self.current_calls == 2*self.init_calls or self.current_subcalls == 0 or self.current_subcalls == self.single_obj_max_calls or old_pareto_front!=self.X :
+                if self.verbose:
+                    print("The Pareto front is of length", len(self.X))
                 self.current_subcalls = 0
                 r=self.select_reference_point()
                 if r==None: # edge case where there is only one point in the Pareto Front
@@ -155,7 +217,8 @@ class BiSEGO(AcquisitionStrategy):
                         return self.get_infill_custom(state,self.acq_func_gen1)
                     else:
                         return self.get_infill_custom(state,self.acq_func_gen2)
-                print("Bi-objective phase with r =",r)
+                if self.verbose:
+                    print("Bi-objective phase with r =",r)
                 if self.soformulation=="Normalized":
                     self.phi = lambda y: SingleObjectiveNormalized(y,r)
                 elif self.soformulation=="Product":
@@ -199,6 +262,7 @@ class BiSEGO(AcquisitionStrategy):
         return infill
 
     def get_infill_naive(self,state,phi):
+        #TODO: refactor to use already defined functions
 
         D,Y=self.get_scaled_DoE()
         Phi_values=[phi(y) for y in Y]
