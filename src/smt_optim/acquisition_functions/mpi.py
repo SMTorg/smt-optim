@@ -56,13 +56,10 @@ def init_mpi(state) -> Callable:
             mu_obj = state.obj_models[idx].predict_values(x).item()
             s2_obj = state.obj_models[idx].predict_variances(x).item()
 
-            if s2_obj > 0:
-                s_obj = np.sqrt(s2_obj)
-            else:
-                return 1.0
+            s_obj = np.sqrt(np.maximum(s2_obj, 1e-16))
 
             values *= stats.norm.cdf((mu_obj - pareto_front[:, idx]) / s_obj)
 
-        return 1 - np.max(values)
+        return 1.0 - np.max(values)
 
     return mpi_func
