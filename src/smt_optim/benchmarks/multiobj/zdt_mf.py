@@ -119,10 +119,9 @@ class ZDT1(BenchmarkProblem):
 
     def f2_lf(self, x):
         g_val = self.g_lf(x)
-        f1_val = self.f1_lf(x)
+        f1_val = self.f1(x)
         h_val = self.h(f1_val, g_val)
         return (0.8 * g_val - 0.2) * (1.2 * h_val + 0.2)
-
 
 ###############################################################################
 # ZDT2 Benchmark
@@ -173,7 +172,7 @@ class ZDT2(BenchmarkProblem):
 
     def f2_lf(self, x):
         g_val = self.g_lf(x)
-        f1_val = self.f1_lf(x)
+        f1_val = self.f1(x)
         h_val = self.h(f1_val, g_val)
         # Formula derived from ZDT2_LF functional snippet
         return (0.9 * g_val + 0.2) * (1.1 * h_val - 0.2)
@@ -229,7 +228,7 @@ class ZDT3(BenchmarkProblem):
 
     def f2_lf(self, x):
         g_val = self.g_lf(x)
-        f1_val = self.f1_lf(x)
+        f1_val = self.f1(x)
         h_val = self.h(f1_val, g_val)
         # Formula derived from ZDT3_LF functional snippet
         return g_val * (1.25 * h_val - 0.25)
