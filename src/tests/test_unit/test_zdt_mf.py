@@ -153,7 +153,9 @@ class _ZDTMultiFidelityMixin:
 
         np.testing.assert_allclose(prob.f1(x), 0.0)
         np.testing.assert_allclose(prob.g(x), 1.0)
-        np.testing.assert_allclose(prob.f2(x), prob.g(x) * prob.h(prob.f1(x), prob.g(x)))
+        np.testing.assert_allclose(
+            prob.f2(x), prob.g(x) * prob.h(prob.f1(x), prob.g(x))
+        )
 
     def test_f2_matches_formula_generic_point(self):
         prob = self.make()
@@ -167,7 +169,9 @@ class _ZDTMultiFidelityMixin:
         g_lf_val = prob.g_lf(x)
         f1_lf_val = prob.f1_lf(x)
         h_lf_val = prob.h(f1_lf_val, g_lf_val)
-        np.testing.assert_allclose(prob.f2_lf(x), self.expected_f2_lf(g_lf_val, h_lf_val))
+        np.testing.assert_allclose(
+            prob.f2_lf(x), self.expected_f2_lf(g_lf_val, h_lf_val)
+        )
 
     def expected_f2_lf(self, g_val, h_val):
         raise NotImplementedError

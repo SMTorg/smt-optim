@@ -69,9 +69,11 @@ class DTLZ5(BenchmarkProblem):
     def g_lf(self, x):
         return self.f1_lf(x)
 
+
 ###############################################################################
 # ZDT1 Benchmark
 ###############################################################################
+
 
 class ZDT1(BenchmarkProblem):
     def __init__(self):
@@ -82,14 +84,14 @@ class ZDT1(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.tags = ["n_variable", "multi-obj", "multi-fidelity"]
-        
+
         # Corrected bounds for 30 dimensions
         self.bounds = np.array(
             [
                 [0, 1],
             ]
         )
-        
+
         self.objective = [
             [self.f1_lf, self.f1],
             [self.f2_lf, self.f2],
@@ -123,9 +125,11 @@ class ZDT1(BenchmarkProblem):
         h_val = self.h(f1_val, g_val)
         return (0.8 * g_val - 0.2) * (1.2 * h_val + 0.2)
 
+
 ###############################################################################
 # ZDT2 Benchmark
 ###############################################################################
+
 
 class ZDT2(BenchmarkProblem):
     def __init__(self):
@@ -136,13 +140,13 @@ class ZDT2(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.tags = ["n_variable", "multi-obj", "multi-fidelity"]
-        
+
         self.bounds = np.array(
             [
                 [0, 1],
             ]
         )
-        
+
         self.objective = [
             [self.f1_lf, self.f1],
             [self.f2_lf, self.f2],
@@ -182,6 +186,7 @@ class ZDT2(BenchmarkProblem):
 # ZDT3 Benchmark
 ###############################################################################
 
+
 class ZDT3(BenchmarkProblem):
     def __init__(self):
         super().__init__()
@@ -191,13 +196,13 @@ class ZDT3(BenchmarkProblem):
         self.num_cstr = 0
         self.num_fidelity = 2
         self.tags = ["n_variable", "multi-obj", "multi-fidelity"]
-        
+
         self.bounds = np.array(
             [
                 [0, 1],
             ]
         )
-        
+
         self.objective = [
             [self.f1_lf, self.f1],
             [self.f2_lf, self.f2],
