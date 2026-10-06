@@ -34,7 +34,7 @@ Issues = "https://github.com/SMTorg/smt-optim/issues"
 
 [project.optional-dependencies]
 dev = [
-  "ruff",
+  "ruff==0.15.22",
   "coverage",
 ]
 
