@@ -48,22 +48,22 @@ class DTLZ5(BenchmarkProblem):
         return np.sum((x - 0.5) ** 2)
 
     def f1(self, x):
-        xq = x[self.num_obj + 1 :]
+        xq = x[self.num_obj - 1 :]
         return (1 + self.u(xq)) * np.cos(np.pi / 2 * x[0])
 
     def f2(self, x):
-        xq = x[self.num_obj + 1 :]
+        xq = x[self.num_obj - 1 :]
         return (1 + self.u(xq)) * np.sin(np.pi / 2 * x[0])
 
     def g(self, x):
         return self.f1(x) - 0.5
 
     def f1_lf(self, x):
-        xq = x[self.num_obj + 1 :]
+        xq = x[self.num_obj - 1 :]
         return (1 + 0.8 * self.u(xq)) * np.cos(np.pi / 2 * x[0])
 
     def f2_lf(self, x):
-        xq = x[self.num_obj + 1 :]
+        xq = x[self.num_obj - 1 :]
         return (1 + 1.1 * self.u(xq)) * np.sin(np.pi / 2 * x[0])
 
     def g_lf(self, x):
