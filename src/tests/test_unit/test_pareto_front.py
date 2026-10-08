@@ -19,9 +19,9 @@ from smt_optim.utils.multi_obj import get_pf_from_dataset
 class TestParetoFront(unittest.TestCase):
     def test_get_pf_from_dataset_constrained(self):
 
-        from smt_optim.benchmarks.multiobj.zdt_mf import DTLZ5
+        from smt_optim.benchmarks.multiobj.zdt_mf import MF_DTLZ5
 
-        problem = DTLZ5()
+        problem = MF_DTLZ5()
         problem.set_dim(4)
 
         obj_config = ObjectiveConfig(

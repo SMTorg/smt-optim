@@ -14,11 +14,11 @@ import numpy as np
 from smt_optim.benchmarks.base import BenchmarkProblem
 
 
-class DTLZ5(BenchmarkProblem):
+class MF_DTLZ5(BenchmarkProblem):
     def __init__(self):
         super().__init__()
 
-        self.name: str = "DTLZ5"
+        self.name: str = "MF_DTLZ5"
 
         self.num_dim: int | str = "variable"
         self.num_obj: int = 2
@@ -75,11 +75,11 @@ class DTLZ5(BenchmarkProblem):
 ###############################################################################
 
 
-class ZDT1(BenchmarkProblem):
+class MF_ZDT1(BenchmarkProblem):
     def __init__(self):
         super().__init__()
-        self.name = "ZDT1"
-        self.num_dim = 30
+        self.name = "MF_ZDT1"
+        self.num_dim = "variable"
         self.num_obj = 2
         self.num_cstr = 0
         self.num_fidelity = 2
@@ -131,11 +131,11 @@ class ZDT1(BenchmarkProblem):
 ###############################################################################
 
 
-class ZDT2(BenchmarkProblem):
+class MF_ZDT2(BenchmarkProblem):
     def __init__(self):
         super().__init__()
-        self.name = "ZDT2"
-        self.num_dim = 30
+        self.name = "MF_ZDT2"
+        self.num_dim = "variable"
         self.num_obj = 2
         self.num_cstr = 0
         self.num_fidelity = 2
@@ -187,11 +187,11 @@ class ZDT2(BenchmarkProblem):
 ###############################################################################
 
 
-class ZDT3(BenchmarkProblem):
+class MF_ZDT3(BenchmarkProblem):
     def __init__(self):
         super().__init__()
-        self.name = "ZDT3"
-        self.num_dim = 30
+        self.name = "MF_ZDT3"
+        self.num_dim = "variable"
         self.num_obj = 2
         self.num_cstr = 0
         self.num_fidelity = 2
