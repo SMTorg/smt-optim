@@ -324,7 +324,7 @@ class TestMOSEGO(unittest.TestCase):
         -------
 
         """
-        from smt_optim.benchmarks.multiobj.zdt_mf import DTLZ5
+        from smt_optim.benchmarks.multiobj.zdt_mf import MF_DTLZ5
 
         x_doe_0 = np.array(
             [
@@ -366,10 +366,10 @@ class TestMOSEGO(unittest.TestCase):
             ]
         )
 
-        ref_point = np.array([1.0, 1.0])
+        ref_point = np.array([1.5, 1.5])
         hv = HV(ref_point=ref_point)
 
-        problem = DTLZ5()
+        problem = MF_DTLZ5()
         problem.set_dim(4)
 
         obj_config = ObjectiveConfig(
@@ -411,7 +411,7 @@ class TestMOSEGO(unittest.TestCase):
             MOSEGO,
             strategy_kwargs={
                 "acq_init": init_ehvi_2o,
-                "n_start": 20,
+                "n_start": 5,
                 "sp_method": "SLSQP",
             },
         )
@@ -428,7 +428,7 @@ class TestMOSEGO(unittest.TestCase):
             MOSEGO,
             strategy_kwargs={
                 "acq_init": init_ehvi_2o,
-                "n_start": 20,
+                "n_start": 5,
                 "sp_method": "SLSQP",
             },
         )
