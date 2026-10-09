@@ -44,22 +44,22 @@ class _ReferenceDOEMixin:
 
 class TestZDT1Reference(_ReferenceDOEMixin, unittest.TestCase):
     cls = zdt_mf.MF_ZDT1
-    csv_name = "ZDT_1.csv"
+    csv_name = "ZDT1_6d.csv"
 
 
 class TestZDT2Reference(_ReferenceDOEMixin, unittest.TestCase):
     cls = zdt_mf.MF_ZDT2
-    csv_name = "ZDT_2.csv"
+    csv_name = "ZDT2_6d.csv"
 
 
 class TestZDT3Reference(_ReferenceDOEMixin, unittest.TestCase):
     cls = zdt_mf.MF_ZDT3
-    csv_name = "ZDT_3.csv"
+    csv_name = "ZDT3_6d.csv"
 
 
 class TestDTLZ5Reference(_ReferenceDOEMixin, unittest.TestCase):
     cls = zdt_mf.MF_DTLZ5
-    csv_name = "DTLZ_5.csv"
+    csv_name = "DTLZ5_6d.csv"
 
 
 class _SingleFidelityReferenceDOEMixin:
@@ -90,21 +90,21 @@ class TestSingleFidelityZDT1Reference(
     _SingleFidelityReferenceDOEMixin, unittest.TestCase
 ):
     cls = zdt.ZDT1
-    csv_name = "ZDT_1.csv"
+    csv_name = "ZDT1_6d.csv"
 
 
 class TestSingleFidelityZDT2Reference(
     _SingleFidelityReferenceDOEMixin, unittest.TestCase
 ):
     cls = zdt.ZDT2
-    csv_name = "ZDT_2.csv"
+    csv_name = "ZDT2_6d.csv"
 
 
 class TestSingleFidelityZDT3Reference(
     _SingleFidelityReferenceDOEMixin, unittest.TestCase
 ):
     cls = zdt.ZDT3
-    csv_name = "ZDT_3.csv"
+    csv_name = "ZDT3_6d.csv"
 
 
 if __name__ == "__main__":
