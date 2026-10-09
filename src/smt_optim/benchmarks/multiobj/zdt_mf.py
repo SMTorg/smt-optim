@@ -12,6 +12,7 @@ DTLZ5
 import numpy as np
 
 from smt_optim.benchmarks.base import BenchmarkProblem
+from smt_optim.benchmarks.multiobj.zdt import ZDT1, ZDT2, ZDT3
 
 
 class MF_DTLZ5(BenchmarkProblem):
@@ -75,7 +76,7 @@ class MF_DTLZ5(BenchmarkProblem):
 ###############################################################################
 
 
-class MF_ZDT1(BenchmarkProblem):
+class MF_ZDT1(ZDT1):
     def __init__(self):
         super().__init__()
         self.name = "MF_ZDT1"
@@ -85,7 +86,6 @@ class MF_ZDT1(BenchmarkProblem):
         self.num_fidelity = 2
         self.tags = ["n_variable", "multi-obj", "multi-fidelity"]
 
-        # Corrected bounds for 30 dimensions
         self.bounds = np.array(
             [
                 [0, 1],
@@ -98,29 +98,11 @@ class MF_ZDT1(BenchmarkProblem):
         ]
         self.constraints = None
 
-    def g(self, x):
-        return 1 + 9 * np.sum(x[1:]) / (self.num_dim - 1)
-
-    def g_lf(self, x):
-        return 1 + 9 * np.sum(x[1:]) / (self.num_dim - 1)
-
-    def f1(self, x):
-        return x[0]
-
     def f1_lf(self, x):
         return x[0] * 0.9 + 0.1
 
-    def h(self, f1, g):
-        return 1 - np.sqrt(f1 / g)
-
-    def f2(self, x):
-        g_val = self.g(x)
-        f1_val = self.f1(x)
-        h_val = self.h(f1_val, g_val)
-        return g_val * h_val
-
     def f2_lf(self, x):
-        g_val = self.g_lf(x)
+        g_val = self.g(x)
         f1_val = self.f1(x)
         h_val = self.h(f1_val, g_val)
         return (0.8 * g_val - 0.2) * (1.2 * h_val + 0.2)
@@ -131,7 +113,7 @@ class MF_ZDT1(BenchmarkProblem):
 ###############################################################################
 
 
-class MF_ZDT2(BenchmarkProblem):
+class MF_ZDT2(ZDT2):
     def __init__(self):
         super().__init__()
         self.name = "MF_ZDT2"
@@ -153,29 +135,11 @@ class MF_ZDT2(BenchmarkProblem):
         ]
         self.constraints = None
 
-    def g(self, x):
-        return 1 + 9 * np.sum(x[1:]) / (self.num_dim - 1)
-
-    def g_lf(self, x):
-        return 1 + 9 * np.sum(x[1:]) / (self.num_dim - 1)
-
-    def f1(self, x):
-        return x[0]
-
     def f1_lf(self, x):
         return 0.8 * x[0] + 0.2
 
-    def h(self, f1, g):
-        return 1 - (f1 / g) ** 2
-
-    def f2(self, x):
-        g_val = self.g(x)
-        f1_val = self.f1(x)
-        h_val = self.h(f1_val, g_val)
-        return g_val * h_val
-
     def f2_lf(self, x):
-        g_val = self.g_lf(x)
+        g_val = self.g(x)
         f1_val = self.f1(x)
         h_val = self.h(f1_val, g_val)
         # Formula derived from ZDT2_LF functional snippet
@@ -187,7 +151,7 @@ class MF_ZDT2(BenchmarkProblem):
 ###############################################################################
 
 
-class MF_ZDT3(BenchmarkProblem):
+class MF_ZDT3(ZDT3):
     def __init__(self):
         super().__init__()
         self.name = "MF_ZDT3"
@@ -209,30 +173,11 @@ class MF_ZDT3(BenchmarkProblem):
         ]
         self.constraints = None
 
-    def g(self, x):
-        return 1 + 9 * np.sum(x[1:]) / (self.num_dim - 1)
-
-    def g_lf(self, x):
-        return 1 + 9 * np.sum(x[1:]) / (self.num_dim - 1)
-
-    def f1(self, x):
-        return x[0]
-
     def f1_lf(self, x):
         return 0.75 * x[0] + 0.25
 
-    def h(self, f1, g):
-        # ZDT3 specific h function
-        return 1 - np.sqrt(f1 / g) - (f1 / g) * np.sin(10 * np.pi * f1)
-
-    def f2(self, x):
-        g_val = self.g(x)
-        f1_val = self.f1(x)
-        h_val = self.h(f1_val, g_val)
-        return g_val * h_val
-
     def f2_lf(self, x):
-        g_val = self.g_lf(x)
+        g_val = self.g(x)
         f1_val = self.f1(x)
         h_val = self.h(f1_val, g_val)
         # Formula derived from ZDT3_LF functional snippet
