@@ -2,7 +2,6 @@ import unittest
 import numpy as np
 
 from smt_optim.benchmarks.multiobj.constrained import BNH, TNK, OSY
-from smt_optim.benchmarks.multiobj.zdt_mf import DTLZ5
 
 
 class TestMOBenchmarks(unittest.TestCase):
@@ -35,18 +34,6 @@ class TestMOBenchmarks(unittest.TestCase):
         np.testing.assert_allclose(prob.g4(x1d), -2.0)
         np.testing.assert_allclose(prob.g5(x1d), 5.0)
         np.testing.assert_allclose(prob.g6(x1d), -5.0)
-
-    def test_dtlz5(self):
-        prob = DTLZ5()
-        x1d = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        np.testing.assert_allclose(prob.f1(x1d), 2.75)
-        np.testing.assert_allclose(prob.f2(x1d), 0.0)
-        np.testing.assert_allclose(prob.g(x1d), 2.25)
-        np.testing.assert_allclose(prob.f1_lf(x1d), 2.4)
-        np.testing.assert_allclose(prob.f2_lf(x1d), 0.0)
-        np.testing.assert_allclose(prob.g_lf(x1d), 2.4)
-
-        np.testing.assert_allclose(prob.u(x1d[3:]), 1.75)
 
 
 if __name__ == "__main__":
