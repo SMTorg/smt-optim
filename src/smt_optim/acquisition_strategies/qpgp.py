@@ -231,8 +231,7 @@ def select_batch(
     if others.shape[0] <= n_clusters:
         return np.vstack([best, others])
 
-    rng = np.random.default_rng(seed)
-    centroids, labels = kmeans2(others, n_clusters, minit="++", seed=rng)
+    centroids, labels = kmeans2(others, n_clusters, minit="++", seed=seed)
 
     selected = []
     for k in np.unique(labels):
