@@ -49,6 +49,15 @@ class qPGP(AcquisitionStrategy):
     seed: int, optional
         Random seed for reproducibility. Default is None.
 
+    Notes
+    -----
+    Based on the global phase of STREGO (Algorithm 2 in [1]_).
+
+    References
+    ----------
+    .. [1] Diouane, Y., El Hallaoui, I., Kadri, M., Lamghari, A. (2026). STREGO: A Scalable
+       Implementation of a Trust-Region Framework for Noisy Bayesian Optimization.
+       arXiv:2610.14338. https://arxiv.org/abs/2610.14338
     """
 
     def __init__(
