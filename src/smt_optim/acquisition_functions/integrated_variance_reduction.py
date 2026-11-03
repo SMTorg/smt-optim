@@ -1,5 +1,8 @@
 # @autor Paul-Saves
+from typing import Callable
+
 import numpy as np
+from scipy import stats
 from scipy.linalg import solve_triangular
 from smt.utils.kriging import cross_distances, differences
 
@@ -229,3 +232,43 @@ def integrated_variance_reduction(
         ivr_vals[i, 0] = imse_current - imse_new
 
     return ivr_vals
+
+
+def init_ivr(state, n_integration: int = 64) -> Callable:
+    """
+    Initialize the Integrated Variance Reduction (IVR) acquisition function of the objective
+    surrogate model.
+
+    Parameters
+    ----------
+    state : State
+        Optimization state containing the problem definition and the trained objective
+        surrogate model.
+    n_integration : int, optional
+        Number of Sobol integration points. Default is 64.
+
+    Returns
+    -------
+    Callable
+        IVR acquisition function with signature::
+
+            acquisition(x) -> np.ndarray
+
+        where `x` is of shape (num_points, num_dim) and the returned values are of shape
+        (num_points, 1). Higher is better.
+
+    Notes
+    -----
+    The integration points are sampled once in the unit hypercube, so that all the evaluations
+    of an iteration share the same integration grid. `x` must be in the scaled design space.
+    """
+
+    model = state.obj_models[0]
+
+    sampler = stats.qmc.Sobol(d=state.problem.num_dim, seed=state.iter)
+    integration_points = sampler.random(n_integration)
+
+    def ivr_func(x: np.ndarray) -> np.ndarray:
+        return integrated_variance_reduction(model, x, integration_points)
+
+    return ivr_func
