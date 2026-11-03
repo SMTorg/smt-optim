@@ -1,9 +1,24 @@
 import unittest
+
 import numpy as np
+from scipy import stats
 from smt.surrogate_models import KRG
 from smt_optim.acquisition_functions.integrated_variance_reduction import (
     integrated_variance_reduction,
+    init_ivr,
 )
+
+
+class DummyProblem:
+    def __init__(self, num_dim):
+        self.num_dim = num_dim
+
+
+class DummyState:
+    def __init__(self, model, num_dim, iter):
+        self.obj_models = [model]
+        self.problem = DummyProblem(num_dim)
+        self.iter = iter
 
 
 class TestIMSEUnit(unittest.TestCase):
@@ -48,6 +63,17 @@ class TestIMSEUnit(unittest.TestCase):
         self.assertEqual(imse_vals.shape, (2, 1))
         self.assertGreaterEqual(imse_vals[0, 0], 0.0)
         self.assertGreaterEqual(imse_vals[1, 0], 0.0)
+
+    def test_init_ivr(self):
+        state = DummyState(self.sm, num_dim=1, iter=3)
+        x_cands = np.array([[0.25], [0.75]])
+
+        integration_points = stats.qmc.Sobol(d=1, seed=3).random(8)
+        expected = integrated_variance_reduction(self.sm, x_cands, integration_points)
+
+        ivr_vals = init_ivr(state, n_integration=8)(x_cands)
+        self.assertEqual(ivr_vals.shape, (2, 1))
+        np.testing.assert_allclose(ivr_vals, expected)
 
 
 if __name__ == "__main__":

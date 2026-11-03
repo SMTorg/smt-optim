@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -7,6 +8,7 @@ from smt_optim.core import ObjectiveConfig, DriverConfig, Driver
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
+from smt_optim.acquisition_functions import init_ivr, init_mean, negate
 from smt_optim.acquisition_strategies import qPGP
 from smt_optim.acquisition_strategies.qpgp import select_batch
 
@@ -27,7 +29,9 @@ class TestqPGP(unittest.TestCase):
     def setUp(self):
         self.bounds = np.array([[-5.0, 10.0], [0.0, 15.0]])
 
-    def run_driver(self, batch_size, max_iter):
+    def run_driver(
+        self, batch_size, max_iter, acq_init_1=init_mean, acq_init_2=negate(init_ivr)
+    ):
         obj_config = ObjectiveConfig(objective=[branin], surrogate=SmtAutoModel)
 
         problem = Problem(
@@ -40,7 +44,11 @@ class TestqPGP(unittest.TestCase):
             config=DriverConfig(max_iter=max_iter, nt_init=6, seed=42),
             strategy=qPGP,
             strategy_kwargs=dict(
-                batch_size=batch_size, pop_size=20, n_gen=10, n_integration=64
+                acq_init_1=acq_init_1,
+                acq_init_2=acq_init_2,
+                batch_size=batch_size,
+                pop_size=20,
+                n_gen=10,
             ),
         )
 
@@ -63,36 +71,66 @@ class TestqPGP(unittest.TestCase):
         # global minimum of Branin: 0.398
         self.assertLessEqual(f_min, 1.0)
 
+    def test_qpgp_custom_acquisition_functions(self):
+        calls = []
+
+        def init_neg_variance(state):
+            model = state.obj_models[0]
+
+            def neg_variance(x):
+                calls.append(x.shape)
+                return -model.predict_variances(x)
+
+            return neg_variance
+
+        batch_size = 3
+        max_iter = 2
+
+        state = self.run_driver(batch_size, max_iter, acq_init_2=init_neg_variance)
+
+        self.assertEqual(len(state.dataset.samples), 6 + batch_size * max_iter)
+
+        # the given acquisition function is evaluated on the whole population
+        self.assertGreater(len(calls), 0)
+        self.assertEqual(calls[0], (20, 2))
+
     def test_select_batch(self):
         rng = np.random.default_rng(0)
         pareto_x = rng.random((30, 2))
-        pareto_mu = rng.random(30)
-        best = pareto_x[np.argmin(pareto_mu)]
 
-        batch = select_batch(pareto_x, pareto_mu, 5, seed=0)
+        batch = select_batch(pareto_x, 5, seed=0)
 
-        # batch_size distinct points from the Pareto set, lowest mean point first
+        # batch_size distinct points from the Pareto set
         self.assertEqual(batch.shape, (5, 2))
         self.assertEqual(np.unique(batch, axis=0).shape[0], 5)
         for x in batch:
             self.assertTrue(np.any(np.all(np.isclose(pareto_x, x), axis=1)))
-        np.testing.assert_allclose(batch[0], best)
 
-        # batch_size = 1 -> lowest mean point only
-        batch = select_batch(pareto_x, pareto_mu, 1, seed=0)
+        # batch_size = 1 -> one point from the Pareto set
+        batch = select_batch(pareto_x, 1, seed=0)
         self.assertEqual(batch.shape, (1, 2))
-        np.testing.assert_allclose(batch[0], best)
+        self.assertTrue(np.any(np.all(np.isclose(pareto_x, batch[0]), axis=1)))
 
-        # fewer Pareto points than batch_size -> return all of them, lowest mean first
-        batch = select_batch(pareto_x[:3], pareto_mu[:3], 5)
+        # fewer Pareto points than batch_size -> return all of them
+        batch = select_batch(pareto_x[:3], 5)
         self.assertEqual(batch.shape, (3, 2))
-        np.testing.assert_allclose(batch[0], pareto_x[np.argmin(pareto_mu[:3])])
 
-        # duplicates of the lowest mean point are not selected twice
-        dup_x = np.vstack([pareto_x, best, best])
-        dup_mu = np.concatenate([pareto_mu, [1.0, 1.0]])
-        batch = select_batch(dup_x, dup_mu, 5, seed=0)
+        # duplicates are not selected twice
+        dup_x = np.vstack([pareto_x[:6], pareto_x[:6]])
+        batch = select_batch(dup_x, 5, seed=0)
         self.assertEqual(np.unique(batch, axis=0).shape[0], 5)
+
+    def test_select_batch_empty_cluster(self):
+        # all the points in a single cluster -> batch completed with the farthest points
+        pareto_x = np.array([[0.0, 0.0], [0.1, 0.0], [0.5, 0.0], [1.0, 0.0]])
+
+        with mock.patch(
+            "smt_optim.acquisition_strategies.qpgp.kmeans2",
+            return_value=(np.array([[0.0, 0.0], [9.0, 9.0]]), np.zeros(4, dtype=int)),
+        ):
+            batch = select_batch(pareto_x, 2)
+
+        np.testing.assert_array_equal(batch, np.array([[0.0, 0.0], [1.0, 0.0]]))
 
 
 if __name__ == "__main__":
