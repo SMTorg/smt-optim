@@ -6,7 +6,7 @@ The functions of this module operate on the nested dictionary returned by
 :class:`pandas.DataFrame` holding the DOE of one optimization run (one ``doe.csv`` file).
 
 Each DataFrame must contain the columns ``iter``, ``budget``, ``fidelity``, ``f0`` (objective value) and
-``rscv`` (relative sum of constraint violations). Rows with ``iter == 0`` form the initial DOE. Additional
+``rscv`` (Root Square Constraint Violation). Rows with ``iter == 0`` form the initial DOE. Additional
 columns (for example ``time``) can be used to define custom cost metrics.
 
 Three kinds of profiles are available:
@@ -38,19 +38,17 @@ References
        Mathematical Programming, 91(2), 201-213.
 """
 
-import os
-import pickle
 import re
 from collections.abc import Callable, Mapping, Sequence
 
 import numpy as np
-from matplotlib import pyplot as plt
 
 import pandas as pd
 
 
-
-def order_f0(df: pd.DataFrame, metric_name: str = "budget", ctol: float = 1e-4) -> pd.DataFrame:
+def order_f0(
+    df: pd.DataFrame, metric_name: str = "budget", ctol: float = 1e-4
+) -> pd.DataFrame:
     """
     Best feasible objective value found so far along a single run.
 
@@ -98,16 +96,20 @@ def order_f0(df: pd.DataFrame, metric_name: str = "budget", ctol: float = 1e-4) 
     f0_ordered = f0_ordered[iter0_max_id:]
     f0_ordered[0] = iter0_fmin
 
-    new_df = pd.DataFrame(data={
-        "iter": iter,
-        metric_name: metric,
-        "fmin": f0_ordered,
-    })
+    new_df = pd.DataFrame(
+        data={
+            "iter": iter,
+            metric_name: metric,
+            "fmin": f0_ordered,
+        }
+    )
 
     return new_df
 
 
-def get_convergence_profile(data: pd.DataFrame, metric_name: str = "budget", ctol: float = 1e-4) -> dict:
+def get_convergence_profile(
+    data: pd.DataFrame, metric_name: str = "budget", ctol: float = 1e-4
+) -> dict:
     """
     Best feasible objective value versus cost, for every algorithm and problem.
 
@@ -148,17 +150,16 @@ def get_convergence_profile(data: pd.DataFrame, metric_name: str = "budget", cto
 
     conv_data = {}
 
-
     for algo, a_data in data.items():
-
         if conv_data.get(algo, None) is None:
             conv_data[algo] = dict()
 
         for problem, p_data in a_data.items():
-
             num_inst = len(p_data.keys())
 
-            max_metric = np.empty(num_inst)  # [i_data[-1] for i, i_data in enumerate(a_data.values())]
+            max_metric = np.empty(
+                num_inst
+            )  # [i_data[-1] for i, i_data in enumerate(a_data.values())]
 
             all_metric = np.concatenate(
                 [i_data[metric_name].to_numpy() for i_data in p_data.values()]
@@ -174,7 +175,6 @@ def get_convergence_profile(data: pd.DataFrame, metric_name: str = "budget", cto
             all_f0 = np.full((all_metric.shape[0], num_inst), np.inf)
 
             for j, (instance, i_data) in enumerate(p_data.items()):
-
                 ordered_data = order_f0(i_data, metric_name, ctol)
 
                 idx = np.searchsorted(all_metric, ordered_data[metric_name])
@@ -246,18 +246,16 @@ def compute_f0_fstar(data: dict, eps: float = 1e-4, method: str | None = None):
 
     for algo, a_data in data.items():
         for prob, p_data in a_data.items():
-
             if f0_fstar.get(prob, None) is None:
-                f0_fstar[prob] = {
-                    "fstar": np.inf,
-                    "f0": -np.inf
-                }
+                f0_fstar[prob] = {"fstar": np.inf, "f0": -np.inf}
 
             for inst, i_data in p_data.items():
                 # i_data in a pd.DataFrame
                 max_fid = i_data["fidelity"].to_numpy().max()
-                fid_feas_mask = (i_data["fidelity"].to_numpy() == max_fid) & (i_data["rscv"].to_numpy() <= eps)
-                
+                fid_feas_mask = (i_data["fidelity"].to_numpy() == max_fid) & (
+                    i_data["rscv"].to_numpy() <= eps
+                )
+
                 if np.any(fid_feas_mask):
                     all_f0 = i_data["f0"].to_numpy()
                     obj_values = all_f0[fid_feas_mask]
@@ -273,7 +271,11 @@ def compute_f0_fstar(data: dict, eps: float = 1e-4, method: str | None = None):
                                 f"but none was found for {algo}/{prob}/{inst}."
                             )
                         init_values = all_f0[init_mask]
-                        f0 = np.min(init_values) if method == "init_min" else np.max(init_values)
+                        f0 = (
+                            np.min(init_values)
+                            if method == "init_min"
+                            else np.max(init_values)
+                        )
 
                     if fstar < f0_fstar[prob]["fstar"]:
                         f0_fstar[prob]["fstar"] = fstar
@@ -284,7 +286,6 @@ def compute_f0_fstar(data: dict, eps: float = 1e-4, method: str | None = None):
                     continue
 
     return f0_fstar
-
 
 
 def compute_threshold(f0_fstar: dict, tau: float = 0.1) -> dict:
@@ -328,7 +329,9 @@ BUILTIN_METRICS = {
 }
 
 
-def _resolve_metrics(metrics: Sequence[str] | Mapping[str, Callable] | None) -> dict[str, Callable]:
+def _resolve_metrics(
+    metrics: Sequence[str] | Mapping[str, Callable] | None,
+) -> dict[str, Callable]:
     """Map metric names to callables `df -> array`. Names are built-ins, instance DataFrame columns, or mapping keys."""
 
     if metrics is None:
@@ -346,7 +349,9 @@ def _resolve_metrics(metrics: Sequence[str] | Mapping[str, Callable] | None) -> 
     return resolved
 
 
-def _eval_metrics(metrics: dict[str, Callable], i_data: pd.DataFrame, where: str) -> dict[str, np.ndarray]:
+def _eval_metrics(
+    metrics: dict[str, Callable], i_data: pd.DataFrame, where: str
+) -> dict[str, np.ndarray]:
     values = {}
     for name, fn in metrics.items():
         try:
@@ -439,14 +444,15 @@ def get_solve_table(
     for algo, a_data in data.items():
         for prob, p_data in a_data.items():
             for inst, i_data in p_data.items():
-
                 fid = i_data["fidelity"].to_numpy()
                 feas = (fid == fid.max()) & (i_data["rscv"].to_numpy() <= ctol)
                 obj = np.where(feas, i_data["f0"].to_numpy(), np.inf)
 
                 reached = obj <= thresholds[prob]
                 solved = bool(reached.any())
-                k = int(np.argmax(reached)) if solved else None  # first position reaching the threshold
+                k = (
+                    int(np.argmax(reached)) if solved else None
+                )  # first position reaching the threshold
 
                 row = {
                     "algo": algo,
@@ -457,7 +463,9 @@ def get_solve_table(
                     "fmin": obj.min(),  # best feasible objective at highest fidelity, inf if none
                 }
 
-                for name, v in _eval_metrics(metrics, i_data, f"{algo}/{prob}/{inst}").items():
+                for name, v in _eval_metrics(
+                    metrics, i_data, f"{algo}/{prob}/{inst}"
+                ).items():
                     row[name] = v[k] if solved else np.inf
                     row[f"max_{name}"] = v[-1]
 
@@ -469,10 +477,14 @@ def get_solve_table(
 def _check_metric(table: pd.DataFrame, metric_name: str) -> None:
     if metric_name not in table.columns or f"max_{metric_name}" not in table.columns:
         available = sorted(c[4:] for c in table.columns if c.startswith("max_"))
-        raise ValueError(f"Metric '{metric_name}' not in solve table. Available: {available}")
+        raise ValueError(
+            f"Metric '{metric_name}' not in solve table. Available: {available}"
+        )
 
 
-def _ecdf(costs: np.ndarray, n_instance: int, x_start: float, x_end: float) -> tuple[np.ndarray, np.ndarray]:
+def _ecdf(
+    costs: np.ndarray, n_instance: int, x_start: float, x_end: float
+) -> tuple[np.ndarray, np.ndarray]:
     """Step ECDF over all instances; non-finite (unsolved) costs never contribute."""
     costs = np.sort(costs[np.isfinite(costs)])
     k = costs.size
@@ -481,7 +493,9 @@ def _ecdf(costs: np.ndarray, n_instance: int, x_start: float, x_end: float) -> t
     return x, portion
 
 
-def get_data_profile_from_table(table: pd.DataFrame, metric_name: str = "budget", normalize_by_dim: bool = False) -> dict:
+def get_data_profile_from_table(
+    table: pd.DataFrame, metric_name: str = "budget", normalize_by_dim: bool = False
+) -> dict:
     r"""
     Data profile of each algorithm from a solve table.
 
@@ -525,7 +539,9 @@ def get_data_profile_from_table(table: pd.DataFrame, metric_name: str = "budget"
     """
     _check_metric(table, metric_name)
 
-    scale = table["n_dim"] + 1 if normalize_by_dim else 1.0  # Moré-Wild: cost in units of n + 1
+    scale = (
+        table["n_dim"] + 1 if normalize_by_dim else 1.0
+    )  # Moré-Wild: cost in units of n + 1
     cost = table[metric_name] / scale
     x_end = (table[f"max_{metric_name}"] / scale).max()
 
@@ -547,7 +563,9 @@ def get_data_profile_from_table(table: pd.DataFrame, metric_name: str = "budget"
     return out
 
 
-def get_perf_profile_from_table(table: pd.DataFrame, metric_name: str = "budget", unsolved_by_all: str = "keep") -> dict:
+def get_perf_profile_from_table(
+    table: pd.DataFrame, metric_name: str = "budget", unsolved_by_all: str = "keep"
+) -> dict:
     r"""
     Performance profile of each algorithm from a solve table.
 
@@ -601,10 +619,14 @@ def get_perf_profile_from_table(table: pd.DataFrame, metric_name: str = "budget"
         raise ValueError("unsolved_by_all must be 'drop' or 'keep'.")
 
     # pairs x algos matrix; pivot raises on duplicate keys, NaN means an algo lacks a pair
-    costs = table.pivot(index=["problem", "instance"], columns="algo", values=metric_name)
+    costs = table.pivot(
+        index=["problem", "instance"], columns="algo", values=metric_name
+    )
     if costs.isna().any().any():
         missing = costs.index[costs.isna().any(axis=1)].tolist()
-        raise ValueError(f"Algorithms were not run on the same problem/instance pairs, e.g. {missing[:5]}")
+        raise ValueError(
+            f"Algorithms were not run on the same problem/instance pairs, e.g. {missing[:5]}"
+        )
 
     best = costs.min(axis=1)
     if unsolved_by_all == "drop":
@@ -618,7 +640,9 @@ def get_perf_profile_from_table(table: pd.DataFrame, metric_name: str = "budget"
     solved = np.isfinite(c)
     pos = solved & (b > 0)
     ratio[pos] = c[pos] / b[pos]
-    ratio[solved & (b == 0) & (c == 0)] = 1.0  # solved for free (e.g. in the initial DOE with iter/idx): 0/0 -> 1
+    ratio[solved & (b == 0) & (c == 0)] = (
+        1.0  # solved for free (e.g. in the initial DOE with iter/idx): 0/0 -> 1
+    )
 
     finite = ratio[np.isfinite(ratio)]
     r_max = finite.max() if finite.size else 1.0
@@ -698,7 +722,9 @@ def get_data_profile(
     >>> cum_time = {"cum_time": lambda df: df["time"].cumsum().to_numpy()}
     >>> profile = get_data_profile(data, "cum_time", custom_metrics=cum_time)
     """
-    table = get_solve_table(data, tau, ctol, f0_method, metrics=_select_metric(metric_name, custom_metrics))
+    table = get_solve_table(
+        data, tau, ctol, f0_method, metrics=_select_metric(metric_name, custom_metrics)
+    )
     return get_data_profile_from_table(table, metric_name, normalize_by_dim)
 
 
@@ -754,5 +780,7 @@ def get_perf_profile(
     ...     plt.step(p["ratio"], p["portion"], where="post", label=algo)
     >>> plt.xscale("log", base=2)
     """
-    table = get_solve_table(data, tau, ctol, f0_method, metrics=_select_metric(metric_name, custom_metrics))
+    table = get_solve_table(
+        data, tau, ctol, f0_method, metrics=_select_metric(metric_name, custom_metrics)
+    )
     return get_perf_profile_from_table(table, metric_name, unsolved_by_all)

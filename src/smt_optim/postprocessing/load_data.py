@@ -19,6 +19,7 @@ summarizing data-quality issues. The dictionary can be passed to the functions o
 """
 
 import os
+import re
 import warnings
 from dataclasses import dataclass, field
 
@@ -28,6 +29,15 @@ import pandas as pd
 
 # columns needed to load a file; the profiles additionally require "fidelity"
 REQUIRED_COLUMNS = {"iter", "budget", "f0", "rscv"}
+
+# design variable columns: x0, x1, ...
+_X_COL = re.compile(r"^x(\d+)$")
+
+
+def _x_columns(df: pd.DataFrame) -> list:
+    """Design variable columns of `df`, ordered by index (``x2`` before ``x10``)."""
+    cols = [c for c in df.columns if _X_COL.match(str(c))]
+    return sorted(cols, key=lambda c: int(_X_COL.match(str(c)).group(1)))
 
 
 @dataclass
@@ -43,22 +53,32 @@ class ValidationReport:
     missing_combinations : dict
         ``algo -> set of (problem, instance)``. Combinations covered by other algorithms but not by `algo`.
     inconsistent_start : dict
-        ``(problem, instance) -> {algo: (f0, rscv)}``. Combinations for which the initial point (``iter == 0``)
-        differs between algorithms. Both files are kept in the loaded data.
+        ``(problem, instance) -> {algo: ndarray of shape (n_init, n_var + 2)}``. Combinations for which the
+        initial DOE (all rows with ``iter == 0``) differs between algorithms, including when the number of design
+        variables differs. The columns of the arrays are ``x0, ..., x{n_var-1}``, ``f0`` and ``rscv``, and the
+        rows are sorted. All files are kept in the loaded data.
 
     Notes
     -----
     The report is valid (`is_valid`) when all three dictionaries are empty.
     """
 
-    missing_columns: dict = field(default_factory=dict)       # (algo, problem, instance) -> missing column names
-    missing_combinations: dict = field(default_factory=dict)  # algo -> {(problem, instance), ...} not covered by it
-    inconsistent_start: dict = field(default_factory=dict)    # (problem, instance) -> {algo: (f0, rscv)}
+    missing_columns: dict = field(
+        default_factory=dict
+    )  # (algo, problem, instance) -> missing column names
+    missing_combinations: dict = field(
+        default_factory=dict
+    )  # algo -> {(problem, instance), ...} not covered by it
+    inconsistent_start: dict = field(
+        default_factory=dict
+    )  # (problem, instance) -> {algo: ndarray (n_init, n_var + 2)}
 
     @property
     def is_valid(self) -> bool:
         """bool: True if no issue was found."""
-        return not (self.missing_columns or self.missing_combinations or self.inconsistent_start)
+        return not (
+            self.missing_columns or self.missing_combinations or self.inconsistent_start
+        )
 
     def summary(self) -> str:
         """
@@ -77,17 +97,24 @@ class ValidationReport:
                 lines.append(f"  - {algo}/{problem}/{instance}: missing {sorted(cols)}")
 
         if self.missing_combinations:
-            lines.append("Algorithms not benchmarked on all problem/instance combinations:")
+            lines.append(
+                "Algorithms not benchmarked on all problem/instance combinations:"
+            )
             for algo, combos in self.missing_combinations.items():
                 for problem, instance in sorted(combos):
                     lines.append(f"  - {algo}: missing {problem}/{instance}")
 
         if self.inconsistent_start:
-            lines.append("Inconsistent initial point (f0/rscv at iter 0) across algorithms:")
+            lines.append(
+                "Inconsistent initial DOE (x/f0/rscv at iter 0) across algorithms:"
+            )
             for (problem, instance), algo_values in self.inconsistent_start.items():
                 lines.append(f"  - {problem}/{instance}:")
-                for algo, (f0, rscv) in algo_values.items():
-                    lines.append(f"      {algo}: f0={f0}, rscv={rscv}")
+                for algo, values in algo_values.items():
+                    lines.append(
+                        f"      {algo}: {len(values)} initial points, {values.shape[1] - 2} variables, "
+                        f"f0={values[:, -2].tolist()}, rscv={values[:, -1].tolist()}"
+                    )
 
         return "\n".join(lines) if lines else "No issues found."
 
@@ -95,7 +122,8 @@ class ValidationReport:
         """Emit a ``UserWarning`` describing the issues, if any."""
         if not self.is_valid:
             warnings.warn(
-                "Data validation issues found while loading optimization results:\n" + self.summary()
+                "Data validation issues found while loading optimization results:\n"
+                + self.summary()
             )
 
     def raise_if_invalid(self) -> None:
@@ -109,20 +137,25 @@ class ValidationReport:
         """
         if not self.is_valid:
             raise ValueError(
-                "Data validation issues found while loading optimization results:\n" + self.summary()
+                "Data validation issues found while loading optimization results:\n"
+                + self.summary()
             )
 
 
 def _check_initial_points(initial_points: dict, atol: float) -> dict:
     """
-    Flag (problem, instance) combinations whose initial point differs between algorithms.
+    Flag (problem, instance) combinations whose initial DOE differs between algorithms.
+
+    The initial DOE of two algorithms is consistent if it has the same number of points and of design variables,
+    and the same ``x``, ``f0`` and ``rscv`` values within `atol`, regardless of the order of the rows.
 
     Parameters
     ----------
     initial_points : dict
-        ``(problem, instance) -> {algo: (f0, rscv)}`` gathered at ``iter == 0``.
+        ``(problem, instance) -> {algo: ndarray of shape (n_init, n_var + 2)}``. The columns are ``x0, ...``,
+        ``f0`` and ``rscv`` of all the rows with ``iter == 0``, sorted.
     atol : float
-        Absolute tolerance used to compare ``f0`` and ``rscv``.
+        Absolute tolerance used to compare the values.
 
     Returns
     -------
@@ -135,11 +168,12 @@ def _check_initial_points(initial_points: dict, atol: float) -> dict:
         if len(algo_values) < 2:
             continue
 
-        f0_values = np.array([f0 for f0, _ in algo_values.values()])
-        rscv_values = np.array([rscv for _, rscv in algo_values.values()])
+        reference, *others = algo_values.values()
 
-        if not np.allclose(f0_values, f0_values[0], atol=atol) or not np.allclose(
-            rscv_values, rscv_values[0], atol=atol
+        if any(
+            v.shape != reference.shape
+            or not np.allclose(v, reference, rtol=0, atol=atol)
+            for v in others
         ):
             inconsistent[(problem, instance)] = algo_values
 
@@ -172,7 +206,11 @@ def _check_coverage(data: dict) -> dict:
 
     missing_combinations = {}
     for algo, algo_data in data.items():
-        algo_combinations = {(problem, instance) for problem, p_data in algo_data.items() for instance in p_data}
+        algo_combinations = {
+            (problem, instance)
+            for problem, p_data in algo_data.items()
+            for instance in p_data
+        }
         missing = all_combinations - algo_combinations
         if missing:
             missing_combinations[algo] = missing
@@ -229,8 +267,10 @@ def load_data(root_dir, delimiter=",", atol=1e-8, strict=False):
       columns are excluded from `data` and listed in ``report.missing_columns``.
     - all algorithms were benchmarked on the same (problem, instance) combinations
       (``report.missing_combinations``).
-    - for a given (problem, instance), all algorithms start from the same initial point: ``f0`` and ``rscv``
-      at ``iter == 0`` must match within `atol` (``report.inconsistent_start``).
+    - for a given (problem, instance), all algorithms start from the same initial DOE: the design variables
+      (columns ``x0``, ``x1``, ...), ``f0`` and ``rscv`` of all the rows with ``iter == 0`` must match within
+      `atol`, regardless of the row order. A different number of design variables is reported as well, as
+      it is not caught otherwise (``report.inconsistent_start``).
 
     The last two issues are reported but the corresponding data is kept.
 
@@ -247,7 +287,7 @@ def load_data(root_dir, delimiter=",", atol=1e-8, strict=False):
     data = {}
     report = ValidationReport()
 
-    # (problem, instance) -> {algo: (f0, rscv)}, gathered from each file's iter == 0 row
+    # (problem, instance) -> {algo: ndarray (n_init, n_var + 2)}, gathered from each file's iter == 0 rows
     initial_points = {}
 
     for algorithm in sorted(os.listdir(root_dir)):
@@ -274,16 +314,23 @@ def load_data(root_dir, delimiter=",", atol=1e-8, strict=False):
 
                 missing_cols = REQUIRED_COLUMNS - set(instance_df.columns)
                 if missing_cols:
-                    report.missing_columns[(algorithm, problem, instance)] = missing_cols
+                    report.missing_columns[(algorithm, problem, instance)] = (
+                        missing_cols
+                    )
                     continue  # data is unreliable without the required columns
 
                 data[algorithm][problem][instance] = instance_df
 
-                init_row = instance_df.loc[instance_df["iter"] == 0]
-                if not init_row.empty:
+                init_cols = _x_columns(instance_df) + ["f0", "rscv"]
+                init_rows = instance_df.loc[
+                    instance_df["iter"] == 0, init_cols
+                ].to_numpy(dtype=float)
+                if init_rows.size:
+                    # sort the rows (first column is the primary key) so that the comparison does not depend
+                    # on the evaluation order
+                    init_rows = init_rows[np.lexsort(init_rows.T[::-1])]
                     initial_points.setdefault((problem, instance), {})[algorithm] = (
-                        init_row["f0"].iloc[0],
-                        init_row["rscv"].iloc[0],
+                        init_rows
                     )
 
             if not data[algorithm][problem]:
@@ -298,4 +345,3 @@ def load_data(root_dir, delimiter=",", atol=1e-8, strict=False):
         report.warn_if_invalid()
 
     return data, report
-
