@@ -9,6 +9,7 @@ from smt.surrogate_models import KRG, GPX
 from smt.applications import MFK, MFCK
 
 from smt.surrogate_models import MixIntKernelType
+from smt.surrogate_models.krg_based import covariance_matrix
 
 
 from smt_optim.surrogate_models import Surrogate
@@ -212,6 +213,10 @@ class SmtAutoModel(Surrogate):
     def predict_variances(self, x_pred: np.ndarray) -> np.ndarray:
         s2_pred = self.model.predict_variances(x_pred)
         return s2_pred
+
+    def predict_covariances(self, x_pred: np.ndarray) -> np.ndarray:
+        cov_pred = covariance_matrix(self.model, x_pred)
+        return cov_pred
 
 
 class HidePrints:
