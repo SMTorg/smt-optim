@@ -35,7 +35,8 @@ class qLogEI(AcquisitionStrategy):
     sp_tol: float, optional
         Tolerance for the SciPy optimizer. Default is sqrt(machine epsilon).
     seed: int, optional
-        Random seed for reproducibility. Default is None.
+        Random seed of the samplers. Default is None, which gives different draws on each
+        run.
     """
 
     def __init__(
@@ -55,7 +56,12 @@ class qLogEI(AcquisitionStrategy):
         self.n_start = n_start
         self.sp_method = sp_method
         self.sp_tol = sp_tol
-        self.seed = seed
+
+        rng = np.random.default_rng(seed)
+        self.z_sampler = stats.qmc.LatinHypercube(d=batch_size, seed=rng)
+        self.x0_sampler = stats.qmc.LatinHypercube(
+            d=batch_size * state.problem.num_dim, seed=rng
+        )
 
     def validate_config(self, state: State) -> None:
 
@@ -98,9 +104,6 @@ class qLogEI(AcquisitionStrategy):
 
         self.validate_config(state)
 
-        if isinstance(self.seed, int) or isinstance(self.seed, float):
-            self.seed += 1
-
         acq_data = dict()
 
         model = state.obj_models[0]
@@ -108,8 +111,7 @@ class qLogEI(AcquisitionStrategy):
         f_min = state.get_best_sample(ctol=0.0, scaled=True).obj[0]
 
         # scenarios kept fixed during the optimization
-        sampler = stats.qmc.LatinHypercube(d=self.batch_size, seed=state.iter)
-        z = stats.norm.ppf(sampler.random(self.n_samples))
+        z = stats.norm.ppf(self.z_sampler.random(self.n_samples))
 
         def scipy_acq_func(x):
             batch = x.reshape(self.batch_size, -1)
@@ -118,14 +120,12 @@ class qLogEI(AcquisitionStrategy):
             return -q_log_ei(mu, cov, f_min, z)
 
         # generate starting batches for the multistart optimization
-        sampler = stats.qmc.LatinHypercube(d=num_var, seed=state.iter)
-        multi_x0 = sampler.random(self.n_start)
+        multi_x0 = self.x0_sampler.random(self.n_start)
 
         res = multistart_minimize(
             scipy_acq_func,
             bounds=np.array([[0, 1]] * num_var),
             multi_x0=multi_x0,
-            seed=self.seed,
             tol=self.sp_tol,
             method=self.sp_method,
         )
