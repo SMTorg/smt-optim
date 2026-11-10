@@ -17,4 +17,5 @@
 ../../_collections/tutorial/benchmark_registry
 ../../_collections/tutorial/imse_example
 ../../_collections/tutorial/multi_obj
+../../_collections/tutorial/postprocessing
 ```
