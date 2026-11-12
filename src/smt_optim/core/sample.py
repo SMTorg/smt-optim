@@ -400,7 +400,13 @@ class Evaluator:
             for i in range(len(sample.cstr)):
                 row[f"c{i}"] = sample.cstr[i]
 
+            # save Root Square Constraint Violation
+            row["rscv"] = sample.metadata.get("rscv", np.nan)
+
             row["time"] = np.sum(sample.eval_time)
+
+            # TODO: save total blackbox time
+            # TODO: save total Bayesian optimization time
 
             path = os.path.join(self.res_path, "doe.csv")
             file_exists = os.path.isfile(path)
