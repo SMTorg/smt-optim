@@ -500,6 +500,6 @@ class SmtMFCK(Surrogate):
         beta_j = solve_triangular(L, np.vstack(k_xX_j), lower=True)
 
         covariances = k_xx - np.dot(beta_j.T, beta_i)
-        covariances = np.diag(covariances)  # * self.model.y_std**2
+        covariances = np.diag(covariances) * self.model.y_std**2
 
         return covariances.reshape(-1, 1)
