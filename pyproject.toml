@@ -39,4 +39,4 @@ dev = [
 ]
 
 [tool.ruff]
-exclude = ["*.ipynb"]
+extend-exclude = ["*.ipynb"]
