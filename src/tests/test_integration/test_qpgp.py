@@ -2,9 +2,11 @@ import unittest
 from unittest import mock
 
 import numpy as np
+import smt.design_space as ds
 
 from smt_optim.core import Problem
-from smt_optim.core import ObjectiveConfig, DriverConfig, Driver
+from smt_optim.core import ConstraintConfig, ObjectiveConfig, DriverConfig, Driver
+from smt_optim.core.state import State
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
@@ -94,6 +96,56 @@ class TestqPGP(unittest.TestCase):
         self.assertGreater(len(calls), 0)
         self.assertEqual(calls[0], (20, 2))
 
+    def test_qpgp_reproducibility(self):
+        state_1 = self.run_driver(batch_size=3, max_iter=2)
+        state_2 = self.run_driver(batch_size=3, max_iter=2)
+
+        # two runs with the same seed give the same points and values
+        for attr in ["x", "obj"]:
+            values_1 = np.array([getattr(s, attr) for s in state_1.dataset.samples])
+            values_2 = np.array([getattr(s, attr) for s in state_2.dataset.samples])
+            np.testing.assert_array_equal(values_1, values_2)
+
+    def test_qpgp_validate_config(self):
+        def build(design_space=None, num_obj=1, num_fidelity=1, constrained=False):
+            problem = Problem(
+                obj_configs=[
+                    ObjectiveConfig(
+                        objective=[branin] * num_fidelity, surrogate=SmtAutoModel
+                    )
+                    for _ in range(num_obj)
+                ],
+                design_space=self.bounds if design_space is None else design_space,
+                cstr_configs=(
+                    [ConstraintConfig([branin], upper=0.0, surrogate=SmtAutoModel)]
+                    if constrained
+                    else []
+                ),
+                costs=[1.0] * num_fidelity,
+            )
+            return State(problem)
+
+        acq_inits = dict(acq_init_1=init_mean, acq_init_2=negate(init_ivr))
+        mixed = ds.DesignSpace(
+            [ds.FloatVariable(-5.0, 10.0), ds.IntegerVariable(0, 15)]
+        )
+
+        invalid = [
+            (build(num_obj=2), acq_inits, ValueError),
+            (build(constrained=True), acq_inits, ValueError),
+            (build(num_fidelity=2), acq_inits, ValueError),
+            (build(design_space=mixed), acq_inits, ValueError),
+            (build(), dict(**acq_inits, batch_size=0), ValueError),
+            (build(), dict(acq_init_1=None, acq_init_2=init_mean), TypeError),
+        ]
+
+        for state, kwargs, error in invalid:
+            with self.assertRaises(error):
+                qPGP(state, **kwargs)
+
+        # valid configuration
+        qPGP(build(), **acq_inits)
+
     def test_select_batch(self):
         rng = np.random.default_rng(0)
         pareto_x = rng.random((30, 2))
@@ -114,6 +166,10 @@ class TestqPGP(unittest.TestCase):
         # fewer Pareto points than batch_size -> return all of them
         batch = select_batch(pareto_x[:3], 5)
         self.assertEqual(batch.shape, (3, 2))
+
+        # batch_size < 1
+        with self.assertRaises(ValueError):
+            select_batch(pareto_x, 0)
 
         # duplicates are not selected twice
         dup_x = np.vstack([pareto_x[:6], pareto_x[:6]])

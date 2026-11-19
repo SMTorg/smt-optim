@@ -56,6 +56,20 @@ class TestBiAcquisition(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bi_acquisition(x)
 
+        # (2, 2) for 4 points has 4 values, but not one per point
+        x = np.zeros((4, 1))
+        bi_acquisition = init_bi_acquisition(
+            None, lambda s: lambda x: np.zeros((2, 2)), lambda s: lambda x: x
+        )
+        with self.assertRaises(ValueError):
+            bi_acquisition(x)
+
+    def test_negate_list(self):
+
+        # an acquisition function returning a list is negated as an array
+        neg_acq = negate(lambda state: lambda x: [1.0, 2.0])(None)
+        np.testing.assert_array_equal(neg_acq(np.zeros((2, 1))), [-1.0, -2.0])
+
 
 if __name__ == "__main__":
     unittest.main()

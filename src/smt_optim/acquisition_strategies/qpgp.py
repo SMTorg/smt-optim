@@ -25,7 +25,7 @@ class qPGP(AcquisitionStrategy):
     k-means, and one candidate per cluster is selected to form the batch of `batch_size` infill
     points.
 
-    Only unconstrained, mono-objective and mono-fidelity problems are supported.
+    Only unconstrained, mono-objective, mono-fidelity and continuous problems are supported.
 
     Parameters
     ----------
@@ -119,6 +119,15 @@ class qPGP(AcquisitionStrategy):
         if state.problem.num_fidelity > 1:
             raise ValueError("qPGP only supports mono-fidelity problems.")
 
+        if not state.problem.design_space.is_all_cont:
+            raise ValueError("qPGP only supports continuous optimization problems.")
+
+        if self.batch_size < 1:
+            raise ValueError(f"batch_size must be at least 1, got {self.batch_size}.")
+
+        if not (callable(self.acq_init_1) and callable(self.acq_init_2)):
+            raise TypeError("acq_init_1 and acq_init_2 must be callable initializers.")
+
     def get_infill(self, state: State) -> list[np.ndarray]:
         """
         Compute the next batch of infill points.
@@ -150,6 +159,9 @@ class qPGP(AcquisitionStrategy):
             seed=self.seed,
         )
         res = minimize(pymoo_prob, algorithm, ("n_gen", self.n_gen), seed=self.seed)
+
+        if res.X is None:
+            raise RuntimeError("NSGA-II failed to return a Pareto set.")
 
         # Pareto set
         pareto_x = np.atleast_2d(res.X)
@@ -223,6 +235,9 @@ def select_batch(
     are empty, the batch is completed with the points farthest from the already selected ones.
     """
 
+    if batch_size < 1:
+        raise ValueError(f"batch_size must be at least 1, got {batch_size}.")
+
     points = np.unique(pareto_x, axis=0)
 
     if points.shape[0] <= batch_size:
@@ -239,6 +254,8 @@ def select_batch(
     # complete the batch if some clusters are empty (maximin distance)
     while len(selected) < batch_size:
         min_dist = cdist(points, points[selected]).min(axis=1)
+        # an already selected point can never be selected twice
+        min_dist[selected] = -1.0
         selected.append(int(np.argmax(min_dist)))
 
     return points[selected]
