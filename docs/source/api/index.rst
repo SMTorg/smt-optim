@@ -13,6 +13,7 @@ API Reference
     Acquisition Strategies <acquisition_strategies>
     Benchmarks <benchmarks>
     Core <core>
+    Postprocessing <postprocessing>
     Subsolvers <subsolvers>
     Surrogate Models <surrogate_models>
     Utils <utils>
@@ -23,6 +24,7 @@ API Reference
     smt_optim.acquisition_strategies
     smt_optim.benchmarks.registry
     smt_optim.core
+    smt_optim.postprocessing
     smt_optim.subsolvers
     smt_optim.surrogate_models
     smt_optim.utils
