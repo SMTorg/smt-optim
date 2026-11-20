@@ -37,7 +37,11 @@ def get_cache_dir() -> Path:
     otherwise.
     """
     env = os.environ.get(CACHE_ENV_VAR)
-    return Path(env).expanduser() if env else Path.home() / ".cache" / "smt-optim" / "datasets"
+    return (
+        Path(env).expanduser()
+        if env
+        else Path.home() / ".cache" / "smt-optim" / "datasets"
+    )
 
 
 def _download(url: str, timeout: float) -> bytes:
@@ -53,7 +57,9 @@ def _expected_checksum(base: str, archive_name: str, timeout: float) -> str:
         parts = line.split()
         if len(parts) == 2 and parts[1] == archive_name:
             return parts[0]
-    raise ValueError(f"'{archive_name}' not found in the checksums.txt file of the release.")
+    raise ValueError(
+        f"'{archive_name}' not found in the checksums.txt file of the release."
+    )
 
 
 def download_dataset(
@@ -142,7 +148,9 @@ def download_dataset(
     if expected is not None:
         digest = hashlib.sha256(content).hexdigest()
         if digest != expected:
-            raise ValueError(f"Checksum mismatch for '{archive_name}': expected {expected}, got {digest}.")
+            raise ValueError(
+                f"Checksum mismatch for '{archive_name}': expected {expected}, got {digest}."
+            )
 
     # extract in a temporary directory first, so that an interrupted download never leaves a partial dataset
     cache_dir.joinpath(version).mkdir(parents=True, exist_ok=True)
@@ -155,7 +163,9 @@ def download_dataset(
             zf.extractall(extracted)
 
         if not (extracted / name).is_dir():
-            raise ValueError(f"Archive '{archive_name}' does not contain a '{name}/' directory.")
+            raise ValueError(
+                f"Archive '{archive_name}' does not contain a '{name}/' directory."
+            )
 
         if dataset_dir.exists():
             shutil.rmtree(dataset_dir)

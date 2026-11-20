@@ -15,7 +15,9 @@ from smt_optim.utils.datasets import download_dataset, get_cache_dir
 
 def _make_release(root, version="v1.0.0", name="demo", files=None, checksum=None):
     """Create a local release ``<root>/<version>/`` with one dataset archive and its checksums.txt."""
-    files = {"a/doe.csv": "iter,f0\n0,1.0\n", "b.txt": "hello"} if files is None else files
+    files = (
+        {"a/doe.csv": "iter,f0\n0,1.0\n", "b.txt": "hello"} if files is None else files
+    )
     release = Path(root) / version
     release.mkdir(parents=True)
 
@@ -43,7 +45,12 @@ class TestDownloadDataset(unittest.TestCase):
 
     def _download(self, name="demo", version="v1.0.0", **kwargs):
         return download_dataset(
-            name, version=version, cache_dir=self.cache, base_url=self.base_url, verbose=False, **kwargs
+            name,
+            version=version,
+            cache_dir=self.cache,
+            base_url=self.base_url,
+            verbose=False,
+            **kwargs,
         )
 
     def test_downloads_and_extracts_the_dataset(self):
@@ -68,7 +75,7 @@ class TestDownloadDataset(unittest.TestCase):
         self.assertEqual(self._download(), first)
 
     def test_force_downloads_again(self):
-        release = _make_release(self.remote)
+        _make_release(self.remote)
         path = self._download()
         (path / "b.txt").write_text("modified")
         (path / "extra.txt").write_text("x")
@@ -80,11 +87,18 @@ class TestDownloadDataset(unittest.TestCase):
 
     def test_datasets_are_independent(self):
         _make_release(self.remote, name="demo")
-        shutil.copy(self.remote / "v1.0.0" / "demo-v1.0.0.zip", self.remote / "v1.0.0" / "other-v1.0.0.zip")
+        shutil.copy(
+            self.remote / "v1.0.0" / "demo-v1.0.0.zip",
+            self.remote / "v1.0.0" / "other-v1.0.0.zip",
+        )
         # the copy is a "demo" archive: not a valid "other" dataset
         with open(self.remote / "v1.0.0" / "checksums.txt", "a") as f:
-            f.write(hashlib.sha256((self.remote / "v1.0.0" / "other-v1.0.0.zip").read_bytes()).hexdigest()
-                    + "  other-v1.0.0.zip\n")
+            f.write(
+                hashlib.sha256(
+                    (self.remote / "v1.0.0" / "other-v1.0.0.zip").read_bytes()
+                ).hexdigest()
+                + "  other-v1.0.0.zip\n"
+            )
 
         self.assertTrue(self._download(name="demo").is_dir())
         with self.assertRaises(ValueError):
@@ -129,16 +143,22 @@ class TestDownloadDataset(unittest.TestCase):
 
     def test_default_version_is_used(self):
         _make_release(self.remote, version=datasets.DATA_VERSION)
-        path = download_dataset("demo", cache_dir=self.cache, base_url=self.base_url, verbose=False)
+        path = download_dataset(
+            "demo", cache_dir=self.cache, base_url=self.base_url, verbose=False
+        )
 
         self.assertEqual(path, self.cache / datasets.DATA_VERSION / "demo")
 
     def test_verbose_prints_only_when_downloading(self):
         _make_release(self.remote)
         with mock.patch("builtins.print") as printed:
-            download_dataset("demo", version="v1.0.0", cache_dir=self.cache, base_url=self.base_url)
+            download_dataset(
+                "demo", version="v1.0.0", cache_dir=self.cache, base_url=self.base_url
+            )
             self.assertEqual(printed.call_count, 1)
-            download_dataset("demo", version="v1.0.0", cache_dir=self.cache, base_url=self.base_url)
+            download_dataset(
+                "demo", version="v1.0.0", cache_dir=self.cache, base_url=self.base_url
+            )
             self.assertEqual(printed.call_count, 1)
 
 
@@ -146,7 +166,9 @@ class TestCacheDir(unittest.TestCase):
     def test_default(self):
         with mock.patch.dict(os.environ, clear=False):
             os.environ.pop(datasets.CACHE_ENV_VAR, None)
-            self.assertEqual(get_cache_dir(), Path.home() / ".cache" / "smt-optim" / "datasets")
+            self.assertEqual(
+                get_cache_dir(), Path.home() / ".cache" / "smt-optim" / "datasets"
+            )
 
     def test_environment_variable(self):
         with mock.patch.dict(os.environ, {datasets.CACHE_ENV_VAR: "/some/where"}):
@@ -156,8 +178,12 @@ class TestCacheDir(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             remote = Path(tmp) / "remote"
             _make_release(remote)
-            with mock.patch.dict(os.environ, {datasets.CACHE_ENV_VAR: str(Path(tmp) / "env_cache")}):
-                path = download_dataset("demo", version="v1.0.0", base_url=remote.as_uri(), verbose=False)
+            with mock.patch.dict(
+                os.environ, {datasets.CACHE_ENV_VAR: str(Path(tmp) / "env_cache")}
+            ):
+                path = download_dataset(
+                    "demo", version="v1.0.0", base_url=remote.as_uri(), verbose=False
+                )
 
             self.assertEqual(path, Path(tmp) / "env_cache" / "v1.0.0" / "demo")
 
