@@ -2,16 +2,10 @@ import os
 import tempfile
 import unittest
 import warnings
-from pathlib import Path
 
 import pandas as pd
 
 from smt_optim.postprocessing.load_data import load_data
-
-# shared, valid sample dataset also used by the postprocessing tutorial
-VALID_DATA_DIR = (
-    Path(__file__).resolve().parents[3] / "examples" / "data" / "unconstrained"
-)
 
 
 def _write_doe(root, algorithm, problem, instance, rows):
@@ -36,31 +30,6 @@ def _default_rows(f0_0=13.0, n_iters=3):
 
 
 class TestLoadDataValid(unittest.TestCase):
-    def test_valid_dataset_loads_without_issues(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            data, report = load_data(str(VALID_DATA_DIR))
-
-        self.assertTrue(report.is_valid)
-        self.assertEqual(report.summary(), "No issues found.")
-
-        self.assertEqual(
-            set(data.keys()), {"expected_improvement", "probability_of_improvement"}
-        )
-        for algo_data in data.values():
-            self.assertEqual(
-                set(algo_data.keys()),
-                {"Sphere_2d", "SumSquares_2d", "RotatedHyperEllipsoid_2d"},
-            )
-            for problem_data in algo_data.values():
-                self.assertEqual(
-                    set(problem_data.keys()), {f"instance_{i}" for i in range(5)}
-                )
-                for df in problem_data.values():
-                    self.assertTrue(
-                        {"iter", "budget", "f0", "rscv"}.issubset(df.columns)
-                    )
-
     def test_empty_root_dir_returns_empty_data_and_valid_report(self):
         with tempfile.TemporaryDirectory() as root:
             data, report = load_data(root)

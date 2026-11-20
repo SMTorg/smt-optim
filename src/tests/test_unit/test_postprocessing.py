@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,11 +18,19 @@ from smt_optim.postprocessing.profiles import (
     compute_threshold,
     order_f0,
 )
+from smt_optim.utils.datasets import download_dataset
 
-# sample datasets also used by the postprocessing tutorial
-DATA_DIR = Path(__file__).resolve().parents[3] / "examples" / "data"
-UNCONSTRAINED_DIR = DATA_DIR / "unconstrained"
-MULTIFIDELITY_DIR = DATA_DIR / "multifidelity"
+
+def _example_data_dir(group):
+    """
+    Directory of a group of the "postprocessing" dataset, also used by the tutorial.
+
+    The dataset is downloaded once and cached. The tests that need it are skipped if it is not available (offline).
+    """
+    try:
+        return download_dataset("postprocessing", verbose=False) / group
+    except RuntimeError as e:
+        raise unittest.SkipTest(f"example data not available: {e}")
 
 
 def _df(f0, iters=None, rscv=None, fidelity=None, budget=None, time=None, n_dim=2):
@@ -826,11 +833,10 @@ def _check_profiles(test, data):
             test.assertTrue(np.all(np.diff(p["ratio"]) >= 0))
 
 
-@unittest.skipUnless(UNCONSTRAINED_DIR.is_dir(), "unconstrained example data not found")
 class TestUnconstrainedExampleData(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.data, cls.report = load_data(str(UNCONSTRAINED_DIR))
+        cls.data, cls.report = load_data(str(_example_data_dir("unconstrained")))
 
     def test_data_is_valid(self):
         self.assertTrue(self.report.is_valid)
@@ -886,11 +892,10 @@ class TestUnconstrainedExampleData(unittest.TestCase):
                     self.assertTrue(np.all(c["min"] <= c["max"]))
 
 
-@unittest.skipUnless(MULTIFIDELITY_DIR.is_dir(), "multifidelity example data not found")
 class TestMultifidelityExampleData(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.data, cls.report = load_data(str(MULTIFIDELITY_DIR))
+        cls.data, cls.report = load_data(str(_example_data_dir("multifidelity")))
 
     def test_data_is_valid(self):
         self.assertTrue(self.report.is_valid)
