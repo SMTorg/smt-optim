@@ -78,7 +78,22 @@ class MFSEGO(AcquisitionStrategy):
     SMT's MFK model must be used.
     """
 
-    def __init__(self, state: State, **kwargs):
+    def __init__(self, state: State,
+                 acq_func = log_ei, # expected_improvement, log_ei
+                 fmin_crit: str =  "min_rscv", # broken -> to be removed (min_rscv, fmin, mean_rscv)
+                 n_start: int | None = None,
+                 fidelity_crit: str = "obj-only", # obj-only, average, optimistic, pessimistic
+                 select_fidelity: bool = True,
+                 min_rscv_first: bool = False,
+                 filter_rscv: bool = False,
+                 optimize_best: bool = False,
+                 relax_constraints: float = 0.,
+                 cr_override: list[float] | None = None,
+                 sp_method: str = "SLSQP",
+                 sp_tol: float = np.sqrt(np.finfo(float).eps),
+                 var_red_corr: str | None = None,
+                 seed = None,
+                 **kwargs):
         """
         Initialize the MFSEGO acquisition strategy.
 
@@ -97,34 +112,21 @@ class MFSEGO(AcquisitionStrategy):
         """
         super().__init__()
 
-        self.acq_context = state
-        self.acq_func = kwargs.pop("acq_func", log_ei)  # expected_improvement, log_ei
-        self.fmin_crit = kwargs.pop(
-            "fmin_crit", "min_rscv"
-        )  # broken -> to be removed (min_rscv, fmin, mean_rscv)
+        self.state = state
+        self.acq_func = acq_func
+        self.fmin_crit = fmin_crit
         # self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
-        self.n_start = kwargs.pop("n_start", None)  # optimizer multistart
-        self.fidelity_crit = kwargs.pop(
-            "fidelity_crit", "obj-only"
-        )  # obj-only, average, optimistic, pessimistic
-        self.select_fidelity = kwargs.pop(
-            "select_fidelity", True
-        )  # if set to False, will always sample (LF+HF)
-        self.min_rscv_first = kwargs.pop("min_rscv_first", False)
-        self.filter_rscv = kwargs.pop("filter_rscv", False)
-        self.optimize_best = kwargs.pop("optimize_best", False)
-        self.relax_constraints = kwargs.pop("relax_constraints", 0.0)
-        self.cr_override = kwargs.pop(
-            "cr_override", None
-        )  # override optimizer Cost Ratio
-        self.sp_method = kwargs.pop("sp_method", "SLSQP")  # SciPy optimizer method
-        self.sp_tol = kwargs.pop(
-            "sp_tol", np.sqrt(np.finfo(float).eps)
-        )  # SciPy optimizer tolerance
-        self.var_red_corr = kwargs.pop(
-            "var_red_corr", None
-        )  # Variance reduction correction scheme
-
+        self.n_start = n_start  # optimizer multistart
+        self.fidelity_crit = fidelity_crit  # obj-only, average, optimistic, pessimistic
+        self.select_fidelity = select_fidelity # if set to False, will always sample (LF+HF)
+        self.min_rscv_first = min_rscv_first
+        self.filter_rscv = filter_rscv
+        self.optimize_best = optimize_best
+        self.relax_constraints = relax_constraints
+        self.cr_override = cr_override  # override optimizer Cost Ratio
+        self.sp_method = sp_method  # SciPy optimizer method
+        self.sp_tol = sp_tol # SciPy optimizer tolerance
+        self.var_red_corr = var_red_corr # Variance reduction correction scheme
         self.seed = kwargs.pop("seed", None)
 
         if kwargs:
@@ -135,12 +137,12 @@ class MFSEGO(AcquisitionStrategy):
 
         self.fmin: float | None = None  # current best feasible objective value
 
-    def validate_config(self, acq_context: State) -> None:
+    def validate_config(self, state: State) -> None:
 
-        if acq_context.problem.num_obj > 1:
+        if state.problem.num_obj > 1:
             raise Exception("Multi-objective not implemented.")
 
-        if not isinstance(acq_context.design_space, np.ndarray):
+        if not isinstance(state.design_space, np.ndarray):
             raise Exception("Design space must be a numpy array.")
 
         obj_required_methods = [
@@ -149,25 +151,25 @@ class MFSEGO(AcquisitionStrategy):
         ]
 
         for method in obj_required_methods:
-            if not callable(getattr(acq_context.obj_models[0], method, None)):
+            if not callable(getattr(state.obj_models[0], method, None)):
                 raise TypeError(f"Objective model requires: '{method}' method.")
 
         cstr_required_methods = [
             "predict_values",
         ]
 
-        for c_id in range(acq_context.problem.num_cstr):
+        for c_id in range(state.problem.num_cstr):
             for method in cstr_required_methods:
-                if not callable(getattr(acq_context.cstr_models[c_id], method, None)):
+                if not callable(getattr(state.cstr_models[c_id], method, None)):
                     raise TypeError(f"Constraint model requires: '{method}' method.")
 
-    def get_infill(self, acq_context: State) -> list[np.ndarray]:
+    def get_infill(self, state: State) -> list[np.ndarray]:
         """
         Compute the next infill point(s) using the acquisition strategy.
 
         Parameters
         ----------
-        acq_context : State
+        state : State
             Current optimization state, including surrogate models and data.
 
         Returns
@@ -190,18 +192,18 @@ class MFSEGO(AcquisitionStrategy):
         acq_data = dict()
 
         # gets the current best feasible objective value from the scaled dataset
-        best_sample = acq_context.get_best_sample(ctol=0.0, scaled=True)
+        best_sample = state.get_best_sample(ctol=0.0, scaled=True)
         self.fmin = best_sample.obj[0]  # mono-objective only
         acq_data["fmin"] = self.fmin
 
         # scipy objective wrapper
-        scipy_obj = self.build_scipy_objective(acq_context)
+        scipy_obj = self.build_scipy_objective(state)
 
         # scipy constraint wrapper (for scipy, the feasible domain is g >= 0)
-        scipy_cstr = self.build_scipy_constraints(acq_context)
+        scipy_cstr = self.build_scipy_constraints(state)
 
         mix_var = False
-        for dv in acq_context.problem.design_space.design_variables:
+        for dv in state.problem.design_space.design_variables:
             if not isinstance(dv, ds.FloatVariable):
                 mix_var = True
                 break
@@ -213,7 +215,7 @@ class MFSEGO(AcquisitionStrategy):
             # multi_x0 = self.generate_multistart_points(optimizer)
             # TODO: initialize sampler in init class method
             sampler = stats.qmc.LatinHypercube(
-                d=acq_context.problem.num_dim, rng=acq_context.iter
+                d=state.problem.num_dim, rng=state.iter
             )
             multi_x0 = sampler.random(self.n_start)
             gen_t1 = perf_counter()
@@ -221,7 +223,7 @@ class MFSEGO(AcquisitionStrategy):
 
             res = multistart_minimize(
                 scipy_obj,
-                bounds=np.array([[0, 1]] * acq_context.problem.num_dim),
+                bounds=np.array([[0, 1]] * state.problem.num_dim),
                 multi_x0=multi_x0,
                 constraints=scipy_cstr,
                 seed=self.seed,
@@ -231,7 +233,7 @@ class MFSEGO(AcquisitionStrategy):
         else:
             res = mixvar_multistart_minimize(
                 scipy_obj,
-                design_space=acq_context.problem.design_space,
+                design_space=state.problem.design_space,
                 constraints=scipy_cstr,
                 n_start=self.n_start,
                 method=self.sp_method,
@@ -244,11 +246,11 @@ class MFSEGO(AcquisitionStrategy):
 
         # selects highest fidelity level to sample
         fid_crit_t0 = perf_counter()
-        level = self.get_fidelity(next_x.reshape(1, -1), acq_context)[0]
+        level = self.get_fidelity(next_x.reshape(1, -1), state)[0]
 
         # keeps the DoE nested -> requests sampling all lower fidelity levels
         infills = []
-        for lvl in range(acq_context.problem.num_fidelity):
+        for lvl in range(state.problem.num_fidelity):
             if lvl <= level:
                 infills.append(next_x.copy().reshape(1, -1))
             else:
@@ -257,16 +259,16 @@ class MFSEGO(AcquisitionStrategy):
         fid_crit_t1 = perf_counter()
         acq_data["fid_crit_time"] = fid_crit_t1 - fid_crit_t0
 
-        acq_context.iter_log["acquisition"] = acq_data
+        state.iter_log["acquisition"] = acq_data
 
         return infills
 
-    def build_scipy_objective(self, acq_context: State) -> Callable:
+    def build_scipy_objective(self, state: State) -> Callable:
 
         def scipy_acq_func(x):
             x = x.reshape(1, -1)
-            mu = acq_context.obj_models[0].predict_values(x).item()
-            s2 = acq_context.obj_models[0].predict_variances(x).item()
+            mu = state.obj_models[0].predict_values(x).item()
+            s2 = state.obj_models[0].predict_variances(x).item()
             return -float(self.acq_func(mu, s2, self.fmin))
 
         return scipy_acq_func
