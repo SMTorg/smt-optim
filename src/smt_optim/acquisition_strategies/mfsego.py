@@ -18,6 +18,22 @@ from smt_optim.subsolvers.multistart import mixvar_multistart_minimize
 
 from smt_optim.subsolvers import multistart_minimize
 
+# TODO: move to acquisition_functions/base.py
+AcqFunc = Callable[[np.ndarray], np.ndarray]    # (n, d) -> (n, 1), higher is better
+AcqInit = Callable[[State], AcqFunc]
+
+def legacy_acq_init(acq_func):
+    def init(state):
+        fmin = state.get_best_sample(ctol=0.0, scaled=True).obj[0]
+        model = state.obj_models[0]
+        def acq(x):
+            mu = model.predict_values(x)
+            s2 = model.predict_variances(x)
+            return np.array([[acq_func(m, v, fmin)] for m, v in zip(mu.ravel(), s2.ravel())])
+        return acq
+    return init
+
+
 
 class MFSEGO(AcquisitionStrategy):
     """
@@ -95,7 +111,8 @@ class MFSEGO(AcquisitionStrategy):
     """
 
     def __init__(self, state: State,
-                 acq_func: Callable[[float, float, float], float] = log_ei, # expected_improvement, log_ei
+                 acq_func: AcqFunc = log_ei, # expected_improvement, log_ei
+                 acq_init: AcqInit = None,
                  fmin_crit: str =  "min_rscv", # broken -> to be removed (min_rscv, fmin, mean_rscv)
                  n_start: int | None = None,
                  fidelity_crit: str = "obj-only", # obj-only, average, optimistic, pessimistic
@@ -130,7 +147,8 @@ class MFSEGO(AcquisitionStrategy):
         super().__init__()
 
         self.state = state
-        self.acq_func = acq_func
+        # self.acq_func = acq_func
+        self.acq_init = acq_init if acq_init is not None else legacy_acq_init(acq_func)
         self.fmin_crit = fmin_crit
         self.n_start = n_start  # optimizer multistart
         self.fidelity_crit = fidelity_crit  # obj-only, average, optimistic, pessimistic
@@ -281,13 +299,17 @@ class MFSEGO(AcquisitionStrategy):
 
     def build_scipy_objective(self, state: State) -> Callable:
 
-        def scipy_acq_func(x):
-            x = x.reshape(1, -1)
-            mu = state.obj_models[0].predict_values(x).item()
-            s2 = state.obj_models[0].predict_variances(x).item()
-            return -float(self.acq_func(mu, s2, self.fmin))
+        # def scipy_acq_func(x):
+        #     x = x.reshape(1, -1)
+        #     mu = state.obj_models[0].predict_values(x).item()
+        #     s2 = state.obj_models[0].predict_variances(x).item()
+        #     return -float(self.acq_func(mu, s2, self.fmin))
+        #
+        # return scipy_acq_func
 
-        return scipy_acq_func
+        acq = self.acq_init(state)
+        return lambda x: -float(acq(x.reshape(1, -1)).item())
+
 
     def build_scipy_constraints(self, state: State) -> list[dict]:
         return build_scipy_constraints(state, self.relax_constraints)
