@@ -19,20 +19,25 @@ from smt_optim.subsolvers.multistart import mixvar_multistart_minimize
 from smt_optim.subsolvers import multistart_minimize
 
 # TODO: move to acquisition_functions/base.py
-AcqFunc = Callable[[np.ndarray], np.ndarray]    # (n, d) -> (n, 1), higher is better
+AcqFunc = Callable[[np.ndarray], np.ndarray]  # (n, d) -> (n, 1), higher is better
 AcqInit = Callable[[State], AcqFunc]
+
 
 def legacy_acq_init(acq_func):
     def init(state):
         fmin = state.get_best_sample(ctol=0.0, scaled=True).obj[0]
         model = state.obj_models[0]
+
         def acq(x):
             mu = model.predict_values(x)
             s2 = model.predict_variances(x)
-            return np.array([[acq_func(m, v, fmin)] for m, v in zip(mu.ravel(), s2.ravel())])
-        return acq
-    return init
+            return np.array(
+                [[acq_func(m, v, fmin)] for m, v in zip(mu.ravel(), s2.ravel())]
+            )
 
+        return acq
+
+    return init
 
 
 class SEGO(AcquisitionStrategy):
@@ -117,23 +122,28 @@ class SEGO(AcquisitionStrategy):
     SMT's MFK model must be used.
     """
 
-    def __init__(self, state: State,
-                 acq_func: Callable[[float, float, float], float] = log_ei, # expected_improvement, log_ei
-                 acq_init: AcqInit | None = None,
-                 fmin_crit: str =  "min_rscv", # broken -> to be removed (min_rscv, fmin, mean_rscv)
-                 n_start: int | None = None,
-                 fidelity_crit: str = "obj-only", # obj-only, average, optimistic, pessimistic
-                 select_fidelity: bool = True,
-                 min_rscv_first: bool = False,
-                 filter_rscv: bool = False,
-                 optimize_best: bool = False,
-                 relax_constraints: float = 0.,
-                 cr_override: list[float] | None = None,
-                 sp_method: str = "SLSQP",
-                 sp_tol: float = np.sqrt(np.finfo(float).eps),
-                 var_red_corr: str | None = None,
-                 seed: int | None = None,
-                 **kwargs):
+    def __init__(
+        self,
+        state: State,
+        acq_func: Callable[
+            [float, float, float], float
+        ] = log_ei,  # expected_improvement, log_ei
+        acq_init: AcqInit | None = None,
+        fmin_crit: str = "min_rscv",  # broken -> to be removed (min_rscv, fmin, mean_rscv)
+        n_start: int | None = None,
+        fidelity_crit: str = "obj-only",  # obj-only, average, optimistic, pessimistic
+        select_fidelity: bool = True,
+        min_rscv_first: bool = False,
+        filter_rscv: bool = False,
+        optimize_best: bool = False,
+        relax_constraints: float = 0.0,
+        cr_override: list[float] | None = None,
+        sp_method: str = "SLSQP",
+        sp_tol: float = np.sqrt(np.finfo(float).eps),
+        var_red_corr: str | None = None,
+        seed: int | None = None,
+        **kwargs,
+    ):
         """
         Initialize the SEGO acquisition strategy.
 
@@ -158,15 +168,17 @@ class SEGO(AcquisitionStrategy):
         self.fmin_crit = fmin_crit
         self.n_start = n_start  # optimizer multistart
         self.fidelity_crit = fidelity_crit  # obj-only, average, optimistic, pessimistic
-        self.select_fidelity = select_fidelity # if set to False, will always sample (LF+HF)
+        self.select_fidelity = (
+            select_fidelity  # if set to False, will always sample (LF+HF)
+        )
         self.min_rscv_first = min_rscv_first
         self.filter_rscv = filter_rscv
         self.optimize_best = optimize_best
         self.relax_constraints = relax_constraints
         self.cr_override = cr_override  # override optimizer Cost Ratio
         self.sp_method = sp_method  # SciPy optimizer method
-        self.sp_tol = sp_tol # SciPy optimizer tolerance
-        self.var_red_corr = var_red_corr # Variance reduction correction scheme
+        self.sp_tol = sp_tol  # SciPy optimizer tolerance
+        self.var_red_corr = var_red_corr  # Variance reduction correction scheme
         self.seed = seed
 
         if kwargs:
@@ -214,15 +226,16 @@ class SEGO(AcquisitionStrategy):
 
         Returns
         -------
-        list of ndarray
-            List of selected infill points. Each entry corresponds to a point
-            (and potentially a fidelity level, depending on configuration).
+        list of ndarray or None
+            One entry per fidelity level. Entry `l` is an array of shape (num_points_l, num_dim)
+            with the points to sample at level `l`, or None if no point is sampled at that level.
+            A point whose selected level is `L` is requested at all levels `0, ..., L` (nested DoE).
 
         Notes
         -----
         This method:
-        - Optimizes the acquisition function using a multistart strategy
-        - Applies the selected fidelity criterion if `select_fidelity=True`
+        - Gets the infill location(s) of shape (num_points, num_dim) from `get_location`
+        - Applies the selected fidelity criterion to each point if `select_fidelity=True`
         - Uses SciPy optimizers (controlled via `sp_method`, `sp_tol`)
         """
 
@@ -236,17 +249,25 @@ class SEGO(AcquisitionStrategy):
         self.fmin = best_sample.obj[0]  # mono-objective only
         acq_data["fmin"] = self.fmin
 
-        next_x = self.get_location(state)
+        # infill location(s) of shape (num_points, num_dim)
+        next_x = np.asarray(self.get_location(state))
+        if next_x.ndim != 2 or next_x.shape[1] != state.problem.num_dim:
+            raise ValueError(
+                f"`get_location` must return an array of shape (num_points, {state.problem.num_dim}), "
+                f"got {next_x.shape}."
+            )
 
-        # selects highest fidelity level to sample
+        # selects highest fidelity level to sample for each point
         fid_crit_t0 = perf_counter()
-        level = self.get_fidelity(next_x.reshape(1, -1), state)[0]
+        levels = np.asarray(self.get_fidelity(next_x, state))
 
         # keeps the DoE nested -> requests sampling all lower fidelity levels
+        # (a point sampled at level `l` is also requested at every level below `l`)
         infills = []
         for lvl in range(state.problem.num_fidelity):
-            if lvl <= level:
-                infills.append(next_x.copy().reshape(1, -1))
+            mask = levels >= lvl
+            if np.any(mask):
+                infills.append(next_x[mask].copy())
             else:
                 infills.append(None)
 
@@ -300,8 +321,9 @@ class SEGO(AcquisitionStrategy):
         Returns
         -------
         np.ndarray of shape (num_points, num_dim)
-            Location(s) in the scaled design space. This implementation returns a single
-            point, i.e. `num_points = 1`.
+            Location(s) in the scaled design space. `get_infill` requires this 2D shape, so
+            subclasses (e.g., batch strategies) only need to override this method to reuse the
+            fidelity selection. This implementation returns a single point, i.e. `num_points = 1`.
 
         Notes
         -----
@@ -329,9 +351,7 @@ class SEGO(AcquisitionStrategy):
             gen_t0 = perf_counter()
             # multi_x0 = self.generate_multistart_points(optimizer)
             # TODO: initialize sampler in init class method
-            sampler = stats.qmc.LatinHypercube(
-                d=state.problem.num_dim, rng=state.iter
-            )
+            sampler = stats.qmc.LatinHypercube(d=state.problem.num_dim, rng=state.iter)
             multi_x0 = sampler.random(self.n_start)
             gen_t1 = perf_counter()
             acq_log["generate_init_points_time"] = gen_t1 - gen_t0
@@ -365,7 +385,7 @@ class SEGO(AcquisitionStrategy):
 
         Parameters
         ----------
-        next_x : np.ndarray
+        next_x : np.ndarray of shape (num_points, num_dim)
             The point(s) to sample at.
         state : State
             The current optimization state.
@@ -373,8 +393,9 @@ class SEGO(AcquisitionStrategy):
         Returns
         -------
         levels : list[int] or array of int
-            The selected fidelity level(s). If `state.problem.num_fidelity` is 1, returns the single fidelity level;
-            otherwise, returns a list of fidelity levels, one for each point in `next_x`.
+            The selected fidelity level of each point in `next_x` (length `num_points`). If
+            `state.problem.num_fidelity` is 1 or `select_fidelity` is False, every point gets the
+            highest fidelity level.
 
         Notes
         -----

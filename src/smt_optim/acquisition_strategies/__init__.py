@@ -1,6 +1,7 @@
 from .base import AcquisitionStrategy
 from .sego import SEGO
 from .mfsego import MFSEGO  # backward compatibility alias of SEGO
+from .qsego import qSEGO
 from .vfpi import VFPI
 from .mosego import MOSEGO
 from .bisego import BiSEGO
@@ -10,6 +11,7 @@ __all__ = [
     "AcquisitionStrategy",
     "SEGO",
     "MFSEGO",
+    "qSEGO",
     "VFPI",
     "MOSEGO",
     "BiSEGO",
