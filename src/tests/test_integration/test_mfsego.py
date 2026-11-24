@@ -15,8 +15,8 @@ from smt_optim.core import (
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
-from smt_optim.acquisition_strategies import MFSEGO
-from smt_optim.acquisition_strategies.mfsego import compute_sigma2_red
+from smt_optim.acquisition_strategies import SEGO
+from smt_optim.acquisition_strategies.sego import compute_sigma2_red
 
 
 def branin_forrester(x):
@@ -113,7 +113,7 @@ class TestOptimization(unittest.TestCase):
         optimizer = Driver(
             problem=problem,
             config=opt_config,
-            strategy=MFSEGO,
+            strategy=SEGO,
         )
 
         state = optimizer.optimize()
@@ -162,7 +162,7 @@ class TestOptimization(unittest.TestCase):
             optimizer = Driver(
                 problem=problem,
                 config=opt_config,
-                strategy=MFSEGO,
+                strategy=SEGO,
                 strategy_kwargs={
                     "fidelity_crit": fid_crit,
                 },
@@ -200,7 +200,7 @@ class TestOptimization(unittest.TestCase):
         state = State(problem)
         state.obj_models[0].model = model
 
-        mfsego = MFSEGO(state)
+        mfsego = SEGO(state)
 
         next_x = np.array([[5]])
         level = mfsego.get_fidelity(next_x, state)[0]
@@ -237,7 +237,7 @@ class TestOptimization(unittest.TestCase):
         state = State(problem)
         state.obj_models[0].model = model
 
-        # mfsego = MFSEGO(state)
+        # mfsego = SEGO(state)
 
         x_valid = np.linspace(0, 10, 101)
 

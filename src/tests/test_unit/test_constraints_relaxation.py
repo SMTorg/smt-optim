@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from smt_optim.acquisition_strategies.mfsego import build_scipy_constraints
+from smt_optim.acquisition_strategies.sego import build_scipy_constraints
 from dataclasses import dataclass
 
 

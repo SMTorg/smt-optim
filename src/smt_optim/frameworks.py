@@ -12,7 +12,7 @@ from smt_optim.core import (
     State,
 )
 from smt_optim.surrogate_models.smt import SmtAutoModel, SmtGPX, SmtMFCK
-from smt_optim.acquisition_strategies import MFSEGO, VFPI
+from smt_optim.acquisition_strategies import SEGO, VFPI
 
 
 def minimize(
@@ -69,7 +69,7 @@ def minimize(
     """
 
     if method is None:
-        strategy = MFSEGO
+        strategy = SEGO
 
         if isinstance(design_space, ds.DesignSpace):
             mix_var = True
@@ -91,9 +91,9 @@ def minimize(
 
     else:
         methods = {
-            "ego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
-            "sego": dict(surrogate=SmtAutoModel, strategy=MFSEGO, costs=[1]),
-            "mfsego": dict(surrogate=SmtAutoModel, strategy=MFSEGO),
+            "ego": dict(surrogate=SmtAutoModel, strategy=SEGO, costs=[1]),
+            "sego": dict(surrogate=SmtAutoModel, strategy=SEGO, costs=[1]),
+            "mfsego": dict(surrogate=SmtAutoModel, strategy=SEGO),
             "vfpi": dict(surrogate=SmtMFCK, strategy=VFPI),
         }
 

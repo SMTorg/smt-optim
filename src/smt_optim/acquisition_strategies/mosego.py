@@ -18,7 +18,7 @@ from smt_optim.subsolvers import multistart_minimize
 
 from smt_optim.acquisition_functions import init_ehvi_2o
 
-from smt_optim.acquisition_strategies.mfsego import (
+from smt_optim.acquisition_strategies.sego import (
     build_scipy_constraints,
     select_fidelity_level,
 )
