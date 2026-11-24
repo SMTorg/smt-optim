@@ -49,24 +49,40 @@ class MFSEGO(AcquisitionStrategy):
     ----------
     state : State
         Optimization state containing surrogate models, data, and problem definition.
-
-    Other Parameters
-    ----------------
-    acq_func: callable, optional
-        Acquisition function used to rank candidate points (default: log_ei).
-    n_start: int, optional
-        Number of multistart initializations for the inner optimizer. Default: 20.
-    fidelity_crit: {"obj-only", "average", "optimistic", "pessimistic"}, optional
-        Strategy used to select fidelity level.
-    select_fidelity: bool, optional
-        If False, always evaluate all fidelity levels.
-    sp_method: str, optional
-        Optimization method passed to SciPy (e.g., "SLSQP", "COBYLA"). Default = "SLSQP".
-    sp_tol: float, optional
-        Tolerance for the SciPy optimizer. Default = sqrt(machine epsilon).
-    relax_constraints: float, optional
+    acq_func : callable, optional
+        Acquisition function ``f(mu, s2, fmin)`` used to rank candidate points
+        (e.g., ``expected_improvement``, ``log_ei``). Default: ``log_ei``.
+    fmin_crit : {"min_rscv", "fmin", "mean_rscv"}, optional
+        Criterion used to define the incumbent value. Currently broken and scheduled for
+        removal; it is stored but not used by this class. Default: "min_rscv".
+    n_start : int or None, optional
+        Number of multistart initializations for the inner optimizer. If None, defaults to 20.
+    fidelity_crit : {"obj-only", "average", "optimistic", "pessimistic"}, optional
+        Strategy used to select the fidelity level. Default: "obj-only".
+    select_fidelity : bool, optional
+        If False, always evaluate all fidelity levels (LF + HF). Default: True.
+    min_rscv_first : bool, optional
+        Stored but not currently used by this class. Default: False.
+    filter_rscv : bool, optional
+        Stored but not currently used by this class. Default: False.
+    optimize_best : bool, optional
+        Stored but not currently used by this class. Default: False.
+    relax_constraints : float, optional
         Margin multiplier to relax the constraints using the variance predicted by the surrogate models (relax * sigma).
-        Default is 0.0 (no relaxation).
+        Default: 0.0 (no relaxation).
+    cr_override : list of float or None, optional
+        Overrides the problem's cost ratios (per-level costs) used for fidelity selection. Default: None.
+    sp_method : str, optional
+        Optimization method passed to SciPy (e.g., "SLSQP", "COBYLA"). Default: "SLSQP".
+    sp_tol : float, optional
+        Tolerance for the SciPy optimizer. Default: sqrt(machine epsilon).
+    var_red_corr : {None, "max", "closest"}, optional
+        Variance reduction correction scheme for ill-conditioned MFK models
+        (see `corrected_predict_variances_all_levels`). Default: None (no correction).
+    seed : int or None, optional
+        Random seed for the multistart optimizer. Incremented at every call of `get_infill`. Default: None.
+    **kwargs
+        Not accepted. Any unexpected keyword argument raises a ``TypeError``.
 
     Notes
     -----
@@ -79,7 +95,7 @@ class MFSEGO(AcquisitionStrategy):
     """
 
     def __init__(self, state: State,
-                 acq_func = log_ei, # expected_improvement, log_ei
+                 acq_func: Callable[[float, float, float], float] = log_ei, # expected_improvement, log_ei
                  fmin_crit: str =  "min_rscv", # broken -> to be removed (min_rscv, fmin, mean_rscv)
                  n_start: int | None = None,
                  fidelity_crit: str = "obj-only", # obj-only, average, optimistic, pessimistic
@@ -92,7 +108,7 @@ class MFSEGO(AcquisitionStrategy):
                  sp_method: str = "SLSQP",
                  sp_tol: float = np.sqrt(np.finfo(float).eps),
                  var_red_corr: str | None = None,
-                 seed = None,
+                 seed: int | None = None,
                  **kwargs):
         """
         Initialize the MFSEGO acquisition strategy.
@@ -102,8 +118,9 @@ class MFSEGO(AcquisitionStrategy):
         state : State
             Optimization state.
 
-        **kwargs
-            Optional configuration parameters. See class docstring for full list.
+        Other parameters
+        ----------------
+        All keyword parameters are documented in the class docstring.
 
         Raises
         ------
@@ -115,7 +132,6 @@ class MFSEGO(AcquisitionStrategy):
         self.state = state
         self.acq_func = acq_func
         self.fmin_crit = fmin_crit
-        # self.sub_optimizer = kwargs.pop("sub_optimizer", "COBYLA")
         self.n_start = n_start  # optimizer multistart
         self.fidelity_crit = fidelity_crit  # obj-only, average, optimistic, pessimistic
         self.select_fidelity = select_fidelity # if set to False, will always sample (LF+HF)
@@ -127,7 +143,7 @@ class MFSEGO(AcquisitionStrategy):
         self.sp_method = sp_method  # SciPy optimizer method
         self.sp_tol = sp_tol # SciPy optimizer tolerance
         self.var_red_corr = var_red_corr # Variance reduction correction scheme
-        self.seed = kwargs.pop("seed", None)
+        self.seed = seed
 
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
