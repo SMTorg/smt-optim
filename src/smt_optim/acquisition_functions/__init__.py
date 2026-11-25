@@ -14,6 +14,7 @@ from .ehvi import init_ehvi_2o
 from .mpi import init_mpi
 from .composite_expected_improvement import init_bi_obj_composite_ei
 from .bi_acquisition import init_bi_acquisition, negate
+from .q_log_expected_improvement import q_log_ei
 
 __all__ = [
     "expected_improvement",
@@ -31,4 +32,5 @@ __all__ = [
     "negate",
     "init_mean",
     "init_ivr",
+    "q_log_ei",
 ]

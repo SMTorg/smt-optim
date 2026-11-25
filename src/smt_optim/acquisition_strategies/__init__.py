@@ -4,6 +4,7 @@ from .vfpi import VFPI
 from .mosego import MOSEGO
 from .bisego import BiSEGO
 from .qpgp import qPGP
+from .qlogei import qLogEI
 
 __all__ = [
     "AcquisitionStrategy",
@@ -12,4 +13,5 @@ __all__ = [
     "MOSEGO",
     "BiSEGO",
     "qPGP",
+    "qLogEI",
 ]
