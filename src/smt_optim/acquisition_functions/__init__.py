@@ -5,10 +5,15 @@ from .probability_improvement import (
     log_pi,
 )
 from .fidelity_correlation import fidelity_correlation
-from .integrated_variance_reduction import integrated_variance_reduction
+from .integrated_variance_reduction import (
+    integrated_variance_reduction,
+    init_ivr,
+)
+from .mean import init_mean
 from .ehvi import init_ehvi_2o
 from .mpi import init_mpi
 from .composite_expected_improvement import init_bi_obj_composite_ei
+from .bi_acquisition import init_bi_acquisition, negate
 from .q_log_expected_improvement import q_log_ei
 
 __all__ = [
@@ -23,5 +28,9 @@ __all__ = [
     "init_ehvi_2o",
     "init_mpi",
     "init_bi_obj_composite_ei",
+    "init_bi_acquisition",
+    "negate",
+    "init_mean",
+    "init_ivr",
     "q_log_ei",
 ]

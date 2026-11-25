@@ -20,8 +20,9 @@ classifiers = [
 dependencies = [
     "numpy>=2.4.0",
     "scipy>=1.17.0",
-    "smt[gpx]>=2.14.1",
+    "smt[gpx]>=2.15.1",
     "pymoo>=0.6.1.6",
+    "pandas>=2.2.2",
 ]
 
 license = "Apache-2.0"
@@ -39,4 +40,4 @@ dev = [
 ]
 
 [tool.ruff]
-exclude = ["*.ipynb"]
+extend-exclude = ["*.ipynb"]
