@@ -1,3 +1,4 @@
+from .base import AcqFunc, AcqInit, legacy_acq_init
 from .expected_improvement import expected_improvement, vec_expected_improvement, log_ei
 from .probability_improvement import (
     probability_of_improvement,
@@ -16,6 +17,9 @@ from .composite_expected_improvement import init_bi_obj_composite_ei
 from .bi_acquisition import init_bi_acquisition, negate
 
 __all__ = [
+    "AcqFunc",
+    "AcqInit",
+    "legacy_acq_init",
     "expected_improvement",
     "vec_expected_improvement",
     "log_ei",

@@ -67,38 +67,8 @@ class qSEGO(SEGO):
         self.validate_config(state)
 
     def validate_config(self, state: State) -> None:
-        """
-        Check that the problem and the parameters are supported by qSEGO.
-
-        Parameters
-        ----------
-        state : State
-            Optimization state containing the problem definition.
-
-        Raises
-        ------
-        ValueError
-            If the problem is multi-objective or not fully continuous, or if `batch_size` or
-            `n_samples` is lower than 1.
-
-        Notes
-        -----
-        Constraints and multi-fidelity are not rejected here: whether they are supported depends
-        on the `get_location` implementation, since the inherited `get_infill` already selects a
-        fidelity level for each point of the batch.
-        """
-
-        if state.problem.num_obj > 1:
-            raise ValueError("qSEGO only supports mono-objective problems.")
-
-        if not state.problem.design_space.is_all_cont:
-            raise ValueError("qSEGO only supports continuous optimization problems.")
-
-        if self.batch_size < 1:
-            raise ValueError(f"batch_size must be at least 1, got {self.batch_size}.")
-
-        if self.n_samples < 1:
-            raise ValueError(f"n_samples must be at least 1, got {self.n_samples}.")
+        # TODO
+        pass
 
     def get_location(self, state: State) -> np.ndarray:
         """

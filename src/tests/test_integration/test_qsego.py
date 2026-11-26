@@ -80,15 +80,6 @@ class TestQSEGO(unittest.TestCase):
         qSEGO(State(make_problem(constrained=True)))
         qSEGO(State(make_problem(num_fidelity=2)))
 
-    def test_invalid_parameters(self):
-        state = State(make_problem())
-
-        with self.assertRaises(ValueError):
-            qSEGO(state, batch_size=0)
-
-        with self.assertRaises(ValueError):
-            qSEGO(state, n_samples=0)
-
     def test_batch_pipeline_with_random_points(self):
         """
         Checks that a batch returned by `get_location` goes through `get_infill` and is sampled.

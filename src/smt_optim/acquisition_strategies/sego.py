@@ -15,29 +15,9 @@ from smt_optim.acquisition_strategies import AcquisitionStrategy
 from smt_optim.core.state import State
 from smt_optim.subsolvers.multistart import mixvar_multistart_minimize
 
-
 from smt_optim.subsolvers import multistart_minimize
 
-# TODO: move to acquisition_functions/base.py
-AcqFunc = Callable[[np.ndarray], np.ndarray]  # (n, d) -> (n, 1), higher is better
-AcqInit = Callable[[State], AcqFunc]
-
-
-def legacy_acq_init(acq_func):
-    def init(state):
-        fmin = state.get_best_sample(ctol=0.0, scaled=True).obj[0]
-        model = state.obj_models[0]
-
-        def acq(x):
-            mu = model.predict_values(x)
-            s2 = model.predict_variances(x)
-            return np.array(
-                [[acq_func(m, v, fmin)] for m, v in zip(mu.ravel(), s2.ravel())]
-            )
-
-        return acq
-
-    return init
+from smt_optim.acquisition_functions import AcqFunc, AcqInit, legacy_acq_init
 
 
 class SEGO(AcquisitionStrategy):
@@ -125,9 +105,7 @@ class SEGO(AcquisitionStrategy):
     def __init__(
         self,
         state: State,
-        acq_func: Callable[
-            [float, float, float], float
-        ] = log_ei,  # expected_improvement, log_ei
+        acq_func: AcqFunc = log_ei,  # expected_improvement, log_ei
         acq_init: AcqInit | None = None,
         fmin_crit: str = "min_rscv",  # broken -> to be removed (min_rscv, fmin, mean_rscv)
         n_start: int | None = None,
@@ -189,13 +167,15 @@ class SEGO(AcquisitionStrategy):
 
         self.fmin: float | None = None  # current best feasible objective value
 
+        self.validate_config(state)
+
     def validate_config(self, state: State) -> None:
 
         if state.problem.num_obj > 1:
             raise Exception("Multi-objective not implemented.")
 
-        if not isinstance(state.design_space, np.ndarray):
-            raise Exception("Design space must be a numpy array.")
+        if not isinstance(state.problem.design_space, ds.DesignSpace):
+            raise Exception("Design space must be a SMT Design Space.")
 
         obj_required_methods = [
             "predict_values",
