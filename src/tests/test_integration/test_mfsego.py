@@ -15,8 +15,8 @@ from smt_optim.core import (
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
-from smt_optim.acquisition_strategies import MFSEGO
-from smt_optim.acquisition_strategies.mfsego import compute_sigma2_red
+from smt_optim.acquisition_strategies import SEGO
+from smt_optim.acquisition_strategies.sego import compute_sigma2_red
 
 
 def branin_forrester(x):
@@ -113,7 +113,7 @@ class TestOptimization(unittest.TestCase):
         optimizer = Driver(
             problem=problem,
             config=opt_config,
-            strategy=MFSEGO,
+            strategy=SEGO,
         )
 
         state = optimizer.optimize()
@@ -162,7 +162,7 @@ class TestOptimization(unittest.TestCase):
             optimizer = Driver(
                 problem=problem,
                 config=opt_config,
-                strategy=MFSEGO,
+                strategy=SEGO,
                 strategy_kwargs={
                     "fidelity_crit": fid_crit,
                 },
@@ -200,7 +200,7 @@ class TestOptimization(unittest.TestCase):
         state = State(problem)
         state.obj_models[0].model = model
 
-        mfsego = MFSEGO(state)
+        mfsego = SEGO(state)
 
         next_x = np.array([[5]])
         level = mfsego.get_fidelity(next_x, state)[0]
@@ -209,6 +209,58 @@ class TestOptimization(unittest.TestCase):
         next_x = np.array([[8]])
         level = mfsego.get_fidelity(next_x, state)[0]
         self.assertEqual(level, 1)
+
+    def test_get_fidelity_multiple_points(self):
+        # LF samples: 0, 2, 4, 6, 8, 10 / HF samples: 2, 4, 6
+        x_train = [np.linspace(0, 10, 6), np.array([2, 4, 6])]
+
+        y_train = [sasena2002_lf(x_train[0]), sasena2002_hf(x_train[1])]
+
+        model = MFK(print_global=False, n_start=3, hyper_opt="Cobyla", seed=42)
+        model.set_training_values(
+            x_train[0].reshape(-1, 1), y_train[0].reshape(-1, 1), name=0
+        )
+        model.set_training_values(x_train[1].reshape(-1, 1), y_train[1].reshape(-1, 1))
+        model.train()
+
+        obj_config = ObjectiveConfig(
+            objective=[sasena2002_lf, sasena2002_hf],
+            type="minimize",
+            surrogate=SmtAutoModel,
+        )
+
+        problem = Problem(
+            obj_configs=[obj_config],
+            design_space=np.array([[0, 10]]),
+            costs=[0.2, 1],
+        )
+
+        state = State(problem)
+        state.obj_models[0].model = model
+
+        sego = SEGO(state)
+
+        # points are interleaved so that a mix-up between rows would be detected
+        lf_only_points = (0.0, 8.0, 10.0)  # LF sample but no HF sample
+        far_points = (1.0, 3.0, 5.0, 7.0, 9.0)  # midway between LF samples
+        next_x = np.array([0, 1, 8, 3, 10, 5, 9, 7], dtype=float).reshape(-1, 1)
+
+        levels = np.asarray(sego.get_fidelity(next_x, state))
+
+        # one fidelity level per query point
+        self.assertEqual(levels.shape, (next_x.shape[0],))
+
+        for x, level in zip(next_x.ravel(), levels):
+            if x in lf_only_points:
+                # an LF sample already exists -> request at least the level above
+                self.assertGreaterEqual(level, 1, msg=f"x={x}")
+            elif x in far_points:
+                # far from any sample -> request the lowest fidelity level
+                self.assertEqual(level, 0, msg=f"x={x}")
+
+        # evaluating the points together must be equivalent to evaluating them one by one
+        single_levels = [sego.get_fidelity(x.reshape(1, -1), state)[0] for x in next_x]
+        self.assertEqual(levels.tolist(), single_levels)
 
     def test_compute_sigma2_red(self):
         x_train = [np.linspace(0, 10, 6), np.array([2, 4, 6])]
@@ -237,7 +289,7 @@ class TestOptimization(unittest.TestCase):
         state = State(problem)
         state.obj_models[0].model = model
 
-        # mfsego = MFSEGO(state)
+        # mfsego = SEGO(state)
 
         x_valid = np.linspace(0, 10, 101)
 

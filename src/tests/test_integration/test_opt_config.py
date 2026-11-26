@@ -7,7 +7,7 @@ from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driv
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
-from smt_optim.acquisition_strategies import MFSEGO
+from smt_optim.acquisition_strategies import SEGO
 
 
 def func_1d(x):
@@ -80,7 +80,7 @@ class TestOptimization(unittest.TestCase):
         optimizer = Driver(
             problem=problem,
             config=opt_config,
-            strategy=MFSEGO,
+            strategy=SEGO,
         )
 
         state = optimizer.optimize()
@@ -115,7 +115,7 @@ class TestOptimization(unittest.TestCase):
             seed=42,
         )
 
-        optimizer = Driver(problem, config=opt_config, strategy=MFSEGO)
+        optimizer = Driver(problem, config=opt_config, strategy=SEGO)
         state = optimizer.optimize()
 
         doe_0 = np.empty(len(state.dataset.samples))
@@ -138,7 +138,7 @@ class TestOptimization(unittest.TestCase):
             seed=42,
         )
 
-        optimizer = Driver(problem, config=opt_config, strategy=MFSEGO)
+        optimizer = Driver(problem, config=opt_config, strategy=SEGO)
         state = optimizer.optimize()
 
         doe_1 = np.empty(len(state.dataset.samples))

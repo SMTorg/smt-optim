@@ -7,7 +7,7 @@ from smt_optim.core import ObjectiveConfig, ConstraintConfig, DriverConfig, Driv
 
 from smt_optim.surrogate_models.smt import SmtAutoModel
 
-from smt_optim.acquisition_strategies import MFSEGO
+from smt_optim.acquisition_strategies import SEGO
 
 
 def rosenbrock(x: np.ndarray) -> np.ndarray:
@@ -82,7 +82,7 @@ class TestOptimization(unittest.TestCase):
         optimizer = Driver(
             problem=problem,
             config=opt_config,
-            strategy=MFSEGO,
+            strategy=SEGO,
         )
 
         state = optimizer.optimize()
